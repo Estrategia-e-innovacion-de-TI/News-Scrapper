@@ -8,6 +8,7 @@ from typing import List, Tuple, Optional
 
 import yaml
 import pandas as pd
+from pandas.api.types import is_datetime64_any_dtype, is_datetime64tz_dtype
 from newsapi import NewsApiClient
 
 
@@ -55,6 +56,33 @@ def load_emisores_excel(path: str = "data/clientes.xlsx") -> List[Tuple[str, Opt
             continue
         emisores.append((emisor, idioma))
     return emisores
+
+
+# ---------- Normalización de fechas para IO ----------
+def prepare_frames_for_io(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Devuelve (df_excel, df_text):
+      - df_excel: datetimes naive (sin tz) para Excel
+      - df_text:  datetimes como strings ISO 'YYYY-MM-DDTHH:MM:SS' para CSV/JSONL
+    """
+    df_excel = df.copy()
+
+    # 1) Quitar tz en columnas datetime tz-aware (Excel no soporta tz)
+    for col in df_excel.columns:
+        if is_datetime64tz_dtype(df_excel[col]):
+            # si tiene tz, convertir a UTC y quitar tz
+            df_excel[col] = df_excel[col].dt.tz_convert("UTC").dt.tz_localize(None)
+        elif is_datetime64_any_dtype(df_excel[col]):
+            # asegurar dtype datetime (naive)
+            df_excel[col] = pd.to_datetime(df_excel[col], errors="coerce")
+
+    # 2) Para CSV/JSONL: formatear datetimes como texto ISO
+    df_text = df_excel.copy()
+    for col in df_text.columns:
+        if is_datetime64_any_dtype(df_text[col]):
+            df_text[col] = df_text[col].dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+    return df_excel, df_text
 
 
 # ---------- Core ----------
@@ -131,95 +159,5 @@ def fetch_news(config: dict, api_key: str) -> pd.DataFrame:
     # Normalización + dedupe
     df["titulo"] = df["titulo"].astype(str).str.strip()
     df["url"] = df["url"].astype(str).str.strip()
-    df = df.drop_duplicates(subset=["titulo", "url"], keep="first")
 
-    if "fecha_publicacion" in df.columns:
-        df["fecha_publicacion"] = pd.to_datetime(df["fecha_publicacion"], errors="coerce")
-        df = df.sort_values(by="fecha_publicacion", ascending=False, na_position="last")
-
-    return df
-
-
-def save_outputs(df: pd.DataFrame, config: dict) -> None:
-    # --- CSV y JSONL consolidados (si quieres mantenerlos) ---
-    out_cfg = config.get("output", {})
-    folder = out_cfg.get("folder", "data")
-    csv_name = out_cfg.get("csv_name", "news.csv")
-    jsonl_name = out_cfg.get("jsonl_name", "news.jsonl")
-
-    ensure_folder(folder)
-    """
-    csv_path = Path(folder) / csv_name
-    jsonl_path = Path(folder) / jsonl_name
-
-    if not df.empty:
-        # Guardar CSV consolidado (merge + dedupe)
-        if csv_path.exists():
-            old = pd.read_csv(csv_path)
-            all_df = pd.concat([old, df], ignore_index=True)
-            all_df = all_df.drop_duplicates(subset=["titulo", "url"], keep="first")
-            all_df.to_csv(csv_path, index=False, quoting=csv.QUOTE_MINIMAL)
-        else:
-            df.to_csv(csv_path, index=False, quoting=csv.QUOTE_MINIMAL)
-
-        # Guardar JSONL “append-only”
-        with open(jsonl_path, "a", encoding="utf-8") as f:
-            for _, row in df.iterrows():
-                f.write(json.dumps(row.dropna().to_dict(), ensure_ascii=False) + "\n")"""
-
-    # --- NUEVO: Excel por corrida en data/noticias/<fecha_consulta>.xlsx ---
-    excel_cfg = out_cfg.get("excel", {})
-    excel_folder = excel_cfg.get("folder", "data/noticias")
-    filename_template = excel_cfg.get("filename_template", "{fecha_consulta_hasta}.xlsx")
-
-    ensure_folder(excel_folder)
-
-    # Todas las filas comparten fecha_consulta_hasta; tomamos la primera no nula
-    fecha_consulta_hasta = None
-    if "fecha_consulta_hasta" in df.columns and not df.empty:
-        # convertir a string YYYY-MM-DD
-        try:
-            fecha_consulta_hasta = pd.to_datetime(df["fecha_consulta_hasta"].iloc[0]).date().isoformat()
-        except Exception:
-            fecha_consulta_hasta = str(df["fecha_consulta_hasta"].iloc[0])
-
-    # fallback por si viniera vacío
-    run_timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%SZ")
-    fecha_consulta_desde = None
-    if "fecha_consulta_desde" in df.columns and not df.empty:
-        try:
-            fecha_consulta_desde = pd.to_datetime(df["fecha_consulta_desde"].iloc[0]).date().isoformat()
-        except Exception:
-            fecha_consulta_desde = str(df["fecha_consulta_desde"].iloc[0])
-
-    fname = filename_template.format(
-        fecha_consulta_hasta=fecha_consulta_hasta or run_timestamp[:10],
-        fecha_consulta_desde=fecha_consulta_desde or "",
-        run_timestamp=run_timestamp
-    )
-    excel_path = Path(excel_folder) / fname
-
-    # Guardamos el DataFrame en una sola hoja "news"
-    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-        df.to_excel(writer, sheet_name="news", index=False)
-
-    print(f"✅ Guardado Excel por corrida en {excel_path}")
-    print(f"📰 Registros nuevos en esta corrida: {len(df)}")
-
-
-def main():
-    cfg = load_config()
-    api_key = os.getenv("NEWSAPI_KEY")
-    if not api_key:
-        print("ERROR: define la variable de entorno NEWSAPI_KEY (GitHub Secret o local).", file=sys.stderr)
-        sys.exit(1)
-
-    df = fetch_news(cfg, api_key)
-    if df.empty:
-        print("No se obtuvieron noticias nuevas.")
-        return
-    save_outputs(df, cfg)
-
-
-if __name__ == "__main__":
-    main()
+    # Parseo de fechas (incluye publishedAt con 'Z', que es UTC tz-aware)
