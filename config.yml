@@ -3,19 +3,20 @@ since_previous_monday: true   # true = desde el lunes anterior hasta hoy
 
 # Si se especifican dominios, se limita la búsqueda a estos (opcional)
 domains:
-  - theverge.com
-  - wired.com
-  - techcrunch.com
 
 # Idiomas por defecto si la fila del Excel no define 'Idioma'
-languages: ["es", "en"]
+languages: ["es"]
 
 # Salida
 output:
-  folder: "data"
+  folder: "data"          # (se mantiene para CSV/JSONL si los usas)
   csv_name: "news.csv"
   jsonl_name: "news.jsonl"
+  excel:                  # 👇 NUEVA sección para Excel por corrida
+    folder: "data/noticias"
+    filename_template: "{fecha_consulta_hasta}.xlsx"  # Tokens válidos: {fecha_consulta_desde}, {fecha_consulta_hasta}, {run_timestamp}
 
 # Límites
 limits:
+  per_query_page_size: 50   # <=100 por NewsAPI
   per_query_page_size: 50   # <=100 por NewsAPI

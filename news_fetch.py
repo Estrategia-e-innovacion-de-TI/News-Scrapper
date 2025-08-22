@@ -141,33 +141,70 @@ def fetch_news(config: dict, api_key: str) -> pd.DataFrame:
 
 
 def save_outputs(df: pd.DataFrame, config: dict) -> None:
+    # --- CSV y JSONL consolidados (si quieres mantenerlos) ---
     out_cfg = config.get("output", {})
     folder = out_cfg.get("folder", "data")
     csv_name = out_cfg.get("csv_name", "news.csv")
     jsonl_name = out_cfg.get("jsonl_name", "news.jsonl")
 
     ensure_folder(folder)
-
+    """
     csv_path = Path(folder) / csv_name
     jsonl_path = Path(folder) / jsonl_name
 
-    # Guardar CSV consolidado (merge + dedupe)
-    if csv_path.exists():
-        old = pd.read_csv(csv_path)
-        all_df = pd.concat([old, df], ignore_index=True)
-        all_df = all_df.drop_duplicates(subset=["titulo", "url"], keep="first")
-        all_df.to_csv(csv_path, index=False, quoting=csv.QUOTE_MINIMAL)
-    else:
-        df.to_csv(csv_path, index=False, quoting=csv.QUOTE_MINIMAL)
+    if not df.empty:
+        # Guardar CSV consolidado (merge + dedupe)
+        if csv_path.exists():
+            old = pd.read_csv(csv_path)
+            all_df = pd.concat([old, df], ignore_index=True)
+            all_df = all_df.drop_duplicates(subset=["titulo", "url"], keep="first")
+            all_df.to_csv(csv_path, index=False, quoting=csv.QUOTE_MINIMAL)
+        else:
+            df.to_csv(csv_path, index=False, quoting=csv.QUOTE_MINIMAL)
 
-    # Guardar JSONL “append-only”
-    with open(jsonl_path, "a", encoding="utf-8") as f:
-        for _, row in df.iterrows():
-            f.write(json.dumps(row.dropna().to_dict(), ensure_ascii=False) + "\\n")
+        # Guardar JSONL “append-only”
+        with open(jsonl_path, "a", encoding="utf-8") as f:
+            for _, row in df.iterrows():
+                f.write(json.dumps(row.dropna().to_dict(), ensure_ascii=False) + "\n")"""
 
-    print(f"✅ Guardado CSV en {csv_path}")
-    print(f"✅ Append JSONL en {jsonl_path}")
-    print(f"📰 Registros nuevos: {len(df)}")
+    # --- NUEVO: Excel por corrida en data/noticias/<fecha_consulta>.xlsx ---
+    excel_cfg = out_cfg.get("excel", {})
+    excel_folder = excel_cfg.get("folder", "data/noticias")
+    filename_template = excel_cfg.get("filename_template", "{fecha_consulta_hasta}.xlsx")
+
+    ensure_folder(excel_folder)
+
+    # Todas las filas comparten fecha_consulta_hasta; tomamos la primera no nula
+    fecha_consulta_hasta = None
+    if "fecha_consulta_hasta" in df.columns and not df.empty:
+        # convertir a string YYYY-MM-DD
+        try:
+            fecha_consulta_hasta = pd.to_datetime(df["fecha_consulta_hasta"].iloc[0]).date().isoformat()
+        except Exception:
+            fecha_consulta_hasta = str(df["fecha_consulta_hasta"].iloc[0])
+
+    # fallback por si viniera vacío
+    run_timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%SZ")
+    fecha_consulta_desde = None
+    if "fecha_consulta_desde" in df.columns and not df.empty:
+        try:
+            fecha_consulta_desde = pd.to_datetime(df["fecha_consulta_desde"].iloc[0]).date().isoformat()
+        except Exception:
+            fecha_consulta_desde = str(df["fecha_consulta_desde"].iloc[0])
+
+    fname = filename_template.format(
+        fecha_consulta_hasta=fecha_consulta_hasta or run_timestamp[:10],
+        fecha_consulta_desde=fecha_consulta_desde or "",
+        run_timestamp=run_timestamp
+    )
+    excel_path = Path(excel_folder) / fname
+
+    # Guardamos el DataFrame en una sola hoja "news"
+    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
+        df.to_excel(writer, sheet_name="news", index=False)
+
+    print(f"✅ Guardado Excel por corrida en {excel_path}")
+    print(f"📰 Registros nuevos en esta corrida: {len(df)}")
 
 
 def main():
