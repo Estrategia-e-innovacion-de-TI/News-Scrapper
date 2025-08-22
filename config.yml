@@ -14,7 +14,8 @@ output:
   jsonl_name: "news.jsonl"
   excel:                  # 👇 NUEVA sección para Excel por corrida
     folder: "data/noticias"
-    filename_template: "{fecha_consulta_hasta}.xlsx"  # Tokens válidos: {fecha_consulta_desde}, {fecha_consulta_hasta}, {run_timestamp}
+    #filename_template: "{fecha_consulta_hasta}.xlsx"  # Tokens válidos: {fecha_consulta_desde}, {fecha_consulta_hasta}, {run_timestamp}
+    filename_template: "{run_timestamp}.xlsx"
 
 # Límites
 limits:
