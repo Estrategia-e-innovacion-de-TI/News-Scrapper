@@ -2,8 +2,8 @@ name: Fetch News (cron)
 
 on:
   schedule:
-    # Hoy 22-08 a las 20:35 UTC (3:35 p.m. Bogotá). Se repetirá cada año si no lo quitas.
-    - cron: "35 20 22 8 *"
+    # Cada mes, día 25 a las 21:00 UTC (4:00 p.m. en Bogotá)
+    - cron: "0 21 25 * *"
   workflow_dispatch: {}
 
 
