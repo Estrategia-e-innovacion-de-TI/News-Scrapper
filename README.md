@@ -22,8 +22,7 @@ Este proyecto trae noticias desde **NewsAPI** usando como **término de búsqued
 1. **Crea un repo privado** en GitHub y sube estos archivos.
 2. En **Settings → Secrets and variables → Actions → New repository secret**, agrega:
    - `NEWSAPI_KEY` con tu API key de NewsAPI.
-3. (Opcional) Ajusta el **cron** en `.github/workflows/news-cron.yml` (está en UTC).
-4. El flujo generará/actualizará `data/news.csv` y `data/news.jsonl` con los resultados.
+3. (Opcional) Ajusta el **cron** en `.github/workflows/news-cron.yml` (está en UTC). Ejecuta cada 25 de cada mes a las 4:00 p.m.
 
 ## ✍️ Cómo **añadir o editar un Emisor** (término de búsqueda)
 
@@ -32,35 +31,22 @@ Este proyecto trae noticias desde **NewsAPI** usando como **término de búsqued
 3. Asegúrate que tenga las columnas:
    - **Emisor** (obligatoria): es el término de búsqueda que se enviará a NewsAPI.
    - **Idioma** (opcional): `es`, `en`, etc. Si se deja vacío, se usan los `languages` de `config.yml`.
-4. (Recomendado) Crea un Pull Request para que pase la validación automática (si agregas el **workflow de validación**).
+4. En la hoja Excludes, escribir la lista de dominios a excluir (opcional)
 
 ### Ejemplo de `clientes.xlsx`
 
 | Emisor                   | Idioma |
 |-------------------------|--------|
-| fraude                  | es     |
-| riesgo cibernético      | es     |
-| ransomware              | en     |
-| “Empresa X” despidos    | es     |
+| Empresa1                  | es     |
+| Empresa2      | es     |
+| Empresa4              | en     |
+| Empresa5   | es     |
 
 > Nota: Puedes usar frases entre comillas o varias palabras como término.
 
-## 🧪 Probar en local
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-
-export NEWSAPI_KEY="TU_API_KEY"  # Windows PowerShell: $env:NEWSAPI_KEY="..."
-python news_fetch.py
-```
-
-- Salida: `data/news.csv` (consolidado y deduplicado) y `data/news.jsonl` (histórico append-only).
-
 ## 🕒 Programación (GitHub Actions)
 
-El workflow `news-cron.yml` corre por cron (por defecto cada 4 horas) y también manualmente desde la pestaña **Actions**. Si hay cambios en los archivos de salida, hace commit automático a la rama.
+El workflow `news-cron.yml` corre por cron (por defecto cada 25 de cada mes a las 4:00 p.m.) y también manualmente desde la pestaña **Actions**. Si hay cambios en los archivos de salida, hace commit automático a la rama.
 
 ### Cambiar la frecuencia
 Edita el cron en el workflow (UTC). Ejemplos:
@@ -75,11 +61,3 @@ Edita el cron en el workflow (UTC). Ejemplos:
 ## 🧩 Personalizaciones útiles (opcionales)
 
 - **Filtrar por dominios** en `config.yml` (lista `domains`).
-- **Notificaciones**: enviar top-N titulares por Slack/Email post-ejecución.
-- **Validación en PR**: crear un workflow de validación de `config.yml` y `clientes.xlsx` para evitar errores.
-
----
-
-## 📄 Licencia
-
-MIT (o la que prefieras).
