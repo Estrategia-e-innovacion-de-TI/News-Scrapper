@@ -5,11 +5,24 @@ import csv
 from datetime import datetime, timedelta, date
 from pathlib import Path
 from typing import List, Tuple, Optional
+from zoneinfo import ZoneInfo  # stdlib 3.9+
+
 
 import yaml
 import pandas as pd
 from pandas.api.types import is_datetime64_any_dtype, is_datetime64tz_dtype
 from newsapi import NewsApiClient
+from urllib.parse import urlparse
+
+
+def domain_from_url(u: str) -> str:
+    try:
+        netloc = urlparse(u).netloc.lower()
+        # quitar puerto si viene (ej. "example.com:8080")
+        return netloc.split(":")[0]
+    except Exception:
+        return ""
+
 
 
 # ---------- Utilidades ----------
@@ -29,33 +42,154 @@ def iso(dt) -> str:
         return dt.isoformat()
     return str(dt)
 
+def start_of_week(dt: datetime, week_start: str) -> datetime:
+    # week_start: 'mon' (0) o 'sun' (6-> start on Sunday)
+    ws = 0 if week_start.lower().startswith("mon") else 6
+    # normalizamos: si domingo = 6, calculamos offset especial
+    if ws == 0:
+        offset = dt.weekday()          # 0..6 (0 = lunes)
+        return (dt - timedelta(days=offset)).replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        # domingo como inicio: convertir weekday() (0..6, 0=lun) a índice con dom=0
+        idx_sun0 = (dt.weekday() + 1) % 7  # dom=0, lun=1, ... sáb=6
+        return (dt - timedelta(days=idx_sun0)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+def start_of_month(dt: datetime) -> datetime:
+    return dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+def end_of_day(dt: datetime) -> datetime:
+    return dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+def get_date_window(config: dict) -> tuple[date, date]:
+    """
+    Devuelve (from_date: date, to_date: date) según config['date_window'] y 'timezone'.
+    Si no hay 'date_window', usa 'desde el lunes anterior' hasta hoy (comportamiento legacy).
+    """
+    tzname = (config.get("timezone") or "UTC").strip()
+    try:
+        tz = ZoneInfo(tzname)
+    except Exception:
+        tz = ZoneInfo("UTC")
+
+    now = datetime.now(tz)
+    today = now.date()
+
+    dw = config.get("date_window") or {}
+    mode = (dw.get("mode") or "").lower().strip()
+
+    if mode == "relative":
+        unit = (dw.get("unit") or "days").lower()
+        amount = int(dw.get("amount") or 7)
+        include_today = bool(dw.get("include_today", True))
+
+        if unit == "days":
+            to_d = today if include_today else (today - timedelta(days=1))
+            from_d = to_d - timedelta(days=amount - 1)
+        elif unit == "weeks":
+            to_d = today if include_today else (today - timedelta(days=1))
+            from_d = to_d - timedelta(weeks=amount) + timedelta(days=1)
+        elif unit == "months":
+            # aproximación simple: 30 días por mes
+            to_d = today if include_today else (today - timedelta(days=1))
+            from_d = to_d - timedelta(days=30 * amount) + timedelta(days=1)
+        else:
+            to_d = today
+            from_d = to_d - timedelta(days=6)
+        return (from_d, to_d)
+
+    elif mode == "calendar_week":
+        which = (dw.get("which") or "previous").lower()
+        week_start = (dw.get("week_start") or "mon").lower()
+
+        # inicio de la semana actual en tz
+        sow = start_of_week(now, week_start=week_start)
+        if which == "previous":
+            # ventana: semana completa anterior
+            end_prev = sow - timedelta(seconds=1)
+            start_prev = start_of_week(sow - timedelta(days=1), week_start=week_start)
+            return (start_prev.date(), end_prev.date())
+        else:
+            # semana actual (inicio hasta hoy)
+            return (sow.date(), today)
+
+    elif mode == "calendar_month":
+        which = (dw.get("which") or "previous").lower()
+        som = start_of_month(now)
+        if which == "previous":
+            # mes anterior completo
+            prev_end = som - timedelta(seconds=1)
+            prev_start = start_of_month(som - timedelta(days=1))
+            return (prev_start.date(), prev_end.date())
+        else:
+            # mes en curso: 1er día hasta hoy
+            return (som.date(), today)
+
+    elif mode == "fixed":
+        try:
+            f = datetime.fromisoformat(dw["from"]).date()
+            t = datetime.fromisoformat(dw["to"]).date()
+            return (f, t)
+        except Exception:
+            # fallback si algo viene mal formateado
+            return (today - timedelta(days=6), today)
+
+    # ---- Legacy / por defecto: desde el lunes anterior ----
+    from_legacy = (now - timedelta(days=now.weekday() + 7)).date()
+    return (from_legacy, today)
+
 
 # ---------- Lectura de emisores desde Excel ----------
-def load_emisores_excel(path: str = "data/clientes.xlsx") -> List[Tuple[str, Optional[str]]]:
+def load_emisores_excel(path: str = "data/clientes.xlsx") -> List[Tuple[str, Optional[str], List[str]]]:
     """
-    Lee el Excel con columnas:
+    Lee el Excel con columnas en la hoja principal:
       - Emisor (obligatoria): término de búsqueda
       - Idioma (opcional): 'es', 'en', etc.
+      - ExcluirDominios (opcional): lista separada por ';'
 
-    Retorna lista de tuplas: [(emisor, idioma_preferido|None), ...]
+    Retorna lista de tuplas:
+      [(emisor, idioma_preferido|None, exclude_domains:list[str]), ...]
     """
     p = Path(path)
     if not p.exists():
         print(f"ADVERTENCIA: No existe {path}. No se cargarán emisores externos.", file=sys.stderr)
         return []
+    # lee la primera hoja por defecto
     df = pd.read_excel(p, engine="openpyxl")
     if "Emisor" not in df.columns:
         print("ERROR: El Excel debe contener una columna 'Emisor'.", file=sys.stderr)
         sys.exit(1)
 
-    emisores: List[Tuple[str, Optional[str]]] = []
+    emisores: List[Tuple[str, Optional[str], List[str]]] = []
     for _, row in df.iterrows():
         emisor = str(row.get("Emisor") or "").strip()
         idioma = str(row.get("Idioma") or "").strip().lower() or None
+        excl_raw = str(row.get("ExcluirDominios") or "").strip()
+        exclude_domains = [d.strip().lower() for d in excl_raw.split(";") if d.strip()] if excl_raw else []
         if not emisor:
             continue
-        emisores.append((emisor, idioma))
+        emisores.append((emisor, idioma, exclude_domains))
     return emisores
+
+def load_global_excludes_excel(path: str = "data/clientes.xlsx", sheet_name: str = "Excludes") -> List[str]:
+    """
+    Lee la hoja 'Excludes' con una columna 'Domain' (dominios a excluir globalmente).
+    Si no existe la hoja, retorna lista vacía.
+    """
+    p = Path(path)
+    if not p.exists():
+        return []
+    try:
+        df = pd.read_excel(p, sheet_name=sheet_name, engine="openpyxl")
+    except Exception:
+        return []
+    if "Domain" not in df.columns:
+        return []
+    domains = []
+    for _, row in df.iterrows():
+        d = str(row.get("Domain") or "").strip().lower()
+        if d:
+            domains.append(d)
+    return domains
 
 
 # ---------- Normalización de fechas para IO ----------
@@ -89,13 +223,9 @@ def prepare_frames_for_io(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]
 def fetch_news(config: dict, api_key: str) -> pd.DataFrame:
     newsapi = NewsApiClient(api_key=api_key)
 
-    # Fechas
-    if config.get("since_previous_monday", True):
-        from_date = previous_monday(datetime.today())
-    else:
-        from_date = (datetime.today() - timedelta(days=7)).date()
+        # Fechas (usando configuraciones avanzadas)
+    from_date, to_date = get_date_window(config)
 
-    to_date = date.today()
 
     # Parámetros globales
     domains = config.get("domains", [])
@@ -117,13 +247,13 @@ def fetch_news(config: dict, api_key: str) -> pd.DataFrame:
         for lang in langs_to_use:
             try:
                 resp = newsapi.get_everything(
-                    q=emisor,
+                    q=f'{emisor} Colombia',
                     language=lang,
                     from_param=from_date,
                     to=to_date,
                     domains=domains_csv,
                     sort_by="publishedAt",
-                    page=1,
+                    page=2,
                     page_size=page_size
                 )
             except Exception as e:
@@ -136,6 +266,11 @@ def fetch_news(config: dict, api_key: str) -> pd.DataFrame:
                 desc = item.get("description")
                 if not title or desc is None:
                     continue
+
+                # 👇 aplicar EXCLUSIONES por dominio
+                if excludes and is_excluded(url):
+                    continue
+
                 rows.append({
                     "emisor": emisor,                 # 👈 guardamos el emisor origen
                     "termino_consulta": emisor,       # alias por compatibilidad
