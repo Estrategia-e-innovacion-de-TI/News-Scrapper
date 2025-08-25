@@ -238,22 +238,35 @@ def fetch_news(config: dict, api_key: str) -> pd.DataFrame:
     rows = []
 
     # Cargar emisores (cada emisor es un término de búsqueda)
-    emisores = load_emisores_excel("data/clientes.xlsx")
+    emisores = load_emisores_excel("data/clientes.xlsx")          # -> (emisor, idioma, exclude_domains)
+    global_excludes = load_global_excludes_excel("data/clientes.xlsx")  # si la tienes
+    global_excludes_set = set(global_excludes)
+
     if not emisores:
         print("ADVERTENCIA: No hay emisores en data/clientes.xlsx; no se hará ninguna búsqueda.", file=sys.stderr)
 
-    for emisor, lang_pref in emisores:
+    for emisor, lang_pref, exclude_domains_emisor in emisores:
+        # set combinado de exclusiones (global + por emisor)
+        excludes = {d.lower() for d in exclude_domains_emisor} | global_excludes_set
+
+        # helper para filtrar por dominio (subdominios incluidos)
+        def is_excluded(url: str) -> bool:
+            dom = domain_from_url(url)
+            if not dom:
+                return False
+            return any(dom == ex or dom.endswith("." + ex) for ex in excludes)
+
         langs_to_use = [lang_pref] if lang_pref else languages_default
         for lang in langs_to_use:
             try:
                 resp = newsapi.get_everything(
-                    q=f'{emisor} Colombia',
+                    q=emisor,
                     language=lang,
                     from_param=from_date,
                     to=to_date,
                     domains=domains_csv,
                     sort_by="publishedAt",
-                    page=2,
+                    page=1,
                     page_size=page_size
                 )
             except Exception as e:
@@ -264,28 +277,30 @@ def fetch_news(config: dict, api_key: str) -> pd.DataFrame:
             for item in articles:
                 title = item.get("title")
                 desc = item.get("description")
-                if not title or desc is None:
+                url = item.get("url")
+                if not title or desc is None or not url:
                     continue
 
-                # 👇 aplicar EXCLUSIONES por dominio
+                # aplicar EXCLUSIONES
                 if excludes and is_excluded(url):
                     continue
 
                 rows.append({
-                    "emisor": emisor,                 # 👈 guardamos el emisor origen
-                    "termino_consulta": emisor,       # alias por compatibilidad
+                    "emisor": emisor,
+                    "termino_consulta": emisor,
                     "idioma": lang,
                     "fuente": (item.get("source") or {}).get("name"),
                     "titulo": title,
                     "autor": item.get("author"),
                     "descripcion": desc,
-                    "url": item.get("url"),
+                    "url": url,
                     "url_imagen": item.get("urlToImage"),
                     "contenido": item.get("content"),
                     "fecha_publicacion": item.get("publishedAt"),
                     "fecha_consulta_desde": iso(from_date),
                     "fecha_consulta_hasta": iso(to_date),
                 })
+
 
     df = pd.DataFrame(rows)
     if df.empty:
