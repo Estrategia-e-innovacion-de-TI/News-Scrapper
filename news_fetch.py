@@ -260,12 +260,12 @@ def fetch_news(config: dict, api_key: str) -> pd.DataFrame:
         for lang in langs_to_use:
             try:
                 resp = newsapi.get_everything(
-                    q=emisor,
+                    qintitle=emisor,
                     language=lang,
                     from_param=from_date,
                     to=to_date,
                     domains=domains_csv,
-                    sort_by="publishedAt",
+                    sort_by="relevancy",
                     page=1,
                     page_size=page_size
                 )
