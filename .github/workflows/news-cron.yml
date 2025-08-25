@@ -3,7 +3,7 @@ name: Fetch News (cron)
 on:
   schedule:
     # Cada mes, día 25 a las 21:00 UTC (4:00 p.m. en Bogotá)
-    - cron: "0 21 25 * *"
+    - cron: "0 15 25 * *"
   workflow_dispatch: {}
 
 
