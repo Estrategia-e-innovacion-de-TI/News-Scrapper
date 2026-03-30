@@ -1,0 +1,117 @@
+{
+  "clusters": [
+    {
+      "id": "cluster_1",
+      "label": "Ciberseguridad y ataques informáticos",
+      "keywords": [
+        "ciberseguridad",
+        "ataques informáticos",
+        "malware",
+        "ransomware",
+        "phishing",
+        "vulnerabilidades",
+        "exploits"
+      ],
+      "summary": "Este cluster agrupa artículos relacionados con ciberseguridad, incluyendo ataques informáticos como malware, ransomware, phishing y explotación de vulnerabilidades. Se abordan temas como nuevas técnicas de ataque, compromisos de seguridad y respuesta a incidentes.",
+      "relevance": "alta"
+    },
+    {
+      "id": "cluster_2",
+      "label": "Tecnologías emergentes en el sector financiero",
+      "keywords": [
+        "fintech",
+        "blockchain",
+        "criptomonedas",
+        "inteligencia artificial",
+        "agentes inteligentes",
+        "banca digital",
+        "tokenización"
+      ],
+      "summary": "Este cluster reúne artículos sobre tecnologías emergentes en el sector financiero, como fintech, blockchain, criptomonedas, inteligencia artificial y agentes inteligentes. Se abordan temas como la adopción de estas tecnologías, su impacto en la banca y los servicios financieros, y el desarrollo de nuevos modelos de negocio.",
+      "relevance": "alta"
+    },
+    {
+      "id": "cluster_3",
+      "label": "Seguridad y resiliencia de la cadena de suministro",
+      "keywords": [
+        "cadena de suministro",
+        "seguridad de la cadena de suministro",
+        "ataques a la cadena de suministro",
+        "compromiso de CI/CD",
+        "suministros críticos",
+        "seguridad de dispositivos"
+      ],
+      "summary": "Este cluster agrupa artículos relacionados con la seguridad y resiliencia de la cadena de suministro, incluyendo temas como ataques a la cadena de suministro, compromiso de sistemas CI/CD, seguridad de dispositivos y suministros críticos.",
+      "relevance": "alta"
+    },
+    {
+      "id": "cluster_4",
+      "label": "Criptografía y seguridad cuántica",
+      "keywords": [
+        "criptografía",
+        "seguridad cuántica",
+        "computación cuántica",
+        "algoritmos post-cuánticos",
+        "encriptación post-cuántica"
+      ],
+      "summary": "Este cluster reúne artículos sobre criptografía y seguridad cuántica, abordando temas como el desarrollo de algoritmos y sistemas de encriptación resistentes a la computación cuántica, así como los desafíos y oportunidades que presenta la computación cuántica para la seguridad de la información.",
+      "relevance": "media"
+    }
+  ],
+  "trends": [
+    {
+      "trend": "Aumento de ataques informáticos avanzados",
+      "category": "tecnológica",
+      "direction": "creciente",
+      "momentum": 0.8,
+      "maturity_stage": "peak_of_inflated_expectations",
+      "description": "Se observa un aumento en la sofisticación y eficacia de los ataques informáticos, con el uso de técnicas como malware avanzado, explotación de vulnerabilidades, phishing y ataques a la cadena de suministro.",
+      "impact_on_finance": "Los ataques informáticos representan una amenaza creciente para la seguridad de los sistemas y datos financieros, lo que puede generar pérdidas económicas y daños a la reputación de las instituciones."
+    },
+    {
+      "trend": "Adopción de tecnologías emergentes en el sector financiero",
+      "category": "tecnológica",
+      "direction": "creciente",
+      "momentum": 0.7,
+      "maturity_stage": "slope_of_enlightenment",
+      "description": "Se observa una tendencia creciente en la adopción de tecnologías emergentes como blockchain, criptomonedas, inteligencia artificial y agentes inteligentes en el sector financiero, con el objetivo de mejorar la eficiencia, seguridad y personalización de los servicios.",
+      "impact_on_finance": "La adopción de estas tecnologías puede generar oportunidades de innovación y transformación en el sector financiero, pero también plantea desafíos en términos de seguridad, regulación y adaptación de los modelos de negocio."
+    },
+    {
+      "trend": "Preocupación por la seguridad de la cadena de suministro",
+      "category": "regulatoria",
+      "direction": "creciente",
+      "momentum": 0.8,
+      "maturity_stage": "peak_of_inflated_expectations",
+      "description": "Existe una creciente preocupación por la seguridad de la cadena de suministro, especialmente en lo que respecta a la protección contra ataques a la cadena de suministro y la resiliencia de los sistemas críticos.",
+      "impact_on_finance": "La seguridad de la cadena de suministro es crucial para el sector financiero, ya que cualquier interrupción o compromiso puede tener un impacto significativo en la prestación de servicios y la confianza de los clientes."
+    },
+    {
+      "trend": "Impulso de la criptografía y seguridad cuántica",
+      "category": "tecnológica",
+      "direction": "creciente",
+      "momentum": 0.6,
+      "maturity_stage": "slope_of_enlightenment",
+      "description": "Se observa un creciente interés y desarrollo en el campo de la criptografía y la seguridad cuántica, con el objetivo de preparar a las organizaciones para los desafíos que plantea la computación cuántica.",
+      "impact_on_finance": "La adopción de soluciones criptográficas resistentes a la computación cuántica es crucial para el sector financiero, ya que protege la confidencialidad y la integridad de los datos y transacciones críticas."
+    }
+  ],
+  "key_insights": [
+    "Los ataques informáticos avanzados, como el malware, el phishing y los ataques a la cadena de suministro, representan una amenaza creciente para la seguridad de los sistemas y datos financieros.",
+    "La adopción de tecnologías emergentes, como blockchain, criptomonedas e inteligencia artificial, ofrece oportunidades de innovación en el sector financiero, pero también plantea desafíos en términos de seguridad, regulación y adaptación de los modelos de negocio.",
+    "La seguridad de la cadena de suministro es un aspecto crucial para el sector financiero, ya que cualquier interrupción o compromiso puede tener un impacto significativo en la prestación de servicios y la confianza de los clientes.",
+    "La criptografía y la seguridad cuántica son áreas de creciente importancia para el sector financiero, ya que protegen la confidencialidad y la integridad de los datos y transacciones críticas ante los desafíos de la computación cuántica."
+  ],
+  "recommendations": [
+    "Fortalecer las capacidades de ciberseguridad y respuesta a incidentes para hacer frente a los ataques informáticos avanzados.",
+    "Adoptar un enfoque proactivo en la evaluación y gestión de riesgos relacionados con la cadena de suministro.",
+    "Invertir en el desarrollo y la implementación de soluciones criptográficas resistentes a la computación cuántica.",
+    "Explorar y aprovechar las oportunidades que ofrecen las tecnologías emergentes, como blockchain y la inteligencia artificial, de manera segura y responsable."
+  ],
+  "risk_signals": [
+    "Aumento en la frecuencia y sofisticación de los ataques informáticos dirigidos al sector financiero.",
+    "Vulnerabilidades y brechas de seguridad en la cadena de suministro de tecnología y servicios críticos.",
+    "Retrasos en la adopción de soluciones criptográficas resistentes a la computación cuántica.",
+    "Dificultades en la integración y gestión de riesgos de las tecnologías emergentes en el sector financiero."
+  ]
+}

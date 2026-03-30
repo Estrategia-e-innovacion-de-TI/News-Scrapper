@@ -1,0 +1,70 @@
+/*
+ * TabLayout.module.css — Styles for the main tab navigation layout.
+ *
+ * Uses CSS variables from globals.css for corporate consistency.
+ * Validates: Req 1.2 (active tab highlight), Req 1.4 (corporate styles),
+ *            Req 10.4 (responsive), Req 10.5 (CSS Modules encapsulation)
+ */
+
+.wrapper {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--spacing-lg);
+}
+
+.tabList {
+  display: flex;
+  gap: var(--spacing-xs);
+  border-bottom: 2px solid var(--color-surface-hover);
+  margin-bottom: var(--spacing-xl);
+}
+
+.tab {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+  margin-bottom: -2px;
+}
+
+.tab:hover {
+  color: var(--color-primary);
+  background: none;
+}
+
+.tabActive {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-secondary);
+  font-weight: var(--font-weight-bold);
+}
+
+.tabPanel {
+  min-height: 200px;
+}
+
+/* Responsive: stack tabs on narrow screens */
+@media (max-width: 767px) {
+  .tabList {
+    flex-direction: column;
+    gap: 0;
+    border-bottom: none;
+  }
+
+  .tab {
+    border-bottom: 1px solid var(--color-surface-hover);
+    border-left: 3px solid transparent;
+    text-align: left;
+    margin-bottom: 0;
+  }
+
+  .tabActive {
+    border-bottom-color: var(--color-surface-hover);
+    border-left-color: var(--color-secondary);
+  }
+}

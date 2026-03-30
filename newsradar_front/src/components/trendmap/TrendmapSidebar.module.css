@@ -1,0 +1,183 @@
+/*
+ * TrendmapSidebar.module.css — Styles for the TrendmapSidebar component.
+ *
+ * Fixed-width 340px sidebar with toggle buttons, category filters,
+ * and scrollable cluster cards.
+ *
+ * Validates: Req 5.1 (sidebar 340px), Req 5.2 (toggle buttons),
+ *            Req 5.3 (category buttons), Req 5.4 (cluster cards)
+ */
+
+.sidebar {
+  width: 340px;
+  min-width: 340px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  background-color: var(--color-surface);
+  border-left: 1px solid var(--color-surface-hover);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* ── Section headings ── */
+.sectionTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+/* ── Toggle buttons (Noticias / Papers) ── */
+.toggleGroup {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.toggleBtn {
+  flex: 1;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  border: 1px solid var(--color-text-muted);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.toggleBtn:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.toggleBtnActive {
+  background-color: var(--accent);
+  color: #000000;
+  border-color: var(--accent);
+  font-weight: var(--font-weight-bold);
+}
+
+.toggleBtnActive:hover {
+  background-color: var(--color-accent-dark);
+}
+
+/* ── Category filter buttons ── */
+.categoryGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.categoryBtn {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  border: 1px solid var(--color-text-muted);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.categoryBtn:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.categoryBtnActive {
+  background-color: var(--accent);
+  color: #000000;
+  border-color: var(--accent);
+  font-weight: var(--font-weight-bold);
+}
+
+.categoryBtnActive:hover {
+  background-color: var(--color-accent-dark);
+}
+
+/* ── Cluster cards list ── */
+.clusterList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ── Individual cluster card ── */
+.clusterCard {
+  border: 1px solid var(--color-surface-hover);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm);
+  cursor: pointer;
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.clusterCard:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-text-muted);
+}
+
+.clusterCardSelected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* Category label badge */
+.categoryLabel {
+  display: inline-block;
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: #ffffff;
+  margin-bottom: var(--spacing-xs);
+}
+
+.clusterName {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  margin: 0 0 var(--spacing-xs) 0;
+  line-height: var(--line-height-tight);
+}
+
+/* ── Metrics row ── */
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-xs);
+}
+
+.metric {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.metricValue {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+/* ── Keywords ── */
+.keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.keyword {
+  font-size: 0.65rem;
+  background-color: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  padding: 1px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+}

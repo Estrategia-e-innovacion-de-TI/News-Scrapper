@@ -1,0 +1,5 @@
+weights:
+  keyword_density: 40
+  recency: 20
+  source_authority: 20
+  topic_alignment: 20

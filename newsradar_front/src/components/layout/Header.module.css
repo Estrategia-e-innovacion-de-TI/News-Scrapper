@@ -1,0 +1,33 @@
+/*
+ * Header.module.css — Styles for the Header component.
+ *
+ * Full-width banner image replicating the Framework_Innovacion header.
+ *
+ * Validates: Req 1.1 (header structure)
+ */
+
+.header {
+  width: 100%;
+}
+
+.brand {
+  display: block;
+  width: 100%;
+}
+
+.brandLink {
+  display: block;
+  width: 100%;
+}
+
+.bannerImg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.navBar {
+  background-color: var(--nav-bg);
+  padding: var(--spacing-xs) var(--spacing-lg);
+  text-align: center;
+}

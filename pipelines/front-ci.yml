@@ -1,0 +1,73 @@
+name: CI/CD — newsradar_front
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "newsradar_front/**"
+      - "pipelines/front-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "newsradar_front/**"
+
+env:
+  AWS_REGION: us-east-1 # TODO: set your AWS region
+  S3_BUCKET: news-radar-sbx-frontend # TODO: set your S3 bucket for static hosting
+  CLOUDFRONT_DISTRIBUTION_ID: "" # TODO: set your CloudFront distribution ID
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: newsradar_front
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: newsradar_front/package.json
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build static assets
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: newsradar_front/out/
+
+  deploy-s3:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: out/
+
+      - name: Sync to S3
+        run: aws s3 sync out/ s3://$S3_BUCKET/ --delete
+
+      - name: Invalidate CloudFront cache
+        if: env.CLOUDFRONT_DISTRIBUTION_ID != ''
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
+            --paths "/*"

@@ -1,0 +1,19 @@
+/*
+ * Layout.module.css — Styles for the Layout wrapper component.
+ *
+ * Replicates the Framework_Innovacion layout pattern:
+ * - min-height: 100vh with flex column for sticky footer
+ * - Header at top, main content grows, footer at bottom
+ *
+ * Validates: Req 1.2 (header → content → footer layout)
+ */
+
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main {
+  flex-grow: 1;
+}

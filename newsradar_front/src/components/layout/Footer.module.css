@@ -1,0 +1,24 @@
+/*
+ * Footer.module.css — Styles for the Footer component.
+ *
+ * Replicates the Framework_Innovacion footer:
+ * - Dark background (#2c2a29) matching the nav bar
+ * - White text for contrast
+ *
+ * Validates: Req 1.4 (footer consistent with Framework_Innovacion)
+ */
+
+.footer {
+  background-color: var(--nav-bg);
+  color: var(--color-text-inverse);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  text-align: center;
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  margin-top: auto;
+}
+
+.copyright {
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-normal);
+}

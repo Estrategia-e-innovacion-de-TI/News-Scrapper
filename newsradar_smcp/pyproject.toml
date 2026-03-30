@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "newsradar-smcp"
+version = "0.1.0"
+description = "News Radar MCP Server — pipeline core for news extraction, classification, scoring, and export"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "News Radar Team"}]
+dependencies = [
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0.0",
+    "openpyxl>=3.1.0",
+    "scikit-learn>=1.4.0",
+    "jsonschema>=4.21.0",
+    "boto3>=1.34.0",
+    "httpx>=0.27.0",
+    "feedparser>=6.0.0",
+    "beautifulsoup4>=4.12.0",
+    "trafilatura>=1.12.0",
+    "pypdf2>=3.0.0",
+    "python-dateutil>=2.8.0",
+]
+
+[project.optional-dependencies]
+browser = ["playwright>=1.40.0"]
+dev = [
+    "pytest>=8.0.0",
+    "hypothesis>=6.100.0",
+    "pytest-cov>=4.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["newsradar_server*"]

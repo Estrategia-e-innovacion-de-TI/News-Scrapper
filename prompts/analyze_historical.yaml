@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────────────
+# Prompt para análisis histórico — clustering por KEYWORDS (no índices)
+#
+# Variables: $article_summaries, $total_articles, $date_range, $focus
+# ─────────────────────────────────────────────────────────────────────
+
+system: |
+  Eres un analista senior de vigilancia tecnológica para el sector financiero.
+  Tu tarea es identificar clusters temáticos y tendencias a partir de títulos
+  de artículos. Debes ser ESTRICTO: solo agrupa artículos que realmente
+  comparten el mismo tema.
+
+user: |
+  Analiza estos $total_articles artículos del período $date_range
+  para: $focus
+
+  ARTÍCULOS:
+  $article_summaries
+
+  INSTRUCCIONES:
+  1. Identifica entre 4 y 8 clusters temáticos coherentes.
+  2. Para cada cluster, define 4-6 KEYWORDS que identifiquen el tema.
+  3. NO uses article_indices — en su lugar, proporciona las keywords
+     que permitan asignar artículos automáticamente por matching de título.
+  4. Un artículo pertenece a un cluster si su título contiene al menos
+     una de las keywords del cluster.
+
+  Responde ÚNICAMENTE con este JSON:
+  {
+    "clusters": [
+      {
+        "id": "cluster_1",
+        "label": "<nombre descriptivo>",
+        "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
+        "summary": "<resumen de 2-3 frases>",
+        "relevance": "<alta|media|baja>"
+      }
+    ],
+    "trends": [
+      {
+        "trend": "<nombre>",
+        "category": "<tecnológica|regulatoria|económica|social|competitiva>",
+        "direction": "<creciente|estable|decreciente>",
+        "momentum": <float 0.0-1.0>,
+        "maturity_stage": "<innovation_trigger|peak_of_inflated_expectations|trough_of_disillusionment|slope_of_enlightenment|plateau_of_productivity>",
+        "description": "<descripción breve>",
+        "impact_on_finance": "<impacto en sector financiero>"
+      }
+    ],
+    "key_insights": ["<insight 1>", "<insight 2>", "<insight 3>"],
+    "recommendations": ["<recomendación 1>", "<recomendación 2>"],
+    "risk_signals": ["<señal de riesgo>"]
+  }
+
+  REGLAS:
+  - Genera entre 8 y 15 keywords por cluster (mezcla de frases y palabras sueltas)
+  - Incluye keywords amplias (ej: "ransomware", "phishing", "exploit") Y específicas
+  - Las keywords deben cubrir la mayoría de artículos del tema, no solo los más específicos
+  - Incluye variantes: singular/plural, inglés/español si aplica
+  - Cada cluster debe tener keywords que NO se solapen con otros clusters
+  - Responde SOLO con el JSON, sin texto adicional

@@ -1,0 +1,122 @@
+/*
+ * VistaHype.module.css — Styles for the VistaHype component.
+ *
+ * SVG hype cycle curve, trend circles, and summary table.
+ *
+ * Validates: Req 9.1 (SVG curve), Req 9.2–9.4 (trend positioning), Req 9.5 (table)
+ */
+
+/* ── SVG container ── */
+.svgContainer {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-surface-hover);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--spacing-lg);
+  overflow: hidden;
+}
+
+.svgTitle {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+/* ── Table section ── */
+.tableSection {
+  margin-top: var(--spacing-md);
+}
+
+.sectionTitle {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.tableWrapper {
+  max-height: 500px;
+  overflow-y: auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.table th {
+  background-color: var(--color-surface-hover);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.table td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-surface-hover);
+  color: var(--color-text);
+  vertical-align: middle;
+}
+
+.table tr:hover td {
+  background-color: var(--color-surface);
+}
+
+/* ── Direction icons ── */
+.dirUp {
+  color: var(--color-success);
+  font-weight: var(--font-weight-bold);
+}
+
+.dirStable {
+  color: var(--color-warning);
+  font-weight: var(--font-weight-bold);
+}
+
+.dirDown {
+  color: var(--color-error);
+  font-weight: var(--font-weight-bold);
+}
+
+/* ── Momentum bar ── */
+.momentumBarBg {
+  width: 80px;
+  height: 10px;
+  background-color: var(--color-surface-hover);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.momentumBarFill {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-primary);
+  transition: width 0.3s ease;
+}
+
+/* ── Description truncation ── */
+.descCell {
+  max-width: 250px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Empty state ── */
+.empty {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}

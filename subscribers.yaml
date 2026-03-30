@@ -1,0 +1,17 @@
+# Subscribers configuration for vigilancia weekly pipeline.
+# Each subscriber has an email, name, and list of query_groups
+# that correspond to top-level keys in terms_vigilancia.yaml.
+#
+# Example:
+#   subscribers:
+#     - email: "analyst@example.com"
+#       name: "Jane Doe"
+#       query_groups:
+#         - ia_ml
+#         - ciberseguridad
+#
+# Predefined query_groups: ia_ml, blockchain, ciberseguridad, fintech,
+#   regtech, cloud, datos, banca_digital
+# (must match top-level keys in terms_vigilancia.yaml)
+
+subscribers: []
