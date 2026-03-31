@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -108,7 +108,11 @@ async def create_subscription(
     )
 
 
-@router.delete("/{subscription_id}", status_code=204)
+@router.delete(
+    "/{subscription_id}",
+    status_code=200,
+    response_class=Response,
+)
 async def delete_subscription(
     subscription_id: str,
     session: AsyncSession = Depends(get_session),
@@ -126,3 +130,4 @@ async def delete_subscription(
 
     sub.active = False
     await session.commit()
+    return Response(status_code=200)

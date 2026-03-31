@@ -11,6 +11,7 @@ import logging
 import uuid
 from datetime import datetime as dt
 from pathlib import Path
+from tempfile import gettempdir
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +31,7 @@ from newsradar_api.domain.usecase.capabilities import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+EXPORT_DIR = Path(gettempdir()) / "newsradar_exports"
 
 # Lazy singletons
 _llm_classifier = None
@@ -272,7 +274,7 @@ async def search_riesgos_endpoint(
                     severity=r_item.severity,
                 ))
 
-            out_path = Path(f"/tmp/newsradar_exports/{run_id}_riesgos.xlsx")
+            out_path = EXPORT_DIR / f"{run_id}_riesgos.xlsx"
             exporter.export(docs_for_export, out_path, metadata={
                 "run_id": run_id,
                 "empresa_o_términos": ", ".join(search_terms[:5]),

@@ -59,7 +59,12 @@ class DBAdapter:
         return list(result.scalars().all())
 
     # ── Subscriptions ──
-    async def save_subscription(self, email: str, query_groups: list[str]) -> bool:
+    async def save_subscription(
+        self,
+        email: str,
+        query_groups: list[str],
+        name: str | None = None,
+    ) -> bool:
         sub = Subscription(subscriber_email=email, query_groups=query_groups)
         self._session.add(sub)
         await self._session.commit()

@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
+from tempfile import gettempdir
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -26,7 +27,7 @@ from newsradar_api.infrastructure.driven_adapters.db_models import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-EXPORT_DIR = Path("/tmp/newsradar_exports")
+EXPORT_DIR = Path(gettempdir()) / "newsradar_exports"
 
 
 class ExcelExportRequest(BaseModel):
