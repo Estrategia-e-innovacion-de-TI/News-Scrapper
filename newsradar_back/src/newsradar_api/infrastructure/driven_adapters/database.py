@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import os
+import logging
 
 from dotenv import load_dotenv
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://newsradar:newsradar@localhost:5432/newsradar")
 
@@ -20,6 +23,6 @@ async def get_session() -> AsyncSession:
 
 
 async def init_db():
-    from newsradar_api.infrastructure.driven_adapters.db_models import Base
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("SELECT 1"))
+    logger.info("Database connectivity check completed")

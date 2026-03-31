@@ -22,13 +22,11 @@ from typing import Any
 import yaml
 
 from newsradar_api.domain.model.pipeline_models import RerankerResult
+from newsradar_api.shared_kernel.config.paths import resolve_prompt_path
 
 logger = logging.getLogger(__name__)
 
 # ── Prompt loading ───────────────────────────────────────────────────
-
-_CONFIG_DIR = Path(__file__).resolve().parents[4] / "config"
-_PROMPTS_DIR = _CONFIG_DIR / "prompts"
 
 _PROMPT_MAP: dict[str, str] = {
     "aras_news": "rerank_riesgo.yaml",
@@ -64,7 +62,7 @@ def _load_prompt(
     """
     if path is None:
         filename = _PROMPT_MAP.get(flow or "", "rerank_riesgo.yaml")
-        path = _PROMPTS_DIR / filename
+        path = resolve_prompt_path(filename)
     try:
         with open(path, "r", encoding="utf-8") as fh:
             data = yaml.safe_load(fh)

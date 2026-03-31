@@ -172,5 +172,12 @@ def tool_extract_news(
 
     Returns dict with run metrics.
     """
-    # TODO: Wire to extract_news use case via DI container
-    raise NotImplementedError("TODO: wire MCP tool to extract_news use case")
+    logger.warning(
+        "tool_extract_news is running in compatibility mode. Use the HTTP adapter service for full execution."
+    )
+    return {
+        "status": "compatibility_mode",
+        "focus": focus,
+        "days": days,
+        "detail": "Use the SMCP HTTP /tools/extract_news endpoint for execution.",
+    }

@@ -8,9 +8,11 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'riesgos', label: 'Riesgos', route: 'riesgos' },
-  { id: 'vigilancia', label: 'Vigilancia Tecnológica', route: 'vigilancia' },
+  { id: 'tech-watch', label: 'Vigilancia Tecnologica', route: 'tech-watch' },
   { id: 'trendmap', label: 'Trend Mapping', route: 'trendmap' },
+  { id: 'subscriptions', label: 'Subscripciones', route: 'subscriptions' },
+  { id: 'aras', label: 'ARAS / Riesgos', route: 'aras' },
+  { id: 'riskmap', label: 'Risk Mapping', route: 'riskmap' },
 ];
 
 @Component({
@@ -20,7 +22,7 @@ const TABS: TabDef[] = [
   encapsulation: ViewEncapsulation.Emulated,
   template: `
     <div class="p-4">
-      <nav class="flex gap-1 border-b border-gray-200 mb-6" role="tablist" aria-label="Secciones principales">
+      <nav class="flex flex-wrap gap-1 border-b border-gray-200 mb-6" role="tablist" aria-label="Secciones principales">
         @for (tab of tabs; track tab.id) {
           <a
             [routerLink]="tab.route"
@@ -40,5 +42,5 @@ const TABS: TabDef[] = [
 })
 export class NoticiasComponent {
   readonly tabs = TABS;
-  readonly activeTab = signal('riesgos');
+  readonly activeTab = signal('tech-watch');
 }

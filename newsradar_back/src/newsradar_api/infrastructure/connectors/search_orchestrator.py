@@ -23,13 +23,11 @@ from .providers.arxiv_provider import search_arxiv
 from .providers.github_provider import search_github
 from .providers.epo_provider import search_epo_patents
 from .search_models import SearchCandidate, SearchReport
+from newsradar_api.shared_kernel.config.paths import resolve_terms_path
 
 logger = logging.getLogger(__name__)
 
-# Default path to terms_vigilancia.yaml
-_DEFAULT_TERMS_PATH = (
-    Path(__file__).resolve().parents[3] / "config" / "terms_vigilancia.yaml"
-)
+_DEFAULT_TERMS_PATH = resolve_terms_path()
 
 PROVIDER_MAP: dict[str, Callable[..., Awaitable[list[SearchCandidate]]]] = {
     "papers": search_arxiv,

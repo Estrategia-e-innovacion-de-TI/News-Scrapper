@@ -1,0 +1,55 @@
+{
+  "report_type": "trend_mapping",
+  "generated_at": "2026-03-31T15:00:00Z",
+  "window_months": 6,
+  "meta": {
+    "generated_at": "2026-03-31T15:00:00Z",
+    "total_articles": 18,
+    "total_papers": 6,
+    "total_filtered": 24,
+    "total_clusters": 4,
+    "total_categories": 3,
+    "silhouette_score": 0.0
+  },
+  "clusters": [
+    {
+      "cluster_id": "ai_agents",
+      "label": "AI Agents",
+      "category": "IA",
+      "summary": "AI Agents concentra 8 documentos.",
+      "keywords": ["agents", "llm", "orchestration"],
+      "relevance": "alta",
+      "item_count": 8,
+      "impact_score": 82.0,
+      "horizon_score": 0.7,
+      "maturity_stage": "slope_of_enlightenment",
+      "hull_polygon": [[0.1, 0.2], [0.2, 0.1]],
+      "articles": ["doc-1", "doc-2"]
+    }
+  ],
+  "articles": [
+    {
+      "id": "doc-1",
+      "title": "Banks adopt AI agents for operations",
+      "source": "example_source",
+      "source_type": "news",
+      "date": "2026-03-20T00:00:00Z",
+      "score": 91,
+      "url": "https://example.com/doc-1",
+      "x_embed": 1.2,
+      "y_embed": -0.5,
+      "cluster_id": "ai_agents"
+    }
+  ],
+  "trends": [
+    {
+      "date": "2026-03",
+      "topic": "AI Agents",
+      "count": 8,
+      "avg_score": 82.0
+    }
+  ],
+  "insights": ["AI Agents lidera el periodo analizado."],
+  "recommendations": ["Monitorear AI Agents en la siguiente ejecucion."],
+  "risk_signals": []
+}

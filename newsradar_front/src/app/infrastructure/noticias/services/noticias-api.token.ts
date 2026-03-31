@@ -9,6 +9,7 @@ import type {
   SubscribeRequest,
   SubscribeResponse,
   Subscription,
+  SubscriptionDelivery,
   Cluster,
   Trend,
 } from '../../../domain/noticias/models';
@@ -36,6 +37,7 @@ export interface VigilanciaApiPort {
   fetchTopics(): Observable<TopicItem[]>;
   subscribe(req: SubscribeRequest): Observable<SubscribeResponse>;
   listSubscriptions(): Observable<Subscription[]>;
+  listDeliveries(): Observable<SubscriptionDelivery[]>;
   deleteSubscription(id: string): Observable<void>;
 }
 

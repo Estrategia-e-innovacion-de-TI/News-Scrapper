@@ -1,0 +1,27 @@
+flow: risk_mapping
+description: Risk mapping batch sobre noticias y fuentes institucionales especializadas.
+default_window_months: 6
+sources:
+  risk_news:
+    schedule: weekly
+    focus: riesgos_news
+    enabled: true
+  institutional_reports:
+    schedule: bimonthly
+    type: institutional_report
+    enabled: true
+    catalog:
+      - world_economic_forum
+      - world_bank
+      - marsh
+      - zurich
+      - allianz
+      - aon
+scoring:
+  classifier_mode: rules
+  llm_prompt: rerank_riesgo.yaml
+  min_relevance: 40
+analytics:
+  cluster_method: tfidf_hdbscan_with_fallback
+  snapshot_llm_prompt: snapshot_riskmap.yaml
+  persist_snapshots: true

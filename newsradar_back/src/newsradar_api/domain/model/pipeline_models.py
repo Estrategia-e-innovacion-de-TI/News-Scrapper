@@ -416,6 +416,7 @@ class GraphState(BaseModel):
     # Results
     documents: list[Document] = Field(default_factory=list)
     seen_hashes: set[str] = Field(default_factory=set)
+    execution_id: str | None = None
 
     # Metrics
     metrics: RunMetrics | None = None

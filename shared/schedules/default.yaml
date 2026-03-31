@@ -1,0 +1,11 @@
+tech_watch:
+  news: weekly
+  papers: monthly
+  patents: bimonthly
+  trigger_snapshot: on_success
+risk_mapping:
+  news: weekly
+  institutional_reports: bimonthly
+  trigger_snapshot: on_success
+subscriptions:
+  deliveries: after_relevant_tech_watch_execution

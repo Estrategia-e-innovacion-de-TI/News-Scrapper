@@ -23,8 +23,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Agent server URL — configurable via env var, defaults to localhost.
-_AGENT_URL: str = os.getenv("AIAGENT_URL", "http://localhost:8100")
-_MCP_SERVER_URL: str = os.getenv("MCP_SERVER_URL", "http://localhost:8080")
+_AGENT_URL: str = os.getenv("AIAGENT_URL", "http://localhost:8090")
+_MCP_SERVER_URL: str = os.getenv("MCP_SERVER_URL", os.getenv("NEWSRADAR_SMCP_URL", "http://localhost:8080"))
+_BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 
 @router.websocket("/chat")
@@ -94,6 +95,7 @@ async def _forward_to_agent(
             user_message,
             conversation_id=conversation_id,
             mcp_server_url=_MCP_SERVER_URL,
+            backend_url=_BACKEND_URL,
         )
     except ImportError:
         logger.debug("aiagent not importable — falling back to HTTP proxy")

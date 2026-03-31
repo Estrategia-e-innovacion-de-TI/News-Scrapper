@@ -16,10 +16,11 @@ from typing import Any
 
 import yaml
 
+from newsradar_api.shared_kernel.config.paths import resolve_terms_path
+
 logger = logging.getLogger(__name__)
 
-# Default path relative to the backend config directory
-_DEFAULT_TERMS_PATH = Path(__file__).resolve().parents[4] / "config" / "terms_vigilancia.yaml"
+_DEFAULT_TERMS_PATH = resolve_terms_path()
 
 
 class SubscriptionManager:
@@ -33,7 +34,7 @@ class SubscriptionManager:
     """
 
     def __init__(self, terms_path: str | Path | None = None) -> None:
-        self._terms_path = Path(terms_path) if terms_path else _DEFAULT_TERMS_PATH
+        self._terms_path = resolve_terms_path(terms_path) if terms_path else _DEFAULT_TERMS_PATH
         self._terms_data: dict[str, Any] = {}
         self._valid_groups: set[str] = set()
         self._load()

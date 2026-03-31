@@ -1,0 +1,31 @@
+ia_ml:
+  terms:
+    - inteligencia artificial
+    - machine learning
+    - large language model
+    - generative ai
+    - ai agents
+blockchain:
+  terms:
+    - blockchain
+    - tokenizacion
+    - smart contracts
+    - defi
+ciberseguridad:
+  terms:
+    - ciberseguridad
+    - ransomware
+    - phishing
+    - zero trust
+fintech:
+  terms:
+    - fintech
+    - open banking
+    - pagos digitales
+    - banca digital
+cloud_datos:
+  terms:
+    - cloud computing
+    - observability
+    - data mesh
+    - data lakehouse

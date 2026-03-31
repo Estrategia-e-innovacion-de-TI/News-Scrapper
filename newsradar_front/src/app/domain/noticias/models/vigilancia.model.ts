@@ -22,3 +22,13 @@ export interface Subscription {
   query_groups: string[];
   active: boolean;
 }
+
+export interface SubscriptionDelivery {
+  id: string;
+  subscription_id: string;
+  execution_id: string | null;
+  status: string;
+  subject: string | null;
+  delivered_at: string | null;
+  content: Record<string, unknown>;
+}

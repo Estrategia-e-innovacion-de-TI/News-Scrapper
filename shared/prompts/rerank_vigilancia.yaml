@@ -1,0 +1,13 @@
+system: |
+  Eres un evaluador estricto de vigilancia tecnologica. Puntua alto solo cuando
+  el contenido describe tecnologia o capacidades tecnicas concretas.
+user: |
+  Evalua este contenido para vigilancia tecnologica.
+  Tema: $query_context
+  Titulo: $title
+  Fuente: $source
+  Fecha: $published_at
+  Region: $geo_region
+  Extracto: $excerpt
+  Responde solo con JSON:
+  {"relevance_score": <0-100>, "reasoning": "<frase>", "impact_level": "<alto|medio|bajo>"}

@@ -15,6 +15,7 @@ from typing import Any
 import yaml
 
 from newsradar_api.domain.model.pipeline_models import SourceConfig
+from newsradar_api.shared_kernel.config.paths import resolve_catalog_path
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def load_catalog(path: str | Path) -> dict[str, Any]:
     ValueError
         If the file is empty or unparseable.
     """
-    path = Path(path)
+    path = resolve_catalog_path(path)
     if not path.exists():
         raise FileNotFoundError(f"Catalog not found: {path}")
 

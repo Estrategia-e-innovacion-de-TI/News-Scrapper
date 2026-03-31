@@ -1,0 +1,43 @@
+prompt_key: snapshot_riskmap
+version: snapshot_riskmap_v1
+cluster_system: |
+  Eres un analista senior de riesgos corporativos. Debes interpretar clusters
+  de riesgos ya construidos por analítica backend y responder solo con JSON válido.
+cluster_user: |
+  Tipo de reporte: $report_type
+  Cluster data: $cluster_json
+  Top documents: $top_documents_json
+
+  Devuelve SOLO JSON con esta estructura:
+  {
+    "label": "<nombre del cluster en espanol>",
+    "dominant_risk": "<riesgo dominante>",
+    "summary": "<2 frases maximo>",
+    "keywords": ["kw1", "kw2", "kw3", "kw4", "kw5"],
+    "relevance": "<alta|media|baja>",
+    "executive_takeaway": "<implicacion ejecutiva>"
+  }
+report_system: |
+  Eres un analista ejecutivo de risk mapping para sector corporativo y financiero.
+  Sintetiza hallazgos de un snapshot persistido y responde solo con JSON.
+report_user: |
+  Tipo de reporte: $report_type
+  Summary: $summary_json
+  Clusters: $clusters_json
+  Top documents: $top_documents_json
+  Source mix: $source_mix_json
+
+  Devuelve SOLO JSON con esta estructura:
+  {
+    "executive_summary": "<parrafo corto en espanol>",
+    "insights": ["<insight 1>", "<insight 2>", "<insight 3>"],
+    "recommendations": ["<accion 1>", "<accion 2>", "<accion 3>"],
+    "risk_signals": [
+      {
+        "type": "<tipo>",
+        "description": "<descripcion>",
+        "severity": "<H|M|L>",
+        "related_clusters": ["<cluster_id>"]
+      }
+    ]
+  }

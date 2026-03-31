@@ -1,6 +1,10 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { VIGILANCIA_API } from '../../../../../infrastructure/noticias/services/noticias-api.token';
-import { TopicItem, Subscription } from '../../../../../domain/noticias/models';
+import {
+  Subscription,
+  SubscriptionDelivery,
+  TopicItem,
+} from '../../../../../domain/noticias/models';
 import { SubscriptionFormComponent } from './subscription-form.component';
 
 @Component({
@@ -9,7 +13,10 @@ import { SubscriptionFormComponent } from './subscription-form.component';
   imports: [SubscriptionFormComponent],
   template: `
     <div class="space-y-4">
-      <h2 class="text-lg font-semibold">Vigilancia Tecnológica</h2>
+      <h2 class="text-lg font-semibold">Subscripciones</h2>
+      <p class="text-sm text-gray-500">
+        Gestiona el boletin de tendencias y consulta el historial de entregas procesadas en backend.
+      </p>
 
       @if (loading()) {
         <p class="text-gray-500 text-sm">Cargando temas...</p>
@@ -26,8 +33,7 @@ import { SubscriptionFormComponent } from './subscription-form.component';
       }
 
       @if (confirmationMessage()) {
-        <div class="bg-green-50 border border-green-200 rounded p-3 text-sm text-green-800"
-          data-testid="subscription-confirmation">
+        <div class="bg-green-50 border border-green-200 rounded p-3 text-sm text-green-800">
           {{ confirmationMessage() }}
         </div>
       }
@@ -44,19 +50,42 @@ import { SubscriptionFormComponent } from './subscription-form.component';
               <div class="flex items-center justify-between border rounded p-3 text-sm">
                 <div>
                   <span class="font-medium">{{ sub.email }}</span>
-                  <span class="text-gray-500 ml-2">
-                    — {{ sub.query_groups.join(', ') }}
-                  </span>
+                  <span class="text-gray-500 ml-2">· {{ sub.query_groups.join(', ') }}</span>
                 </div>
-                <button (click)="deleteSub(sub.id)"
+                <button
+                  (click)="deleteSub(sub.id)"
                   class="text-red-500 hover:text-red-700 text-xs font-medium"
-                  [disabled]="deletingId() === sub.id">
+                  [disabled]="deletingId() === sub.id"
+                >
                   @if (deletingId() === sub.id) {
                     Eliminando...
                   } @else {
                     Eliminar
                   }
                 </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="mt-6">
+        <h3 class="text-md font-semibold mb-2">Historial de entregas</h3>
+        @if (deliveriesLoading()) {
+          <p class="text-gray-500 text-sm">Cargando entregas...</p>
+        } @else if (deliveries().length === 0) {
+          <p class="text-gray-400 text-sm">Aun no hay entregas registradas.</p>
+        } @else {
+          <div class="space-y-2">
+            @for (delivery of deliveries(); track delivery.id) {
+              <div class="border rounded p-3 text-sm">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="font-medium">{{ delivery.subject || 'Entrega sin asunto' }}</span>
+                  <span class="text-xs uppercase text-gray-500">{{ delivery.status }}</span>
+                </div>
+                <p class="text-gray-500 mt-1">
+                  Subscription: {{ delivery.subscription_id }} · {{ delivery.delivered_at || 'Pendiente' }}
+                </p>
               </div>
             }
           </div>
@@ -75,10 +104,13 @@ export class VigilanciaComponent implements OnInit {
   readonly subscriptions = signal<Subscription[]>([]);
   readonly subsLoading = signal(false);
   readonly deletingId = signal<string | null>(null);
+  readonly deliveries = signal<SubscriptionDelivery[]>([]);
+  readonly deliveriesLoading = signal(false);
 
   ngOnInit(): void {
     this.loadTopics();
     this.loadSubscriptions();
+    this.loadDeliveries();
   }
 
   loadTopics(): void {
@@ -107,9 +139,21 @@ export class VigilanciaComponent implements OnInit {
     });
   }
 
+  loadDeliveries(): void {
+    this.deliveriesLoading.set(true);
+    this.api.listDeliveries().subscribe({
+      next: (deliveries) => {
+        this.deliveries.set(deliveries);
+        this.deliveriesLoading.set(false);
+      },
+      error: () => this.deliveriesLoading.set(false),
+    });
+  }
+
   onSubscriptionCreated(message: string): void {
     this.confirmationMessage.set(message);
     this.loadSubscriptions();
+    this.loadDeliveries();
   }
 
   deleteSub(id: string): void {

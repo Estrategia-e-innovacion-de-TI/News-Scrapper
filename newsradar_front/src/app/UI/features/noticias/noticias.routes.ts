@@ -12,21 +12,41 @@ export const NOTICIAS_ROUTES: Routes = [
     path: '',
     component: NoticiasComponent,
     children: [
-      { path: '', redirectTo: 'riesgos', pathMatch: 'full' },
+      { path: '', redirectTo: 'tech-watch', pathMatch: 'full' },
       {
-        path: 'riesgos',
+        path: 'tech-watch',
         loadComponent: () =>
-          import('./components/riesgos/riesgos.component').then((m) => m.RiesgosComponent),
-      },
-      {
-        path: 'vigilancia',
-        loadComponent: () =>
-          import('./components/vigilancia/vigilancia.component').then((m) => m.VigilanciaComponent),
+          import('./components/tech-watch/tech-watch.component').then((m) => m.TechWatchComponent),
       },
       {
         path: 'trendmap',
         loadComponent: () =>
           import('./components/trendmap/trendmap.component').then((m) => m.TrendmapComponent),
+      },
+      {
+        path: 'subscriptions',
+        loadComponent: () =>
+          import('./components/subscriptions/subscriptions.component').then((m) => m.SubscriptionsComponent),
+      },
+      {
+        path: 'aras',
+        loadComponent: () =>
+          import('./components/riesgos/riesgos.component').then((m) => m.RiesgosComponent),
+      },
+      {
+        path: 'riskmap',
+        loadComponent: () =>
+          import('./components/riskmap/riskmap.component').then((m) => m.RiskmapComponent),
+      },
+      {
+        path: 'riesgos',
+        redirectTo: 'aras',
+        pathMatch: 'full',
+      },
+      {
+        path: 'vigilancia',
+        redirectTo: 'tech-watch',
+        pathMatch: 'full',
       },
     ],
   },

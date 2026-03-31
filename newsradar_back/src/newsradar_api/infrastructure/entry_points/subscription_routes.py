@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from newsradar_api.domain.model.dtos import SubscriptionDTO
 from newsradar_api.infrastructure.driven_adapters.database import get_session
-from newsradar_api.infrastructure.driven_adapters.db_models import Subscription
+from newsradar_api.infrastructure.driven_adapters.db_models import Subscription, SubscriptionTopic
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -37,6 +37,7 @@ def _get_manager():
 class CreateSubscriptionRequest(BaseModel):
     """Request body for POST /api/subscriptions/."""
     email: str = Field(..., description="Subscriber email")
+    name: str | None = Field(None, description="Subscriber display name")
     query_groups: list[str] = Field(..., description="Topic groups to subscribe to")
 
 
@@ -93,12 +94,17 @@ async def create_subscription(
     # Create subscription
     sub = Subscription(
         subscriber_email=request.email,
+        subscriber_name=request.name,
         query_groups=accepted,
         active=True,
     )
     session.add(sub)
     await session.commit()
     await session.refresh(sub)
+
+    for group in accepted:
+        session.add(SubscriptionTopic(subscription_id=sub.id, topic_key=group))
+    await session.commit()
 
     return SubscriptionDTO(
         id=str(sub.id),

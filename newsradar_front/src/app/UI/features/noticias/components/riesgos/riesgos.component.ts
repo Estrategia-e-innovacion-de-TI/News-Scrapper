@@ -10,6 +10,11 @@ import { DocumentResult } from '../../../../../domain/noticias/models';
   imports: [ArasSearchFormComponent, RiesgosSearchFormComponent, ResultsTableComponent],
   template: `
     <div class="space-y-6" data-testid="content-riesgos">
+      <h2 class="text-lg font-semibold">ARAS / Riesgos</h2>
+      <p class="text-sm text-gray-500">
+        Consulta por empresa, emisor o NIT, y tambien por terminos generales de riesgo desde la misma vista.
+      </p>
+
       <div class="flex gap-2 border-b border-gray-200 mb-4" role="tablist" aria-label="Sub-secciones de Riesgos">
         <button
           role="tab"
@@ -20,7 +25,7 @@ import { DocumentResult } from '../../../../../domain/noticias/models';
           [class.text-gray-600]="activeSubTab() !== 'aras'"
           (click)="activeSubTab.set('aras')"
         >
-          ARAS
+          Empresa / emisor
         </button>
         <button
           role="tab"
@@ -31,7 +36,7 @@ import { DocumentResult } from '../../../../../domain/noticias/models';
           [class.text-gray-600]="activeSubTab() !== 'riesgos'"
           (click)="activeSubTab.set('riesgos')"
         >
-          Riesgos Emergentes
+          Terminos de riesgo
         </button>
       </div>
 

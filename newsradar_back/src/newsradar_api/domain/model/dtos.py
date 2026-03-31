@@ -53,7 +53,10 @@ class ArasSearchRequest(BaseModel):
     """Request body for POST /api/aras/search."""
 
     company: Optional[str] = Field(None, description="Company name to search")
+    issuer: Optional[str] = Field(None, description="Issuer name to search")
     nit: Optional[str] = Field(None, description="Colombian NIT (alternative to company)")
+    term: Optional[str] = Field(None, description="General risk term to search")
+    terms: list[str] = Field(default_factory=list, description="Additional ad-hoc terms")
     risk_category: Optional[str] = Field(None, description="ARAS risk category filter")
     date_from: Optional[date] = Field(None, description="Start date range")
     date_to: Optional[date] = Field(None, description="End date range")
@@ -64,6 +67,9 @@ class ArasSearchResponse(BaseModel):
     """Response body for POST /api/aras/search."""
 
     run_id: str
+    search_id: Optional[str] = None
+    audit_id: Optional[str] = None
+    export_id: Optional[str] = None
     total_documents: int = 0
     total_classified: int = 0
     results: list[DocumentResult] = Field(default_factory=list)
@@ -88,6 +94,9 @@ class RiesgosSearchResponse(BaseModel):
     """Response body for POST /api/riesgos/search."""
 
     run_id: str
+    search_id: Optional[str] = None
+    audit_id: Optional[str] = None
+    export_id: Optional[str] = None
     total_documents: int = 0
     total_classified: int = 0
     results: list[DocumentResult] = Field(default_factory=list)

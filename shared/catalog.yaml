@@ -1105,6 +1105,155 @@ sources:
     quality_hint: ok
     notes: "Insights corporativos accesibles."
 
+  - source_id: wef_global_risks
+    name: "WEF - Global Risks Report"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam"]
+    pipeline_class: "news"
+    type: "pdf"
+    base_url: "https://es.weforum.org/publications/global-risks-report-2026/"
+    pdf_urls:
+      - "https://es.weforum.org/publications/global-risks-report-2026/"
+    languages: ["en", "es"]
+    geo: ["GLOBAL"]
+    topics: ["risk_mapping", "geopolitics", "climate", "cybersecurity"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+    notes: "Fuente institucional bimensual para risk mapping."
+
+  - source_id: world_bank_resilience
+    name: "World Bank - Resilience and Sustainable Development"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.worldbank.org/"
+    listing_urls:
+      - "https://www.worldbank.org/en/topic/disasterriskmanagement"
+    languages: ["en", "es"]
+    geo: ["GLOBAL"]
+    topics: ["resilience", "climate", "development", "risk_mapping"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: ok
+    notes: "Fuente institucional bimensual para risk mapping."
+
+  - source_id: marsh_global_risks
+    name: "Marsh - Global Risks Report"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.corporate.marsh.com/news-events/2026/january/global-risks-report-2026.html"
+    listing_urls:
+      - "https://www.corporate.marsh.com/news-events/2026/january/global-risks-report-2026.html"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["insurance", "global_risks", "risk_mapping"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: ok
+
+  - source_id: zurich_global_risk_report
+    name: "Zurich - Global Risk Report"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.zurich.de/de-de/geschaeftskunden/firmenwissen/global-risk-report"
+    listing_urls:
+      - "https://www.zurich.de/de-de/geschaeftskunden/firmenwissen/global-risk-report"
+      - "https://www.zurich.co.uk/news-and-insight/specialty-lines-in-2026"
+    languages: ["en", "de"]
+    geo: ["GLOBAL"]
+    topics: ["insurance", "cybersecurity", "specialty_lines", "risk_mapping"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: ok
+
+  - source_id: allianz_risk_barometer
+    name: "Allianz - Risk Barometer"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam"]
+    pipeline_class: "news"
+    type: "pdf"
+    base_url: "https://commercial.allianz.com/news-and-insights/reports/allianz-risk-barometer.html"
+    pdf_urls:
+      - "https://commercial.allianz.com/content/dam/onemarketing/commercial/commercial/reports/allianz-risk-barometer-2026.pdf"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["insurance", "cybersecurity", "ai_risk", "risk_mapping"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: aon_outlook
+    name: "Aon - Risk Outlook"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.aon.com/en/insights/articles/2026-pnc-outlook-navigating-volatility-unlocking-growth"
+    listing_urls:
+      - "https://www.aon.com/en/insights/articles/2026-pnc-outlook-navigating-volatility-unlocking-growth"
+      - "https://www.aon.com/en-gb/insights/articles/locations/uk/2026-risk-outlook-airmic"
+      - "https://www.aon.com/en/insights/insights-for-insurers"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["insurance", "volatility", "risk_mapping"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: ok
+
+  - source_id: baker_tilly_risks
+    name: "Baker Tilly - Trends and Risks for Insurers"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.bakertilly.com/insights/insurance-trends-risks-and-strategies-for-2026"
+    listing_urls:
+      - "https://www.bakertilly.com/insights/insurance-trends-risks-and-strategies-for-2026"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["insurance", "strategy", "risk_mapping"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: ok
+
+  - source_id: iron_mountain_outlook
+    name: "Iron Mountain - Insurance Outlook"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://resources.ironmountain.com/whitepapers/i/insurance-outlook-trends-technologies-and-tactics-for-a-changing-world"
+    listing_urls:
+      - "https://resources.ironmountain.com/whitepapers/i/insurance-outlook-trends-technologies-and-tactics-for-a-changing-world"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["insurance", "technology", "risk_mapping"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: ok
+
 # =========================
 # RESUMEN DE PERFILADO
 # =========================

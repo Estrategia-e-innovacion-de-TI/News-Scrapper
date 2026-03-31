@@ -19,6 +19,11 @@ import { API_BASE_URL } from '../../../../../config/api.token';
               class="w-full border rounded px-3 py-2 text-sm" placeholder="Nombre de la empresa" />
           </div>
           <div>
+            <label for="aras-issuer" class="block text-sm mb-1">Emisor</label>
+            <input id="aras-issuer" formControlName="issuer"
+              class="w-full border rounded px-3 py-2 text-sm" placeholder="Nombre del emisor" />
+          </div>
+          <div>
             <label for="aras-nit" class="block text-sm mb-1">NIT</label>
             <input id="aras-nit" formControlName="nit"
               class="w-full border rounded px-3 py-2 text-sm" placeholder="900123456-7" />
@@ -93,6 +98,7 @@ export class ArasSearchFormComponent {
 
   readonly form: FormGroup = this.fb.group({
     company: [''],
+    issuer: [''],
     nit: [''],
     riskCategory: [''],
     classifier: ['rules'],
@@ -109,6 +115,7 @@ export class ArasSearchFormComponent {
     this.api
       .searchAras({
         company: v.company || undefined,
+        issuer: v.issuer || undefined,
         nit: v.nit || undefined,
         risk_category: v.riskCategory || undefined,
         classifier: v.classifier || undefined,

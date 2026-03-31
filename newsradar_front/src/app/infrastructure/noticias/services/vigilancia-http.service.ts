@@ -8,6 +8,7 @@ import {
   SubscribeRequest,
   SubscribeResponse,
   Subscription,
+  SubscriptionDelivery,
 } from '../../../domain/noticias/models';
 import { VigilanciaApiPort } from './noticias-api.token';
 
@@ -41,6 +42,12 @@ export class VigilanciaHttpService implements VigilanciaApiPort {
   listSubscriptions(): Observable<Subscription[]> {
     return this.http
       .get<Subscription[]>(`${this.baseUrl}/subscriptions/`)
+      .pipe(catchError(this.handleError));
+  }
+
+  listDeliveries(): Observable<SubscriptionDelivery[]> {
+    return this.http
+      .get<SubscriptionDelivery[]>(`${this.baseUrl}/subscriptions/deliveries`)
       .pipe(catchError(this.handleError));
   }
 

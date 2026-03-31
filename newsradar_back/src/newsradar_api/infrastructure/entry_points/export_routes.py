@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from newsradar_api.infrastructure.driven_adapters.database import get_session
 from newsradar_api.infrastructure.driven_adapters.db_models import (
     Document as DBDocument,
+    ExportAudit,
     PipelineRun,
 )
 
@@ -114,6 +115,21 @@ async def export_excel(
     file_name = f"{run_id}_export.xlsx"
     out_path = EXPORT_DIR / file_name
     exporter.export(docs_for_export, out_path, metadata=metadata)
+
+    session.add(
+        ExportAudit(
+            export_kind="excel",
+            file_name=file_name,
+            file_path=str(out_path),
+            status="created",
+            row_count=len(docs_for_export),
+            metadata_json={
+                "run_id": run_id,
+                "filters": request.filters or {},
+            },
+        )
+    )
+    await session.commit()
 
     return {
         "file_url": f"/api/export/download/{file_name}",

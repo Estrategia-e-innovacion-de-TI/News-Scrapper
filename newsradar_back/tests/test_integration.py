@@ -12,7 +12,9 @@ from newsradar_api.infrastructure.connectors.search_models import SearchCandidat
 from newsradar_api.infrastructure.driven_adapters.database import get_session
 from newsradar_api.infrastructure.driven_adapters.db_models import (
     Document as DBDocument,
+    Execution,
     PipelineRun,
+    ReportSnapshot,
     Subscription,
     TrendmapSnapshot,
 )
@@ -80,10 +82,53 @@ def test_routers_registered_and_existing_routes_respond(
         id="snapshot-1",
         generated_at=datetime(2026, 3, 31, tzinfo=timezone.utc),
     )
+    canonical_snapshot = SimpleNamespace(
+        id="canonical-1",
+        generated_at=datetime(2026, 3, 31, tzinfo=timezone.utc),
+        data_json={
+            "generated_at": "2026-03-31T00:00:00+00:00",
+            "meta": {
+                "generated_at": "2026-03-31T00:00:00+00:00",
+                "total_articles": 1,
+                "total_papers": 0,
+                "total_filtered": 1,
+                "total_clusters": 1,
+                "total_categories": 1,
+                "silhouette_score": 0.0,
+            },
+            "summary": {"total_documents": 1, "total_clusters": 1, "dominant_risks": ["ciberseguridad"]},
+            "clusters": [{"cluster_id": "cluster-1", "label": "cluster-1", "category": "IA", "documents": 1, "avg_score": 75}],
+            "articles": [{"id": "doc-1", "title": "Doc 1", "source": "demo", "source_type": "news", "date": "2026-03-31", "score": 75, "url": "https://example.com", "x_embed": 0, "y_embed": 0, "cluster_id": "cluster-1"}],
+            "top_documents": [{"id": "doc-1", "title": "Doc 1", "source": "demo", "score": 75, "summary": "summary"}],
+        },
+        summary_json={"total_documents": 1, "total_clusters": 1},
+        window_months=6,
+    )
+    execution = SimpleNamespace(
+        id="exec-1",
+        run_key="run-1",
+        status="completed",
+        started_at=datetime(2026, 3, 31, tzinfo=timezone.utc),
+        finished_at=datetime(2026, 3, 31, tzinfo=timezone.utc),
+        metrics_json={"total_ok": 1},
+    )
+    tech_doc = SimpleNamespace(
+        id="doc-1",
+        title="Documento de prueba",
+        source_id="demo",
+        source_type="rss",
+        published_at=datetime(2026, 3, 31, tzinfo=timezone.utc),
+        relevance_score=88,
+        category="IA",
+        url="https://example.com/doc-1",
+    )
     session = FakeSession(
         entity_map={
             Subscription: [],
             TrendmapSnapshot: [snapshot],
+            ReportSnapshot: [canonical_snapshot],
+            Execution: [execution],
+            DBDocument: [tech_doc],
         },
     )
 
@@ -103,6 +148,11 @@ def test_routers_registered_and_existing_routes_respond(
         assert openapi.status_code == 200
         paths = openapi.json()["paths"]
         assert "/api/pipeline/run" in paths
+        assert "/api/tech-watch/run" in paths
+        assert "/api/riskmap/latest" in paths
+        assert "/api/jobs/status" in paths
+        assert "/api/health" in paths
+        assert "/api/aras/search/history" in paths
         assert "/api/subscriptions/" in paths
         assert "/api/catalog/sources" in paths
 
@@ -120,6 +170,22 @@ def test_routers_registered_and_existing_routes_respond(
         vigilancia_topics = client.get("/api/vigilancia/topics")
         assert vigilancia_topics.status_code == 200
         assert any(topic["group_id"] == "ia_ml" for topic in vigilancia_topics.json())
+
+        tech_watch_topics = client.get("/api/tech-watch/topics")
+        assert tech_watch_topics.status_code == 200
+        assert any(topic["group_id"] == "ia_ml" for topic in tech_watch_topics.json())
+
+        tech_watch_docs = client.get("/api/tech-watch/documents")
+        assert tech_watch_docs.status_code == 200
+        assert tech_watch_docs.json()[0]["title"] == "Documento de prueba"
+
+        trendmap_latest = client.get("/api/trendmap/latest")
+        assert trendmap_latest.status_code == 200
+        assert trendmap_latest.json()["snapshot_id"] == "canonical-1"
+
+        riskmap_latest = client.get("/api/riskmap/latest")
+        assert riskmap_latest.status_code == 200
+        assert riskmap_latest.json()["snapshot_id"] == "canonical-1"
 
         trendmap_meta = client.get("/api/trendmap/meta")
         assert trendmap_meta.status_code == 200

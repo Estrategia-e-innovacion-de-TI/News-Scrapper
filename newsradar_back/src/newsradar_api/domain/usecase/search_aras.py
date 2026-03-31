@@ -33,5 +33,8 @@ class SearchArasUseCase:
         ArasSearchResponse
             Classified results with optional Excel download URL.
         """
-        # TODO: Invoke MCP server aras_adhoc tool, collect results, build response
-        raise NotImplementedError("TODO: implement ARAS search via MCP")
+        result = await self._mcp.invoke_tool(
+            "aras_search",
+            request.model_dump(mode="json"),
+        )
+        return ArasSearchResponse(**result)

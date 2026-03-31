@@ -13,30 +13,35 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from newsradar_api.domain.model.dtos import PipelineRunRequest, PipelineRunResponse
-from newsradar_api.domain.model.pipeline_models import RunMetrics
 from newsradar_api.infrastructure.driven_adapters.database import get_session
 from newsradar_api.infrastructure.driven_adapters.db_models import PipelineRun
+from newsradar_api.shared_kernel.ingestion import run_local_ingestion
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+class PipelineExecuteRequest(PipelineRunRequest):
+    run_id: str | None = Field(None, description="Optional run id supplied by SMCP or worker orchestration")
+
+
 async def _run_pipeline_background(run_id: str, params: PipelineRunRequest) -> None:
     """Execute the pipeline in background and update pipeline_runs table."""
     try:
-        from newsradar_api.infrastructure.pipeline.pipeline import run_extraction
         from newsradar_api.infrastructure.driven_adapters.database import async_session
 
-        final_state = await run_extraction(
+        result = await run_local_ingestion(
+            run_id=run_id,
+            focus=params.focus,
+            adhoc=params.adhoc,
             catalog_path=params.catalog_path,
             days=params.days,
             max_items_per_source=params.max_items_per_source,
-            focus=params.focus,
-            adhoc=params.adhoc,
             company=params.company,
             terms=params.terms,
             date_from=params.date_from.isoformat() if params.date_from else None,
@@ -58,14 +63,10 @@ async def _run_pipeline_background(run_id: str, params: PipelineRunRequest) -> N
                 run_record.duration_seconds = (
                     now - run_record.started_at
                 ).total_seconds()
-                metrics = final_state.metrics
-                if metrics:
-                    run_record.total_sources = metrics.total_sources
-                    run_record.total_discovered = metrics.total_discovered
-                    run_record.total_fetched = metrics.total_fetched
-                    run_record.total_ok = metrics.total_ok
-                    run_record.total_errors = metrics.total_errors
-                    run_record.total_dupes = metrics.total_dupes
+                run_record.params_json = {
+                    **(run_record.params_json or {}),
+                    "execution_id": result.get("execution_id"),
+                }
                 await session.commit()
 
         logger.info("Pipeline run %s completed", run_id)
@@ -113,6 +114,45 @@ async def run_pipeline(
     background_tasks.add_task(_run_pipeline_background, run_id, request)
 
     return PipelineRunResponse(run_id=run_id, status="started")
+
+
+@router.post("/execute", include_in_schema=False)
+async def execute_pipeline(
+    request: PipelineExecuteRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Internal synchronous execution endpoint consumed by SMCP."""
+    run_id = request.run_id or str(uuid.uuid4())[:8]
+
+    stmt = select(PipelineRun).where(PipelineRun.run_id == run_id)
+    existing = (await session.execute(stmt)).scalar_one_or_none()
+    if existing is None:
+        session.add(
+            PipelineRun(
+                run_id=run_id,
+                started_at=datetime.now(timezone.utc),
+                params_json=request.model_dump(mode="json"),
+            )
+        )
+        await session.commit()
+
+    result = await run_local_ingestion(
+        run_id=run_id,
+        focus=request.focus,
+        adhoc=request.adhoc,
+        catalog_path=request.catalog_path,
+        days=request.days,
+        max_items_per_source=request.max_items_per_source,
+        company=request.company,
+        terms=request.terms,
+        date_from=request.date_from.isoformat() if request.date_from else None,
+        date_to=request.date_to.isoformat() if request.date_to else None,
+        classifier_mode=request.classifier_mode,
+        dry_run=request.dry_run,
+        nit=request.nit,
+        terms_preset=request.terms_preset,
+    )
+    return result
 
 
 @router.get("/status/{run_id}")

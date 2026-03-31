@@ -1,88 +1,66 @@
-"""Prompt templates for the AI Agent.
-
-Templates used to construct LLM prompts for intent detection,
-parameter extraction, and response generation.
-"""
+"""Prompt templates used by the NewsRadar AI agent."""
 from __future__ import annotations
+
+import string
 
 from pydantic import BaseModel
 
 
 class PromptTemplate(BaseModel):
-    """A prompt template with placeholder substitution.
-
-    Attributes
-    ----------
-    name : str
-        Template identifier.
-    system_prompt : str
-        System-level instructions for the LLM.
-    user_template : str
-        User message template with {placeholders}.
-    """
+    """Prompt template with safe placeholder validation."""
 
     name: str
     system_prompt: str = ""
     user_template: str = ""
 
     def render(self, **kwargs: str) -> str:
-        """Render the user template with the given parameters.
-
-        Parameters
-        ----------
-        **kwargs : str
-            Values to substitute into {placeholders}.
-
-        Returns
-        -------
-        str
-            Rendered prompt string.
-        """
-        # TODO: Implement template rendering with validation
+        formatter = string.Formatter()
+        required = {
+            field_name
+            for _, field_name, _, _ in formatter.parse(self.user_template)
+            if field_name
+        }
+        missing = sorted(field for field in required if field not in kwargs)
+        if missing:
+            raise ValueError(f"Missing prompt placeholders for {self.name}: {', '.join(missing)}")
         return self.user_template.format(**kwargs)
 
-
-# -- Default prompt templates ------------------------------------------------
 
 INTENT_DETECTION_PROMPT = PromptTemplate(
     name="intent_detection",
     system_prompt=(
-        "You are an intent classifier for a news risk analysis system. "
-        "Classify the user message into one of: aras_search, riesgos_search, "
-        "clarification, greeting, unknown. Extract relevant parameters."
+        "Classify the user message for the NewsRadar assistant. "
+        "Allowed intents: aras_search, risk_search, trendmap_latest, "
+        "riskmap_latest, tech_watch_status, help, greeting, clarification, unknown."
     ),
     user_template=(
-        "Classify the following user message and extract parameters:\n\n"
-        "Message: {user_message}\n\n"
-        "Respond in JSON: {{\"intent\": \"...\", \"confidence\": 0.0, "
-        "\"parameters\": {{...}}}}"
+        "Message: {user_message}\n"
+        "Return JSON with keys intent, confidence and parameters."
     ),
 )
 
-ARAS_RESPONSE_PROMPT = PromptTemplate(
-    name="aras_response",
+SEARCH_RESPONSE_PROMPT = PromptTemplate(
+    name="search_response",
     system_prompt=(
-        "You are a risk analyst assistant. Summarize ARAS search results "
-        "for the user in a clear, concise manner. Highlight key findings, "
-        "severity levels, and evidence."
+        "Summarize news search results for an analyst. Highlight the total, the most "
+        "relevant documents and any severity or risk labels."
     ),
     user_template=(
-        "The user asked about: {query}\n\n"
-        "Search results:\n{results}\n\n"
-        "Provide a concise summary of the findings."
+        "Query: {query}\n"
+        "Results: {results}\n"
+        "Provide a concise operational summary."
     ),
 )
 
-RIESGOS_RESPONSE_PROMPT = PromptTemplate(
-    name="riesgos_response",
+SNAPSHOT_RESPONSE_PROMPT = PromptTemplate(
+    name="snapshot_response",
     system_prompt=(
-        "You are an emerging risks analyst assistant. Summarize Riesgos "
-        "Emergentes search results for the user. Highlight risk types, "
-        "materialized events, and severity."
+        "Summarize a persisted analytical snapshot for an executive audience. Focus on "
+        "dominant themes, clusters and immediate implications."
     ),
     user_template=(
-        "The user searched for emerging risks with terms: {terms}\n\n"
-        "Search results:\n{results}\n\n"
-        "Provide a concise summary of the findings."
+        "Snapshot type: {snapshot_type}\n"
+        "Snapshot data: {snapshot}\n"
+        "Provide a concise analytical summary."
     ),
 )

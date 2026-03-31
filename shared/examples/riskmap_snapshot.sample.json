@@ -1,0 +1,42 @@
+{
+  "report_type": "risk_mapping",
+  "generated_at": "2026-03-31T15:00:00Z",
+  "window_months": 6,
+  "summary": {
+    "total_documents": 30,
+    "total_clusters": 5,
+    "dominant_risks": ["ciberseguridad", "desinformacion", "geopolitica"]
+  },
+  "clusters": [
+    {
+      "cluster_id": "ciberseguridad",
+      "label": "ciberseguridad",
+      "dominant_risk": "ciberseguridad",
+      "documents": 12,
+      "avg_score": 78.0,
+      "coords": {"x": 1.4, "y": -0.2},
+      "top_keywords": ["ransomware", "phishing"]
+    }
+  ],
+  "charts": {
+    "timeline": [{"bucket": "2026-03", "risk": "ciberseguridad", "count": 5}],
+    "source_mix": [{"source": "wef", "count": 4}],
+    "cluster_sizes": [{"label": "ciberseguridad", "count": 12}],
+    "hype_cycle": [{"label": "ciberseguridad", "x": 1.4, "y": 78.0}]
+  },
+  "top_documents": [
+    {
+      "id": "doc-1",
+      "title": "Cyber risk remains top concern",
+      "source": "wef",
+      "score": 92,
+      "summary": "Cyber risk remains the top concern for executives."
+    }
+  ],
+  "sources_used": ["wef", "allianz", "zurich"],
+  "parameters": {
+    "window_months": 6,
+    "cluster_method": "lexical_v1"
+  },
+  "version": 1
+}

@@ -5,12 +5,12 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from newsradar_api.infrastructure.driven_adapters.db_models import (
     Document, Cluster, Trend, Subscription, Topic,
-    EvidenceSpan, PipelineRun, TrendmapSnapshot,
+    EvidenceSpan, PipelineRun, TrendmapSnapshot, SubscriptionTopic,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,41 @@ class DBAdapter:
             stmt = stmt.where(Document.run_id == run_id)
         if search_type:
             stmt = stmt.where(Document.query_type == search_type)
+        if company:
+            term = f"%{company.lower()}%"
+            stmt = stmt.where(
+                or_(
+                    func.lower(Document.title).like(term),
+                    func.lower(Document.text).like(term),
+                    func.lower(Document.url).like(term),
+                )
+            )
+        if nit:
+            nit_term = f"%{nit.lower()}%"
+            stmt = stmt.where(
+                or_(
+                    func.lower(Document.title).like(nit_term),
+                    func.lower(Document.text).like(nit_term),
+                )
+            )
+        if risk_category:
+            stmt = stmt.where(
+                or_(Document.category == risk_category, Document.risk_type == risk_category)
+            )
+        if terms:
+            patterns = [f"%{term.lower()}%" for term in terms if term]
+            if patterns:
+                stmt = stmt.where(
+                    or_(
+                        *[
+                            or_(
+                                func.lower(Document.title).like(pattern),
+                                func.lower(Document.text).like(pattern),
+                            )
+                            for pattern in patterns
+                        ]
+                    )
+                )
         if date_from:
             stmt = stmt.where(Document.published_at >= date_from)
         if date_to:
@@ -65,8 +100,16 @@ class DBAdapter:
         query_groups: list[str],
         name: str | None = None,
     ) -> bool:
-        sub = Subscription(subscriber_email=email, query_groups=query_groups)
+        sub = Subscription(
+            subscriber_email=email,
+            subscriber_name=name,
+            query_groups=query_groups,
+        )
         self._session.add(sub)
+        await self._session.commit()
+        await self._session.refresh(sub)
+        for group in query_groups:
+            self._session.add(SubscriptionTopic(subscription_id=sub.id, topic_key=group))
         await self._session.commit()
         return True
 

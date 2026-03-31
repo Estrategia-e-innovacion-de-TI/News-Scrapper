@@ -12,6 +12,9 @@ export interface RiesgosSearchRequest {
 
 export interface RiesgosSearchResponse {
   run_id: string;
+  search_id?: string | null;
+  audit_id?: string | null;
+  export_id?: string | null;
   total_documents: number;
   total_classified: number;
   results: DocumentResult[];

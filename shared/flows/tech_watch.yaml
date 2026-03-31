@@ -1,0 +1,20 @@
+flow: tech_watch
+description: Vigilancia tecnologica batch sobre noticias, papers y patentes.
+default_window_months: 6
+sources:
+  news:
+    schedule: weekly
+    focus: vigilancia_news
+    enabled: true
+  papers:
+    schedule: monthly
+    mode: papers
+    enabled: true
+  patents:
+    schedule: bimonthly
+    mode: patents
+    enabled: true
+scoring:
+  classifier_mode: rules
+  llm_prompt: rerank_vigilancia.yaml
+  min_relevance: 45

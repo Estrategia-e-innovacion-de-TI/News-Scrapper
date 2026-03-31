@@ -82,6 +82,7 @@ def compile_graph():
 
 
 async def run_extraction(
+    run_id: str | None = None,
     catalog_path: str = "catalog.yaml",
     days: int = 7,
     max_items_per_source: int = 20,
@@ -146,6 +147,7 @@ async def run_extraction(
             logger.warning("Preset resolution failed: %s", exc)
 
     initial_state = GraphState(
+        run_id=run_id or GraphState().run_id,
         catalog_path=catalog_path,
         days=days,
         max_items_per_source=max_items_per_source,

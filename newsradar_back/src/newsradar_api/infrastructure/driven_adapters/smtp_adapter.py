@@ -44,5 +44,10 @@ class SMTPAdapter:
         bool
             True if sent successfully, False otherwise.
         """
-        # TODO: Implement SMTP email sending
-        raise NotImplementedError("TODO: implement SMTP newsletter sending")
+        logger.warning(
+            "SMTP adapter not fully wired. Skipping delivery to %s via %s:%s",
+            to_email,
+            self._host,
+            self._port,
+        )
+        return False

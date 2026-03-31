@@ -7,15 +7,12 @@ Validates: Requirements 5.3
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, Query
+from newsradar_api.shared_kernel.config.paths import resolve_catalog_path
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-_DEFAULT_CATALOG_PATH = Path(__file__).resolve().parents[5] / "config" / "catalog.yaml"
-
 
 @router.get("/sources")
 async def list_sources(
@@ -32,12 +29,7 @@ async def list_sources(
             filter_sources,
         )
 
-        catalog_path = _DEFAULT_CATALOG_PATH
-        if not catalog_path.exists():
-            # Try alternative paths
-            alt_path = Path(__file__).resolve().parents[6] / "catalog.yaml"
-            if alt_path.exists():
-                catalog_path = alt_path
+        catalog_path = resolve_catalog_path()
 
         defaults, sources = load_sources(str(catalog_path))
 

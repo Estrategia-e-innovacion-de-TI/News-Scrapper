@@ -1,235 +1,165 @@
-# News Radar — Monorepo
+# News-Scrapper
 
-Sistema de monitoreo, clasificación y análisis de noticias para gestión de riesgos e innovación. Integra extracción automatizada de noticias, clasificación por categorías de riesgo, vigilancia tecnológica y visualización de tendencias (trend mapping).
+Monorepo para vigilancia tecnologica, consultas ARAS/Riesgos, trend mapping, risk mapping, subscriptions y adapters SMCP/AI Agent.
 
-## Estructura del Monorepo
+## Estado actual
 
-```
-Noticias/
-├── newsradar_front/       # Frontend Angular 21 — Feature Noticias (Clean Architecture)
-│   └── src/app/
-│       ├── domain/        # Modelos y servicios de negocio
-│       ├── infrastructure/# Servicios de acceso a datos/APIs
-│       └── UI/            # Componentes visuales y features
-├── newsradar_back/        # Backend API — Python 3.11 (Express mock / FastAPI)
-│   ├── src/
-│   ├── tests/
-│   ├── Dockerfile
-│   └── pyproject.toml
-├── newsradar_smcp/        # Servidor MCP — Pipeline de extracción y clasificación
-│   ├── src/
-│   ├── tests/
-│   ├── Dockerfile
-│   └── pyproject.toml
-├── newsradar_aiagent/     # Agente IA conversacional — Consultas ARAS y Riesgos
-│   ├── src/
-│   ├── tests/
-│   ├── Dockerfile
-│   └── pyproject.toml
-├── shared/                # Configuración compartida entre módulos
-│   ├── catalog.yaml       # Catálogo de fuentes de noticias
-│   └── source_profiles.json # Perfiles de fuentes
-├── .gitignore
-├── MIGRATION_NOTES.md
-└── README.md
-```
+- `newsradar_back`: backend principal FastAPI con dominios canonicos `tech_watch`, `trend_mapping`, `subscriptions`, `aras_search` y `risk_mapping`.
+- `newsradar_front`: frontend Angular 21 reorganizado en 5 tabs: `tech-watch`, `trendmap`, `subscriptions`, `aras`, `riskmap`.
+- `newsradar_smcp`: adapter HTTP funcional sobre capacidades del backend. Todavia no reemplaza por completo al motor de ingesta.
+- `newsradar_aiagent`: cliente opcional sobre backend/SMCP. No contiene logica core ni es parte del camino critico.
+- `shared/`: configuracion declarativa prioritaria para catalogos, flujos, prompts, topicos, schedules y ejemplos de snapshots.
 
-## Requisitos Previos
+## Arquitectura objetivo implementada
 
-| Módulo | Requisito |
-|--------|-----------|
-| `newsradar_front` | Node.js >= 20, npm >= 10 |
-| `newsradar_back` | Python 3.11+, pip |
-| `newsradar_smcp` | Python 3.11+, pip |
-| `newsradar_aiagent` | Python 3.11+, pip |
+### Backend
 
-## Setup e Instrucciones por Módulo
+`newsradar_back/src/newsradar_api/`
 
-### newsradar_front — Frontend Angular 21
+- `domains/tech_watch`
+- `domains/trend_mapping`
+- `domains/subscriptions`
+- `domains/aras_search`
+- `domains/risk_mapping`
+- `shared_kernel/config`
+- `shared_kernel/documents`
+- `shared_kernel/snapshots`
+- `shared_kernel/observability`
+- `worker`
 
-Frontend construido con Angular 21, TypeScript 5.9, Tailwind CSS 3.4 y D3.js v7. Sigue arquitectura Clean (domain / infrastructure / UI).
+### Persistencia
 
-```bash
-cd newsradar_front
+Se introdujo el modelo canónico para:
 
-# Instalar dependencias
-npm install
+- `executions`
+- `execution_sources`
+- `documents`
+- `document_scores`
+- `document_topics`
+- `report_snapshots`
+- `trend_reports`
+- `risk_reports`
+- `subscription_topics`
+- `subscription_deliveries`
+- `search_audit`
+- `exports_audit`
+- `llm_prompts`
+- `flow_configs`
+- `source_catalog`
+- `job_status`
 
-# Servidor de desarrollo (http://localhost:4200)
-ng serve
+Compatibilidad legacy mantenida:
 
-# Build de producción
-ng build --configuration production
+- `pipeline_runs`
+- `trendmap_snapshots`
+- `clusters`
+- `trends`
+- `topics`
+- rutas `/api/vigilancia/*`, `/api/pipeline/*`, `/api/riesgos/search`
 
-# Ejecutar tests unitarios
-ng test
+## Endpoints principales
 
-# Ejecutar tests con cobertura
-npx jest --coverage
-```
+### Canonicos
 
-### newsradar_back — Backend API
+- `POST /api/tech-watch/run`
+- `GET /api/tech-watch/executions`
+- `GET /api/tech-watch/documents`
+- `GET /api/tech-watch/topics`
+- `POST /api/trendmap/generate`
+- `GET /api/trendmap/latest`
+- `GET /api/trendmap/history`
+- `GET /api/trendmap/{snapshot_id}`
+- `POST /api/subscriptions`
+- `GET /api/subscriptions`
+- `PUT /api/subscriptions/{id}`
+- `GET /api/subscriptions/deliveries`
+- `POST /api/aras/search`
+- `GET /api/aras/search/history`
+- `GET /api/aras/search/{search_id}`
+- `GET /api/aras/export/{export_id}`
+- `POST /api/riskmap/run`
+- `GET /api/riskmap/latest`
+- `GET /api/riskmap/history`
+- `GET /api/riskmap/{snapshot_id}`
+- `GET /api/health`
+- `GET /api/jobs/status`
+- `GET /api/catalog/sources`
 
-Backend en Python 3.11 que expone las APIs REST consumidas por el frontend.
+### Legacy mantenidos
 
-```bash
-cd newsradar_back
+- `POST /api/pipeline/run`
+- `GET /api/pipeline/status/{run_id}`
+- `GET /api/vigilancia/topics`
+- `POST /api/vigilancia/subscribe`
+- `POST /api/riesgos/search`
+- `GET /api/trendmap/`
+- `GET /api/trendmap/meta`
 
-# Crear entorno virtual
-python3.11 -m venv .venv
-source .venv/bin/activate
+## Snapshots
 
-# Instalar dependencias
-pip install -e ".[dev]"
+Ejemplos incluidos en:
 
-# Ejecutar servidor de desarrollo
-uvicorn src.main:app --reload --port 4000
+- `shared/examples/trendmap_snapshot.sample.json`
+- `shared/examples/riskmap_snapshot.sample.json`
 
-# Ejecutar tests
-pytest tests/
-```
+Los snapshots se generan en backend y quedan persistidos/versionados para consumo directo del frontend.
 
-### newsradar_smcp — Servidor MCP (Pipeline de Noticias)
+- analitica estructurada con vectorizacion TF-IDF, reduccion dimensional, clusterizacion y payloads de charts
+- enriquecimiento opcional con LLM en Bedrock para relabeling de clusters, `executive_summary`, `insights` y `recommendations`
+- trazabilidad LLM en `parameters.llm_enrichment` y persistencia de prompts en `llm_prompts`
 
-Servidor MCP (Model Context Protocol) en Python 3.11 que ejecuta el pipeline de extracción, clasificación, scoring y exportación de noticias.
+## Configuracion compartida
 
-```bash
-cd newsradar_smcp
+La resolucion de config ahora prioriza `shared/`:
 
-# Crear entorno virtual
-python3.11 -m venv .venv
-source .venv/bin/activate
+- `shared/catalog.yaml`
+- `shared/flows/tech_watch.yaml`
+- `shared/flows/trend_mapping.yaml`
+- `shared/flows/risk_mapping.yaml`
+- `shared/prompts/rerank_vigilancia.yaml`
+- `shared/prompts/rerank_riesgo.yaml`
+- `shared/prompts/snapshot_trendmap.yaml`
+- `shared/prompts/snapshot_riskmap.yaml`
+- `shared/topics/tech_watch.yaml`
+- `shared/schedules/default.yaml`
 
-# Instalar dependencias
-pip install -e ".[dev]"
+Fallback legado conservado:
 
-# Ejecutar servidor MCP
-python -m src.server
+- `newsradar_back/config/*`
 
-# Ejecutar tests
-pytest tests/
-```
+## Desarrollo local
 
-### newsradar_aiagent — Agente IA Conversacional
+Ver [RUNBOOK.md](RUNBOOK.md).
 
-Agente conversacional en Python 3.11 que permite consultas de ARAS y Riesgos Emergentes mediante chat, usando boto3 y MCP.
+## Docker local
 
-```bash
-cd newsradar_aiagent
+`docker-compose.yml` levanta:
 
-# Crear entorno virtual
-python3.11 -m venv .venv
-source .venv/bin/activate
+- `postgres`
+- `backend`
+- `worker`
+- `smcp`
+- `aiagent`
+- `frontend`
 
-# Instalar dependencias
-pip install -e ".[dev]"
+Puertos:
 
-# Ejecutar agente
-python -m src.agent
+- backend: `8000`
+- frontend: `4200`
+- smcp: `8080`
+- aiagent: `8090`
+- postgres: `5432`
 
-# Ejecutar tests
-pytest tests/
-```
+## Validacion ejecutada
 
-## Archivos de Configuración Compartidos
+- `python -m pytest -q` en `newsradar_back` -> `7 passed`
+- `python -m pytest -q` en `newsradar_aiagent` -> `3 passed`
+- `python -m compileall newsradar_back/src newsradar_smcp/src newsradar_aiagent/src`
 
-La carpeta `shared/` contiene archivos de configuración utilizados por múltiples módulos:
+## TODOs reales
 
-- **`catalog.yaml`** — Catálogo de fuentes de noticias con metadatos de cada fuente (URL, frecuencia, categoría). Usado por el pipeline SMCP para la extracción.
-- **`source_profiles.json`** — Perfiles detallados de cada fuente de noticias (fiabilidad, cobertura geográfica, sesgo). Usado por los módulos de clasificación y scoring.
-
-Estos archivos se mantienen en la raíz compartida para evitar duplicación y garantizar consistencia entre módulos.
-
-## Ejecución Completa del Sistema
-
-Para ejecutar el sistema completo en desarrollo local:
-
-1. Iniciar el backend: `cd newsradar_back && uvicorn src.main:app --reload --port 4000`
-2. Iniciar el frontend: `cd newsradar_front && ng serve`
-3. Acceder a la aplicación en `http://localhost:4200`
-
-El frontend se conecta al backend mediante la variable de entorno `API_BASE_URL` (por defecto `http://localhost:4000/api`). Esta configuración se encuentra en `newsradar_front/src/app/config/environment.ts`.
-
-> **Nota:** El mock_backend original en `news_radar_mvp/mock_backend/` también puede usarse como servidor de desarrollo alternativo en el puerto 4000.
-
-## Arquitectura del Frontend (Clean Architecture)
-
-```
-newsradar_front/src/app/
-├── config/                          # Tokens de inyección y entornos
-│   ├── api.token.ts                 # InjectionToken API_BASE_URL
-│   ├── environment.ts               # Dev: http://localhost:4000/api
-│   └── environment.prod.ts          # Prod: /api
-├── domain/noticias/                 # Capa de dominio (lógica de negocio)
-│   ├── models/                      # Interfaces TypeScript
-│   │   ├── document-result.model.ts
-│   │   ├── aras.model.ts
-│   │   ├── riesgos.model.ts
-│   │   ├── vigilancia.model.ts
-│   │   ├── trendmap.model.ts
-│   │   └── index.ts                 # Barrel export
-│   └── services/                    # Servicios de dominio
-│       ├── riesgos.service.ts       # Validación de búsquedas
-│       ├── vigilancia.service.ts    # Validación de suscripciones
-│       └── trendmap.service.ts      # Filtrado, ordenamiento, agrupación
-├── infrastructure/noticias/         # Capa de infraestructura (acceso a datos)
-│   └── services/
-│       ├── noticias-api.token.ts    # InjectionTokens y puertos (interfaces)
-│       ├── riesgos-http.service.ts  # HTTP: ARAS y Riesgos Emergentes
-│       ├── vigilancia-http.service.ts # HTTP: Vigilancia Tecnológica
-│       └── trendmap-http.service.ts # HTTP: Trend Mapping
-└── UI/                              # Capa de presentación
-    ├── features/noticias/           # Feature principal
-    │   ├── noticias.component.ts    # Tabs: Riesgos, Vigilancia, Trend Mapping
-    │   ├── noticias.routes.ts       # Rutas lazy-loadable
-    │   └── components/
-    │       ├── riesgos/             # ARAS + Riesgos Emergentes + Tabla
-    │       ├── vigilancia/          # Suscripción a boletín
-    │       └── trendmap/            # Clusters, tendencias, D3 visualizaciones
-    └── shared/components/           # Header, Footer compartidos
-```
-
-## Testing
-
-### Frontend (Jest 30 + fast-check 4.5)
-
-```bash
-cd newsradar_front
-
-# Tests unitarios
-npx jest
-
-# Tests con cobertura (umbral mínimo: 80%)
-npx jest --coverage
-
-# Tests en modo watch
-npx jest --watch
-```
-
-Reporters configurados:
-- JUnit XML → `coverage/junit.xml`
-- HTML → `coverage/report-jest.html`
-- Sonar → `coverage/sonar-report.xml`
-
-### Módulos Python (pytest)
-
-```bash
-cd newsradar_back && pytest tests/
-cd newsradar_smcp && pytest tests/
-cd newsradar_aiagent && pytest tests/
-```
-
-## Pipelines CI/CD (Azure DevOps)
-
-Cada módulo tiene su propio pipeline de CI:
-
-| Módulo | Pipeline | Descripción |
-|--------|----------|-------------|
-| `newsradar_front` | `azure-pipeline.yml` → `pipelines/build.yml` + `pipelines/deploy.yml` | Install, lint, test, build, SonarQube, deploy |
-| `newsradar_back` | `back-ci.yml` | Install, pytest con cobertura |
-| `newsradar_smcp` | `smcp-ci.yml` | Install, pytest con cobertura |
-| `newsradar_aiagent` | `aiagent-ci.yml` | Install, pytest con cobertura |
-
-## Migración
-
-Este repositorio fue migrado de Next.js 14 + React 18 a Angular 21. Para detalles completos de la migración, consultar `MIGRATION_NOTES.md`.
+- `newsradar_smcp` hoy es un adapter HTTP funcional al backend. La extraccion sigue corriendo desde `newsradar_back` mientras se completa la migracion del ownership de ingesta.
+- `newsradar_aiagent` queda integrado pero opcional. No se recomienda invertir ahi antes de cerrar el core operativo.
+- Las fuentes institucionales de riesgo quedaron catalogadas; el afinado extractor por fuente y el parsing PDF especializado sigue pendiente.
+- Patentes siguen sujetas a estabilidad/credenciales externas.
+- Las migraciones y el smoke con Postgres real siguen dependiendo de que Docker Desktop o un Postgres local esten disponibles.

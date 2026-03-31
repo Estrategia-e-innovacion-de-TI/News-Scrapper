@@ -1,33 +1,60 @@
-"""A2A protocol entry point — placeholder for future Agent-to-Agent communication.
-
-This module will implement the A2A (Agent-to-Agent) protocol, allowing
-other agents or the backend API to communicate with this agent using
-a standardized protocol.
-
-See: https://google.github.io/A2A/
-"""
+"""Lightweight A2A compatibility entry point for the NewsRadar agent."""
 from __future__ import annotations
 
 import logging
 
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+from newsradar_agent.application.config import AgentConfig
+from newsradar_agent.infrastructure.entry_points.standalone import handle_message
+
 logger = logging.getLogger(__name__)
+
+_CONFIG = AgentConfig.load()
+
+
+class TaskRequest(BaseModel):
+    message: str
+    conversation_id: str | None = None
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(title="NewsRadar AI Agent A2A", version="0.1.0")
+
+    @app.get("/health")
+    async def health() -> dict:
+        return {"status": "ok", "mode": "a2a_compat"}
+
+    @app.get("/agent-card")
+    async def agent_card() -> dict:
+        return {
+            "name": "newsradar-aiagent",
+            "description": "Conversational facade over NewsRadar backend and SMCP capabilities.",
+            "capabilities": [
+                "aras_search",
+                "risk_search",
+                "trendmap_latest",
+                "riskmap_latest",
+                "tech_watch_status",
+            ],
+            "transport": "http-json-compat",
+        }
+
+    @app.post("/tasks/send")
+    async def send_task(request: TaskRequest) -> dict:
+        return handle_message(
+            request.message,
+            conversation_id=request.conversation_id,
+            mcp_server_url=_CONFIG.mcp_server_url,
+            backend_url=_CONFIG.backend_url,
+        )
+
+    return app
 
 
 def run_a2a_server(host: str = "0.0.0.0", port: int = 8081) -> None:
-    """Start the agent in A2A protocol mode.
+    logger.info("Starting NewsRadar A2A compatibility server on %s:%s", host, port)
+    import uvicorn
 
-    Parameters
-    ----------
-    host : str
-        Host to bind the A2A server.
-    port : int
-        Port to listen on.
-    """
-    # TODO: Implement A2A protocol server
-    # This will expose the agent's capabilities via the A2A protocol,
-    # enabling:
-    # - Agent card discovery
-    # - Task submission and streaming
-    # - Multi-turn conversation via A2A messages
-    logger.info("A2A server placeholder — not yet implemented")
-    raise NotImplementedError("TODO: implement A2A protocol entry point")
+    uvicorn.run(create_app(), host=host, port=port)

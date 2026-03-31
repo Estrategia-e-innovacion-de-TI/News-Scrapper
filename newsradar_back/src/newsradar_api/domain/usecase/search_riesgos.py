@@ -33,5 +33,8 @@ class SearchRiesgosUseCase:
         RiesgosSearchResponse
             Classified results with optional Excel download URL.
         """
-        # TODO: Invoke MCP server riesgos_adhoc tool, collect results, build response
-        raise NotImplementedError("TODO: implement Riesgos search via MCP")
+        result = await self._mcp.invoke_tool(
+            "riesgos_search",
+            request.model_dump(mode="json"),
+        )
+        return RiesgosSearchResponse(**result)

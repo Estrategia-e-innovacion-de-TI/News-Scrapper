@@ -69,6 +69,10 @@ def _truncate_text(text: str, max_len: int = 500) -> str:
     return text[:max_len].rsplit(" ", 1)[0] + "…"
 
 
+def _query_terms_list(value: str | None) -> list[str]:
+    return [item.strip() for item in (value or "").split(",") if item.strip()]
+
+
 def _init_source_metrics(source_id: str, requires_playwright: bool = False) -> SourceMetrics:
     """Create a fresh :class:`SourceMetrics` for *source_id*."""
     return SourceMetrics(source_id=source_id, requires_playwright=requires_playwright)
@@ -433,7 +437,7 @@ async def _process_html(
             query_terms = [state.company] if state.company else []
         elif state.focus == "riesgos_news":
             query_type = "riesgos"
-            query_terms = [t.strip() for t in (state.terms or "").split(",") if t.strip()]
+            query_terms = _query_terms_list(state.terms)
         if state.date_from and state.date_to:
             query_range = {"from": state.date_from, "to": state.date_to}
 
@@ -801,8 +805,9 @@ async def classify_and_score_node(state: GraphState) -> dict[str, Any]:
 
     is_adhoc = state.adhoc
     is_vigilancia = state.focus == "vigilancia_news"
+    is_risk_batch = state.focus == "riesgos_news" and not is_adhoc
 
-    if not is_adhoc and not is_vigilancia:
+    if not is_adhoc and not is_vigilancia and not is_risk_batch:
         return {}
 
     # Lazy-init classifiers / scorers
@@ -810,6 +815,7 @@ async def classify_and_score_node(state: GraphState) -> dict[str, Any]:
         RulesClassifier,
         SeverityScorer,
         EvidenceExtractor,
+        process_document,
     )
     from newsradar_api.domain.usecase.relevance_scorer import RelevanceScorer
 
@@ -908,10 +914,17 @@ async def classify_and_score_node(state: GraphState) -> dict[str, Any]:
                     else:
                         source_metrics[sid].severity_l += 1
 
-            elif is_vigilancia:
+            elif is_vigilancia or is_risk_batch:
                 if relevance_scorer is None:
                     relevance_scorer = RelevanceScorer()
-                vig_terms = [t.strip() for t in (state.terms or "").split(",") if t.strip()]
+                vig_terms = _query_terms_list(state.terms)
+                if is_risk_batch:
+                    analysis = process_document(doc.text, doc.title, query_type="riesgos")
+                    doc.risk_type = analysis.get("category")
+                    doc.materialized_events = analysis.get("events", [])
+                    doc.matched_keywords = analysis.get("matched_keywords", [])
+                    doc.confidence = analysis.get("confidence")
+                    doc.classifier_mode = state.classifier_mode
                 score = relevance_scorer.score(doc=doc, query_terms=vig_terms)
                 matched_count = len(getattr(doc, "query_terms", []) or [])
                 if matched_count == 0 and vig_terms:
@@ -939,7 +952,7 @@ async def classify_and_score_node(state: GraphState) -> dict[str, Any]:
     logger.info("classify_and_score complete: %d documents processed", len(documents))
 
     # --- LLM re-ranking ---
-    if state.classifier_mode == "llm" and documents and (is_adhoc or is_vigilancia):
+    if state.classifier_mode == "llm" and documents and (is_adhoc or is_vigilancia or is_risk_batch):
         from newsradar_api.domain.usecase.llm_reranker import LLMReranker
 
         reranker = LLMReranker(flow=state.focus)
@@ -1015,8 +1028,21 @@ async def persist_and_report_node(state: GraphState) -> dict[str, Any]:
         f.write(metrics.model_dump_json(indent=2))
     logger.info("Saved report to %s", report_path)
 
+    execution_id = None
+    try:
+        from newsradar_api.shared_kernel.documents.persistence import (
+            persist_pipeline_results,
+        )
+
+        execution_id = await persist_pipeline_results(state, metrics)
+    except Exception:
+        logger.exception("Failed to persist pipeline results to database")
+
     logger.info(
         "Run complete: %d documents, %d sources processed",
         len(state.documents), len(state.selected_sources),
     )
-    return {"metrics": metrics}
+    payload: dict[str, Any] = {"metrics": metrics}
+    if execution_id:
+        payload["execution_id"] = execution_id
+    return payload
