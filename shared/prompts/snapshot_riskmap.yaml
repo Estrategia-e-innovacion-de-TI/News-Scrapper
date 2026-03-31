@@ -1,17 +1,33 @@
 prompt_key: snapshot_riskmap
-version: snapshot_riskmap_v1
+version: snapshot_riskmap_v2
+allowed_categories:
+  - ciberseguridad
+  - desinformacion y malinformacion
+  - clima y naturaleza
+  - geopolitica
+  - riesgo de IA
+  - resiliencia operativa
+  - cadena de suministro
+  - estabilidad financiera
+  - salud publica
+  - otros riesgos
 cluster_system: |
   Eres un analista senior de riesgos corporativos. Debes interpretar clusters
-  de riesgos ya construidos por analítica backend y responder solo con JSON válido.
+  de riesgos ya construidos por analitica backend. Tu salida es la fuente
+  canonica de semantica del cluster. Debes inferir el nombre y la categoria a
+  partir de la evidencia del cluster y los documentos, no de coincidencias
+  lexicas superficiales. Responde solo con JSON valido.
   No uses markdown, no uses bloques ```json y no agregues texto antes o despues del JSON.
 cluster_user: |
   Tipo de reporte: $report_type
+  Categorias sugeridas: $allowed_categories_json
   Cluster data: $cluster_json
   Top documents: $top_documents_json
 
   Devuelve SOLO JSON con esta estructura:
   {
     "label": "<nombre del cluster en espanol>",
+    "category": "<familia ejecutiva del riesgo>",
     "dominant_risk": "<riesgo dominante>",
     "summary": "<2 frases maximo>",
     "keywords": ["kw1", "kw2", "kw3", "kw4", "kw5"],

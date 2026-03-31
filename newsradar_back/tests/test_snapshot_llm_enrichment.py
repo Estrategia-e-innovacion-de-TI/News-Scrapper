@@ -62,7 +62,7 @@ def test_snapshot_llm_enricher_overrides_cluster_and_summary(monkeypatch) -> Non
             if "Cluster data:" in prompt:
                 return (
                     '{"label":"IA aplicada a banca","summary":"Cluster de automatizacion bancaria.",'
-                    '"keywords":["ia","banca","automatizacion"],"relevance":"alta",'
+                    '"category":"Fintech / Banca Digital","keywords":["ia","banca","automatizacion"],"relevance":"alta",'
                     '"executive_takeaway":"La IA aplicada a banca gana traccion."}'
                 )
             return (
@@ -85,22 +85,41 @@ def test_snapshot_llm_enricher_overrides_cluster_and_summary(monkeypatch) -> Non
             {
                 "cluster_id": "trend_mapping_cluster_1",
                 "label": "IA",
+                "category": "Otros temas",
                 "summary": "old",
                 "keywords": ["old"],
                 "top_keywords": ["old"],
                 "relevance": "media",
+                "item_count": 4,
+                "impact_score": 72,
+                "horizon_score": 0.51,
+                "maturity_stage": "trigger",
+                "coords": {"x": 0.1, "y": 0.2},
                 "top_documents": [{"title": "Doc 1"}],
             }
         ],
+        "super_clusters": [{"category": "Otros temas", "clusters": ["trend_mapping_cluster_1"], "hull_polygon": [], "total_items": 4, "avg_impact": 72}],
         "top_documents": [{"title": "Doc 1"}],
         "sources_used": ["demo"],
         "parameters": {},
-        "documents": [{"cluster_id": "trend_mapping_cluster_1", "title": "Doc 1"}],
+        "articles": [{"cluster_id": "trend_mapping_cluster_1", "title": "Doc 1", "category": "Otros temas"}],
+        "trends": [{"cluster_id": "trend_mapping_cluster_1", "topic": "IA", "count": 4, "avg_score": 72}],
+        "charts": {
+            "cluster_sizes": [{"label": "IA", "count": 4}],
+            "hype_cycle": [{"label": "IA", "x": 51.0, "y": 72}],
+        },
     }
 
     enriched = SnapshotLLMEnricher("trend_mapping").enrich_payload(payload)
 
     assert enriched["clusters"][0]["label"] == "IA aplicada a banca"
+    assert enriched["clusters"][0]["category"] == "Fintech / Banca Digital"
+    assert enriched["super_clusters"][0]["category"] == "Fintech / Banca Digital"
+    assert enriched["summary"]["dominant_topics"] == ["IA aplicada a banca"]
+    assert enriched["articles"][0]["category"] == "Fintech / Banca Digital"
+    assert enriched["trends"][0]["topic"] == "IA aplicada a banca"
+    assert enriched["charts"]["cluster_sizes"][0]["label"] == "IA aplicada a banca"
+    assert enriched["parameters"]["cluster_semantics_source"] == "llm"
     assert enriched["summary"]["executive_summary"] == "La IA domina el snapshot."
     assert enriched["insights"] == ["IA crece"]
     assert enriched["parameters"]["llm_enrichment"]["used"] is True
@@ -119,6 +138,7 @@ def test_snapshot_llm_enricher_accepts_markdown_wrapped_json(monkeypatch) -> Non
 ```json
 {
   "label": "IA aplicada a banca",
+  "category": "Fintech / Banca Digital",
   "summary": "Cluster de automatizacion bancaria.",
   "keywords": ["ia", "banca", "automatizacion",],
   "relevance": "alta",
@@ -154,6 +174,7 @@ def test_snapshot_llm_enricher_accepts_markdown_wrapped_json(monkeypatch) -> Non
             {
                 "cluster_id": "trend_mapping_cluster_1",
                 "label": "IA",
+                "category": "Otros temas",
                 "summary": "old",
                 "keywords": ["old"],
                 "top_keywords": ["old"],
@@ -170,6 +191,7 @@ def test_snapshot_llm_enricher_accepts_markdown_wrapped_json(monkeypatch) -> Non
     enriched = SnapshotLLMEnricher("trend_mapping").enrich_payload(payload)
 
     assert enriched["clusters"][0]["label"] == "IA aplicada a banca"
+    assert enriched["clusters"][0]["category"] == "Fintech / Banca Digital"
     assert enriched["clusters"][0]["keywords"] == ["ia", "banca", "automatizacion"]
     assert enriched["summary"]["executive_summary"] == "La IA domina el snapshot."
     assert enriched["recommendations"] == ["Acelerar monitoreo"]

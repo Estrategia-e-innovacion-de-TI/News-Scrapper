@@ -1,6 +1,7 @@
 """Bedrock enrichment for analytical snapshots."""
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 import hashlib
 import json
@@ -166,6 +167,12 @@ def _safe_string_list(value: Any, limit: int) -> list[str]:
     return result
 
 
+def _safe_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 class SnapshotLLMEnricher:
     """Enrich trend/risk snapshot payloads using Amazon Bedrock."""
 
@@ -315,12 +322,15 @@ class SnapshotLLMEnricher:
                 bundle.cluster_system,
                 bundle.cluster_user,
                 report_type=self.report_type,
+                allowed_categories_json=json.dumps(bundle.content_json.get("allowed_categories") or [], ensure_ascii=False),
                 cluster_json=json.dumps(cluster, ensure_ascii=False),
                 top_documents_json=json.dumps(top_documents, ensure_ascii=False),
             )
             trace["cluster_calls"] += 1
             if response.get("label"):
                 cluster["label"] = str(response["label"]).strip()
+            if response.get("category"):
+                cluster["category"] = str(response["category"]).strip()
             if response.get("summary"):
                 cluster["summary"] = str(response["summary"]).strip()
             keywords = _safe_string_list(response.get("keywords"), 6)
@@ -331,15 +341,16 @@ class SnapshotLLMEnricher:
                 cluster["relevance"] = str(response["relevance"]).strip().lower()
             if response.get("executive_takeaway"):
                 cluster["executive_takeaway"] = str(response["executive_takeaway"]).strip()
-            if self.report_type == "risk_mapping" and response.get("dominant_risk"):
-                cluster["dominant_risk"] = str(response["dominant_risk"]).strip()
+            if self.report_type == "risk_mapping":
+                if response.get("dominant_risk"):
+                    cluster["dominant_risk"] = str(response["dominant_risk"]).strip()
+                elif cluster.get("category"):
+                    cluster["dominant_risk"] = str(cluster["category"]).strip()
+            cluster["semantic_source"] = "llm"
+            cluster["category_source"] = "llm"
 
-        if documents:
-            labels_by_cluster = {cluster["cluster_id"]: cluster.get("label") for cluster in clusters if cluster.get("cluster_id")}
-            for item in documents:
-                cluster_id = item.get("cluster_id")
-                if cluster_id and cluster_id in labels_by_cluster:
-                    item["cluster_label"] = labels_by_cluster[cluster_id]
+        self._refresh_payload_views(payload)
+        payload.setdefault("parameters", {})["cluster_semantics_source"] = "llm"
 
     def _enrich_report(self, payload: dict[str, Any], bundle: PromptBundle, trace: dict[str, Any]) -> None:
         summary = payload.get("summary") or {}
@@ -387,3 +398,132 @@ class SnapshotLLMEnricher:
                 )
             if normalized_signals:
                 payload["risk_signals"] = normalized_signals
+
+    def _refresh_payload_views(self, payload: dict[str, Any]) -> None:
+        clusters = payload.get("clusters") or []
+        labels_by_cluster = {
+            _safe_text(cluster.get("cluster_id")): _safe_text(cluster.get("label"))
+            for cluster in clusters
+            if cluster.get("cluster_id")
+        }
+        categories_by_cluster = {
+            _safe_text(cluster.get("cluster_id")): _safe_text(
+                cluster.get("dominant_risk") if self.report_type == "risk_mapping" else cluster.get("category")
+            )
+            for cluster in clusters
+            if cluster.get("cluster_id")
+        }
+
+        documents = payload.get("documents") or payload.get("articles") or []
+        for item in documents:
+            cluster_id = _safe_text(item.get("cluster_id"))
+            if not cluster_id or cluster_id == "sin_cluster":
+                continue
+            if cluster_id in labels_by_cluster:
+                item["cluster_label"] = labels_by_cluster[cluster_id]
+            if cluster_id in categories_by_cluster:
+                if self.report_type == "risk_mapping":
+                    item["dominant_risk"] = categories_by_cluster[cluster_id]
+                else:
+                    item["category"] = categories_by_cluster[cluster_id]
+
+        for entry in payload.get("timeline") or payload.get("trends") or []:
+            cluster_id = _safe_text(entry.get("cluster_id"))
+            if not cluster_id or cluster_id not in labels_by_cluster:
+                continue
+            if "topic" in entry:
+                entry["topic"] = labels_by_cluster[cluster_id]
+            if "risk" in entry:
+                entry["risk"] = labels_by_cluster[cluster_id]
+
+        super_clusters = self._build_super_clusters(clusters)
+        if "super_clusters" in payload:
+            payload["super_clusters"] = super_clusters
+
+        summary = payload.get("summary")
+        if isinstance(summary, dict):
+            summary["total_clusters"] = len(clusters)
+            if self.report_type == "trend_mapping":
+                summary["dominant_topics"] = [
+                    label
+                    for label in (_safe_text(cluster.get("label")) for cluster in clusters[:5])
+                    if label
+                ]
+                summary["emerging_topics"] = [
+                    _safe_text(cluster.get("label"))
+                    for cluster in clusters
+                    if _safe_text(cluster.get("direction")) == "up"
+                    and float(cluster.get("horizon_score") or 0) >= 0.45
+                ][:3]
+                summary["consolidating_topics"] = [
+                    _safe_text(cluster.get("label"))
+                    for cluster in clusters
+                    if _safe_text(cluster.get("maturity_stage")) in {"slope_of_enlightenment", "plateau_of_productivity"}
+                ][:3]
+            else:
+                summary["dominant_risks"] = [
+                    label
+                    for label in (
+                        _safe_text(cluster.get("dominant_risk") or cluster.get("category") or cluster.get("label"))
+                        for cluster in clusters[:5]
+                    )
+                    if label
+                ]
+
+        meta = payload.get("meta")
+        if isinstance(meta, dict):
+            meta["total_clusters"] = len(clusters)
+            meta["total_categories"] = len(super_clusters)
+
+        charts = payload.get("charts")
+        if isinstance(charts, dict):
+            charts["cluster_sizes"] = [
+                {
+                    "label": _safe_text(cluster.get("label")),
+                    "count": int(cluster.get("item_count") or cluster.get("documents") or 0),
+                }
+                for cluster in clusters
+            ]
+            charts["hype_cycle"] = [
+                {
+                    "label": _safe_text(cluster.get("label")),
+                    "x": round(float(cluster.get("horizon_score") or 0) * 100, 2),
+                    "y": float(cluster.get("impact_score") or cluster.get("avg_score") or 0),
+                }
+                for cluster in clusters
+            ]
+
+    def _build_super_clusters(self, clusters: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for cluster in clusters:
+            category = _safe_text(
+                cluster.get("dominant_risk") if self.report_type == "risk_mapping" else cluster.get("category")
+            ) or ("Otros riesgos" if self.report_type == "risk_mapping" else "Innovacion general")
+            grouped[category].append(cluster)
+
+        result: list[dict[str, Any]] = []
+        for category, related_clusters in sorted(grouped.items(), key=lambda item: len(item[1]), reverse=True):
+            result.append(
+                {
+                    "category": category,
+                    "clusters": [
+                        _safe_text(cluster.get("cluster_id"))
+                        for cluster in related_clusters
+                        if cluster.get("cluster_id")
+                    ],
+                    "hull_polygon": [
+                        [
+                            float((cluster.get("coords") or {}).get("x", 0.0)),
+                            float((cluster.get("coords") or {}).get("y", 0.0)),
+                        ]
+                        for cluster in related_clusters
+                    ],
+                    "total_items": sum(int(cluster.get("item_count") or cluster.get("documents") or 0) for cluster in related_clusters),
+                    "avg_impact": round(
+                        sum(float(cluster.get("impact_score") or cluster.get("avg_score") or 0) for cluster in related_clusters)
+                        / max(len(related_clusters), 1),
+                        1,
+                    ),
+                }
+            )
+        return result

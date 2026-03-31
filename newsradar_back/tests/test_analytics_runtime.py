@@ -182,3 +182,52 @@ def test_embeddings_are_preferred_for_clustering(monkeypatch) -> None:
     assert analysis["parameters"]["cluster_method"] == "hdbscan"
     assert analysis["summary"]["clustered_documents"] == 3
     assert analysis["summary"]["unclustered_documents"] == 1
+
+
+def test_cluster_labels_filter_noise_and_infer_category(monkeypatch) -> None:
+    docs = [
+        _doc("tw-l1", "AI agents transform banking operations", source_id="rss-tech", source_type="rss", score=88, days_ago=4),
+        _doc("tw-l2", "Foundation models for banking automation", source_id="rss-tech", source_type="rss", score=84, days_ago=7),
+        _doc("tw-l3", "Generative AI copilots for risk teams", source_id="rss-fin", source_type="rss", score=82, days_ago=9),
+    ]
+
+    monkeypatch.setattr(
+        advanced_engine,
+        "_build_embedding_features",
+        lambda documents: (None, {
+            "feature_space": "tfidf_lexical",
+            "embedding_provider": None,
+            "embedding_model_id": None,
+            "embedding_attempted": False,
+            "embedding_error": None,
+        }),
+    )
+    monkeypatch.setattr(
+        advanced_engine,
+        "_cluster_features",
+        lambda features: (np.asarray([0, 0, 0], dtype=int), "single_cluster"),
+    )
+    monkeypatch.setattr(
+        advanced_engine,
+        "_project_coordinates",
+        lambda features: (
+            np.asarray(
+                [
+                    [0.0, 0.0],
+                    [0.2, 0.1],
+                    [0.1, 0.2],
+                ],
+                dtype=float,
+            ),
+            "mock",
+        ),
+    )
+
+    analysis = advanced_engine.generate_report_analysis(docs, "trend_mapping", 6)
+    cluster = analysis["clusters"][0]
+
+    assert cluster["category"] == "Inteligencia Artificial"
+    assert cluster["label"] != "Mas / And"
+    assert cluster["label"] != "Más / And"
+    assert "and" not in [keyword.lower() for keyword in cluster["keywords"]]
+    assert "mas" not in [keyword.lower() for keyword in cluster["keywords"]]

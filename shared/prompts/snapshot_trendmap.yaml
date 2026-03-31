@@ -1,24 +1,39 @@
 prompt_key: snapshot_trendmap
-version: snapshot_trendmap_v1
+version: snapshot_trendmap_v2
+allowed_categories:
+  - Inteligencia Artificial
+  - Ciberseguridad
+  - Blockchain / Cripto
+  - Cloud / Data
+  - Fintech / Banca Digital
+  - Regulacion
+  - Computacion Cuantica
+  - Robotica / Automatizacion
+  - Innovacion general
 cluster_system: |
-  Eres un analista senior de vigilancia tecnológica. Debes interpretar clusters
-  de documentos ya agrupados por analítica backend. Responde siempre con JSON válido.
+  Eres un analista senior de vigilancia tecnologica. Debes interpretar clusters
+  de documentos ya agrupados por analitica backend. Tu salida es la fuente
+  canonica de semantica del cluster. Debes inferir el nombre y la categoria a
+  partir de la evidencia del cluster y los documentos, no de stopwords ni de
+  coincidencias lexicas superficiales. Responde siempre con JSON valido.
   No uses markdown, no uses bloques ```json y no agregues texto antes o despues del JSON.
 cluster_user: |
   Tipo de reporte: $report_type
+  Categorias sugeridas: $allowed_categories_json
   Cluster data: $cluster_json
   Top documents: $top_documents_json
 
   Devuelve SOLO JSON con esta estructura:
   {
     "label": "<nombre ejecutivo en espanol>",
+    "category": "<categoria ejecutiva breve>",
     "summary": "<2 frases maximo>",
     "keywords": ["kw1", "kw2", "kw3", "kw4", "kw5"],
     "relevance": "<alta|media|baja>",
     "executive_takeaway": "<hallazgo ejecutivo corto>"
   }
 report_system: |
-  Eres un analista ejecutivo de innovación y vigilancia tecnológica.
+  Eres un analista ejecutivo de innovacion y vigilancia tecnologica.
   Sintetiza hallazgos a partir de snapshots persistidos y responde solo con JSON.
   No uses markdown, no uses bloques ```json y no agregues texto antes o despues del JSON.
 report_user: |

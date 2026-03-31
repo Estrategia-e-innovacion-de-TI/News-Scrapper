@@ -6,8 +6,10 @@ from datetime import datetime, timezone
 import math
 import os
 from pathlib import Path
+import re
 from statistics import mean
 from typing import Any
+import unicodedata
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -35,8 +37,56 @@ _STOPWORDS = {
     "esa", "ese", "eso", "esta", "este", "esto", "for", "from", "ha", "hasta", "hay",
     "into", "la", "las", "lo", "los", "mas", "more", "muy", "no", "of", "para", "pero",
     "por", "que", "se", "sin", "sobre", "son", "su", "sus", "that", "the", "their", "them",
-    "they", "this", "to", "un", "una", "uno", "with", "y",
+    "they", "this", "to", "un", "una", "uno", "with", "y", "you", "your", "ours", "ourselves",
+    "we", "our", "us", "said", "says", "according", "report", "reports", "latest", "breaking",
+    "news", "week", "weeks", "month", "months", "year", "years", "today", "new", "will",
+    "can", "could", "would", "may", "might", "also", "via", "among", "across", "around",
+    "after", "before", "during", "including", "based", "using", "used", "use",
 }
+
+_GENERIC_TERMS = {
+    "news", "report", "reports", "latest", "breaking", "update", "updates", "global", "world",
+    "market", "markets", "sector", "industry", "company", "companies", "group", "groups",
+    "technology", "technologies", "tech", "business", "services", "service", "based", "using",
+    "used", "use", "more", "mas", "year", "years", "week", "weeks", "month", "months", "today",
+    "new", "analysis", "insight", "insights", "article", "articles", "source", "sources",
+}
+
+_DISPLAY_TOKEN_MAP = {
+    "ai": "AI",
+    "ia": "IA",
+    "llm": "LLM",
+    "ml": "ML",
+    "nlp": "NLP",
+    "api": "API",
+    "gpu": "GPU",
+    "iot": "IoT",
+    "5g": "5G",
+    "vr": "VR",
+    "ar": "AR",
+    "fintech": "Fintech",
+    "blockchain": "Blockchain",
+}
+
+_TREND_CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("Inteligencia Artificial", ("ai", "ia", "llm", "agent", "agents", "copilot", "copilots", "generative", "generativa", "foundation model", "foundation models", "modelo", "modelos")),
+    ("Ciberseguridad", ("cyber", "ciber", "ransomware", "phishing", "malware", "threat", "vulnerability", "zero trust", "breach")),
+    ("Blockchain / Cripto", ("blockchain", "tokenizacion", "tokenization", "crypto", "web3", "defi", "stablecoin")),
+    ("Cloud / Data", ("cloud", "data", "datos", "platform", "plataforma", "lakehouse", "warehouse", "observability", "infrastructure", "infraestructura", "gpu")),
+    ("Fintech / Banca Digital", ("banking", "banca", "payment", "payments", "wallet", "fintech", "lending", "insurance", "seguros", "credit", "fraud")),
+    ("Regulación", ("regulation", "regulatory", "regulacion", "compliance", "normativa", "law", "policy", "governance")),
+    ("Computación Cuántica", ("quantum", "cuantica", "qubit", "qpu", "quantico")),
+    ("Robótica / Automatización", ("robot", "robotics", "autonomous", "autonomia", "automation", "automatizacion", "drone")),
+]
+
+_RISK_CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("ciberseguridad", ("cyber", "ciber", "ransomware", "phishing", "malware", "zero trust", "breach")),
+    ("desinformacion y malinformacion", ("disinformation", "desinformacion", "misinformation", "malinformation", "fraud", "deepfake")),
+    ("clima y naturaleza", ("climate", "clima", "nature", "naturaleza", "biodiversity", "water", "emissions")),
+    ("geopolitica", ("geopolitics", "geopolitical", "geoeconomic", "geopolitica", "trade war", "sanctions", "supply chain")),
+    ("riesgo de IA", ("ai risk", "riesgo ia", "model risk", "foundation model", "autonomous system", "algoritmic", "algorithmic")),
+    ("resiliencia operativa", ("operational resilience", "outage", "downtime", "resilience", "third party", "vendor risk")),
+]
 
 
 def _credential_hints_present() -> bool:
@@ -84,6 +134,69 @@ def _safe_text(value: Any) -> str:
     if isinstance(value, str):
         return value
     return str(value)
+
+
+def _normalize_text(value: str) -> str:
+    stripped = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    lowered = stripped.lower()
+    return re.sub(r"[^a-z0-9]+", " ", lowered).strip()
+
+
+def _clean_term(term: str) -> str | None:
+    normalized = _normalize_text(term)
+    if not normalized:
+        return None
+    tokens = [
+        token
+        for token in normalized.split()
+        if len(token) >= 3 and token not in _STOPWORDS and token not in _GENERIC_TERMS
+    ]
+    if not tokens:
+        return None
+    return " ".join(tokens[:4])
+
+
+def _display_term(term: str) -> str:
+    return " ".join(_DISPLAY_TOKEN_MAP.get(token, token.title()) for token in term.split())
+
+
+def _meaningful_terms(terms: list[str], limit: int = 6) -> list[str]:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for term in terms:
+        cleaned_term = _clean_term(term)
+        if not cleaned_term or cleaned_term in seen:
+            continue
+        seen.add(cleaned_term)
+        cleaned.append(cleaned_term)
+        if len(cleaned) >= limit:
+            break
+    return cleaned
+
+
+def _fallback_terms_from_docs(docs: list[Any], limit: int = 6) -> list[str]:
+    counter: Counter[str] = Counter()
+    for doc in docs:
+        for keyword in getattr(doc, "matched_keywords", []) or []:
+            cleaned = _clean_term(_safe_text(keyword))
+            if cleaned:
+                counter[cleaned] += 3
+
+        title_tokens = [
+            token
+            for token in _normalize_text(_safe_text(getattr(doc, "title", ""))).split()
+            if len(token) >= 3 and token not in _STOPWORDS and token not in _GENERIC_TERMS
+        ]
+        for size in (2, 1):
+            if len(title_tokens) < size:
+                continue
+            for index in range(len(title_tokens) - size + 1):
+                phrase = " ".join(title_tokens[index:index + size])
+                cleaned = _clean_term(phrase)
+                if cleaned:
+                    counter[cleaned] += 1
+
+    return [term for term, _ in counter.most_common(limit)]
 
 
 def _document_text(doc: Any) -> str:
@@ -144,16 +257,28 @@ def _select_hdbscan_params(document_count: int) -> tuple[int, int]:
 
 def _build_lexical_features(documents: list[Any]) -> tuple[list[str], Any, np.ndarray, np.ndarray]:
     corpus = [_document_text(doc) for doc in documents]
+    max_df = 0.45 if len(documents) >= 30 else 1.0
+    min_df = 2 if len(documents) >= 60 else 1
     vectorizer = TfidfVectorizer(
         max_features=1500,
         ngram_range=(1, 2),
-        min_df=1,
+        min_df=min_df,
+        max_df=max_df,
+        strip_accents="unicode",
+        sublinear_tf=True,
         stop_words=sorted(_STOPWORDS),
     )
     try:
         matrix = vectorizer.fit_transform(corpus)
     except ValueError:
-        vectorizer = TfidfVectorizer(max_features=1000, ngram_range=(1, 1), min_df=1)
+        vectorizer = TfidfVectorizer(
+            max_features=1000,
+            ngram_range=(1, 1),
+            min_df=1,
+            strip_accents="unicode",
+            sublinear_tf=True,
+            stop_words=sorted(_STOPWORDS),
+        )
         matrix = vectorizer.fit_transform(
             [text or f"documento {index + 1}" for index, text in enumerate(corpus)]
         )
@@ -315,28 +440,54 @@ def _normalize_labels(labels: np.ndarray) -> np.ndarray:
     return np.asarray(normalized, dtype=int)
 
 
-def _cluster_terms(matrix: Any, indices: list[int], feature_names: np.ndarray) -> list[str]:
+def _cluster_terms(matrix: Any, indices: list[int], feature_names: np.ndarray, docs: list[Any]) -> list[str]:
     if not indices:
         return []
     row = np.asarray(matrix[indices].mean(axis=0)).ravel()
     if row.size == 0:
         return []
-    top_indices = row.argsort()[-6:][::-1]
-    terms = [feature_names[idx] for idx in top_indices if row[idx] > 0]
-    return [term for term in terms if term]
+    top_indices = row.argsort()[-24:][::-1]
+    candidate_terms = [feature_names[idx] for idx in top_indices if row[idx] > 0]
+    terms = _meaningful_terms(candidate_terms, limit=6)
+    if len(terms) < 3:
+        terms.extend(
+            term
+            for term in _fallback_terms_from_docs(docs, limit=6)
+            if term not in terms
+        )
+    return terms[:6]
 
 
-def _cluster_label(docs: list[Any], report_type: str, terms: list[str]) -> str:
-    counter = Counter(
-        _document_category(doc, report_type)
-        for doc in docs
-        if _document_category(doc, report_type)
+def _heuristic_category(report_type: str, terms: list[str], docs: list[Any]) -> str:
+    explicit = Counter(
+        category
+        for category in (_document_category(doc, report_type) for doc in docs)
+        if category and category not in {"Otros temas", "Otros riesgos"}
     )
-    dominant = counter.most_common(1)
-    if dominant and dominant[0][0] not in {"Otros temas", "Otros riesgos"}:
-        return dominant[0][0]
+    if explicit:
+        return explicit.most_common(1)[0][0]
+
+    haystack_parts = list(terms)
+    haystack_parts.extend(_fallback_terms_from_docs(docs, limit=8))
+    haystack_parts.extend(_normalize_text(_safe_text(getattr(doc, "title", ""))) for doc in docs[:10])
+    haystack = " ".join(part for part in haystack_parts if part)
+
+    rules = _RISK_CATEGORY_RULES if report_type == "risk_mapping" else _TREND_CATEGORY_RULES
+    for category, keywords in rules:
+        if any(keyword in haystack for keyword in keywords):
+            return category
+
+    return "Otros riesgos" if report_type == "risk_mapping" else "Innovación general"
+
+
+def _cluster_label(docs: list[Any], report_type: str, terms: list[str], category: str) -> str:
     if terms:
-        return " / ".join(term.title() for term in terms[:2])
+        return " / ".join(_display_term(term) for term in terms[:2])
+    if category not in {"Innovación general", "Otros temas", "Otros riesgos"}:
+        return category
+    title_terms = _fallback_terms_from_docs(docs, limit=2)
+    if title_terms:
+        return " / ".join(_display_term(term) for term in title_terms[:2])
     title = _safe_text(getattr(docs[0], "title", "")).strip()
     return title[:80] if title else "Cluster sin etiqueta"
 
@@ -553,10 +704,10 @@ def generate_report_analysis(
     for label_index in unique_labels:
         indices = grouped_indices[label_index]
         docs = [documents[index] for index in indices]
-        terms = _cluster_terms(matrix, indices, feature_names)
-        label = _cluster_label(docs, report_type, terms)
+        terms = _cluster_terms(matrix, indices, feature_names, docs)
         cluster_id = f"{report_type}_cluster_{label_index + 1}"
-        category = _document_category(docs[0], report_type)
+        category = _heuristic_category(report_type, terms, docs)
+        label = _cluster_label(docs, report_type, terms, category)
         avg_score = round(mean((getattr(doc, "relevance_score", 0) or 0) for doc in docs), 1)
         month_counter: Counter[str] = Counter()
         cluster_sources = Counter()
@@ -595,10 +746,10 @@ def generate_report_analysis(
                 avg_score,
                 novelty,
                 len(cluster_sources),
-                terms or [label],
+                [_display_term(term) for term in terms] or [label],
             ),
-            "keywords": terms or [label],
-            "top_keywords": terms or [label],
+            "keywords": [_display_term(term) for term in terms] or [label],
+            "top_keywords": [_display_term(term) for term in terms] or [label],
             "relevance": "alta" if avg_score >= 75 else "media" if avg_score >= 45 else "baja",
             "item_count": len(docs),
             "documents": len(docs),
