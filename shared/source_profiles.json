@@ -1,0 +1,23 @@
+{
+  "generated_at": "2026-03-09T00:00:00Z",
+  "total_sources_profiled": 37,
+  "summary": {
+    "rss_detected": 8,
+    "requires_playwright": 15,
+    "paywall_gated": 5,
+    "custom_dev_required": 2,
+    "ready_for_scraping": 30
+  },
+  "rss_sources": {
+    "infobae_latam_listing": "https://www.infobae.com/argentina-footer/infobae/rss/",
+    "cyberscoop": "https://cyberscoop.com/feed/",
+    "finextra": "https://www.finextra.com/rss/headlines.aspx",
+    "techcrunch": "https://techcrunch.com/feed/",
+    "technologyreview": "https://www.technologyreview.com/feed/",
+    "wired": "https://www.wired.com/feed/rss",
+    "coindesk": "https://www.coindesk.com/arc/outboundfeeds/rss/"
+  },
+  "paywall_sources": ["gartner", "forrester", "celent", "venturebeat", "cisa_news"],
+  "custom_dev_sources": ["vital_ruia_sanciones", "tremarctos_colombia"],
+  "ssl_issues": ["anm_sala_prensa", "anh_noticias"]
+}

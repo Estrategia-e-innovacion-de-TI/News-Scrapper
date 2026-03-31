@@ -1,0 +1,40 @@
+name: $(Build.SourceBranchName).$(date:yyyyMMdd)$(rev:.r)
+
+variables:
+  component-name: "newsradar_front"
+  Artifactory.Repository: "build-noticias/$(component-name)"
+  application-code: newsradar
+  project-name: noticias
+  business-service: noticias
+  society: bancolombia
+  impact: un area
+  sox-compliance: "no"
+  BROWSERSLIST_IGNORE_OLD_DATA: true
+
+trigger:
+  branches:
+    include:
+      - trunk
+      - feature/*
+  paths:
+    include:
+      - "newsradar_front/*"
+
+resources:
+  - repo: self
+    clean: all
+    fetchDepth: 1
+
+stages:
+  - stage: Build
+    displayName: Build and Publish
+    jobs:
+      - job: Linux
+        displayName: Build and publication of artifact
+        pool:
+          name: Build
+          demands:
+            - Agent.OS -equals Linux
+        steps:
+          - template: /newsradar_front/pipelines/build.yml
+          - template: /newsradar_front/pipelines/deploy.yml

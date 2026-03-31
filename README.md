@@ -1,441 +1,235 @@
-# News Radar MVP
+# News Radar — Monorepo
 
-Extractor de noticias multi-fuente con orquestación LangGraph.
+Sistema de monitoreo, clasificación y análisis de noticias para gestión de riesgos e innovación. Integra extracción automatizada de noticias, clasificación por categorías de riesgo, vigilancia tecnológica y visualización de tendencias (trend mapping).
 
-## Quickstart
+## Estructura del Monorepo
+
+```
+Noticias/
+├── newsradar_front/       # Frontend Angular 21 — Feature Noticias (Clean Architecture)
+│   └── src/app/
+│       ├── domain/        # Modelos y servicios de negocio
+│       ├── infrastructure/# Servicios de acceso a datos/APIs
+│       └── UI/            # Componentes visuales y features
+├── newsradar_back/        # Backend API — Python 3.11 (Express mock / FastAPI)
+│   ├── src/
+│   ├── tests/
+│   ├── Dockerfile
+│   └── pyproject.toml
+├── newsradar_smcp/        # Servidor MCP — Pipeline de extracción y clasificación
+│   ├── src/
+│   ├── tests/
+│   ├── Dockerfile
+│   └── pyproject.toml
+├── newsradar_aiagent/     # Agente IA conversacional — Consultas ARAS y Riesgos
+│   ├── src/
+│   ├── tests/
+│   ├── Dockerfile
+│   └── pyproject.toml
+├── shared/                # Configuración compartida entre módulos
+│   ├── catalog.yaml       # Catálogo de fuentes de noticias
+│   └── source_profiles.json # Perfiles de fuentes
+├── .gitignore
+├── MIGRATION_NOTES.md
+└── README.md
+```
+
+## Requisitos Previos
+
+| Módulo | Requisito |
+|--------|-----------|
+| `newsradar_front` | Node.js >= 20, npm >= 10 |
+| `newsradar_back` | Python 3.11+, pip |
+| `newsradar_smcp` | Python 3.11+, pip |
+| `newsradar_aiagent` | Python 3.11+, pip |
+
+## Setup e Instrucciones por Módulo
+
+### newsradar_front — Frontend Angular 21
+
+Frontend construido con Angular 21, TypeScript 5.9, Tailwind CSS 3.4 y D3.js v7. Sigue arquitectura Clean (domain / infrastructure / UI).
 
 ```bash
-cd news_radar_mvp
-pip install -r requirements.txt
-python -m extractor.main --catalog ../catalog.yaml --out out/ --debug
+cd newsradar_front
+
+# Instalar dependencias
+npm install
+
+# Servidor de desarrollo (http://localhost:4200)
+ng serve
+
+# Build de producción
+ng build --configuration production
+
+# Ejecutar tests unitarios
+ng test
+
+# Ejecutar tests con cobertura
+npx jest --coverage
 ```
 
-## Instalación
+### newsradar_back — Backend API
+
+Backend en Python 3.11 que expone las APIs REST consumidas por el frontend.
 
 ```bash
-pip install -r requirements.txt
+cd newsradar_back
 
-# Playwright (opcional, para sitios JS-heavy)
-pip install playwright
-playwright install chromium
+# Crear entorno virtual
+python3.11 -m venv .venv
+source .venv/bin/activate
+
+# Instalar dependencias
+pip install -e ".[dev]"
+
+# Ejecutar servidor de desarrollo
+uvicorn src.main:app --reload --port 4000
+
+# Ejecutar tests
+pytest tests/
 ```
 
-## Modos de Ejecución
+### newsradar_smcp — Servidor MCP (Pipeline de Noticias)
 
-### 1. Extracción general (todas las fuentes)
+Servidor MCP (Model Context Protocol) en Python 3.11 que ejecuta el pipeline de extracción, clasificación, scoring y exportación de noticias.
 
 ```bash
-python -m extractor.main --catalog ../catalog.yaml --out out/ --debug
+cd newsradar_smcp
+
+# Crear entorno virtual
+python3.11 -m venv .venv
+source .venv/bin/activate
+
+# Instalar dependencias
+pip install -e ".[dev]"
+
+# Ejecutar servidor MCP
+python -m src.server
+
+# Ejecutar tests
+pytest tests/
 ```
 
-### 2. ARAS ad hoc (empresa + rango de fechas)
+### newsradar_aiagent — Agente IA Conversacional
 
-Búsqueda ad-hoc por empresa en metadatos (title/summary/snippet/URL) sin fetch masivo.
-
-**Opción 1 (metadata-only)**: Filtra candidatos ANTES de descargar artículos completos.
-Esto es rápido y barato porque solo analiza los metadatos del RSS/listing sin hacer
-requests HTTP a cada artículo. El scoring es:
-- +2 puntos si el término aparece en el título
-- +1 punto si aparece en el snippet/summary
-- +1 punto si aparece en el slug de la URL
-- -30% si el item no tiene `published_at` (menos confiable para el rango de fechas)
+Agente conversacional en Python 3.11 que permite consultas de ARAS y Riesgos Emergentes mediante chat, usando boto3 y MCP.
 
 ```bash
-python -m extractor.main --catalog ../catalog.yaml --focus aras_news --adhoc \
-  --company "Bancolombia" --date-from 2026-01-01 --date-to 2026-03-01 \
-  --topk-per-source 5 --max-candidates-total 50 --out out/aras_adhoc --debug
+cd newsradar_aiagent
+
+# Crear entorno virtual
+python3.11 -m venv .venv
+source .venv/bin/activate
+
+# Instalar dependencias
+pip install -e ".[dev]"
+
+# Ejecutar agente
+python -m src.agent
+
+# Ejecutar tests
+pytest tests/
 ```
 
-Reglas:
-- `--focus aras_news` requiere `--adhoc`, `--company` y rango de fechas
-- `--date-from` debe ser <= `--date-to`
-- Descubre items vía RSS/listing, filtra por nombre de empresa en title/summary/URL
-- Encola solo los TOP-K candidatos por fuente para fetch completo
-- El reporte incluye `matched_candidates` (antes de topk) y `selected_candidates` (después)
+## Archivos de Configuración Compartidos
 
-Provenance en JSONL:
-```json
-{
-  "origin": "adhoc_query",
-  "query_type": "aras",
-  "query_terms": ["Bancolombia"],
-  "query_range": {"from": "2026-01-01", "to": "2026-03-01"}
-}
+La carpeta `shared/` contiene archivos de configuración utilizados por múltiples módulos:
+
+- **`catalog.yaml`** — Catálogo de fuentes de noticias con metadatos de cada fuente (URL, frecuencia, categoría). Usado por el pipeline SMCP para la extracción.
+- **`source_profiles.json`** — Perfiles detallados de cada fuente de noticias (fiabilidad, cobertura geográfica, sesgo). Usado por los módulos de clasificación y scoring.
+
+Estos archivos se mantienen en la raíz compartida para evitar duplicación y garantizar consistencia entre módulos.
+
+## Ejecución Completa del Sistema
+
+Para ejecutar el sistema completo en desarrollo local:
+
+1. Iniciar el backend: `cd newsradar_back && uvicorn src.main:app --reload --port 4000`
+2. Iniciar el frontend: `cd newsradar_front && ng serve`
+3. Acceder a la aplicación en `http://localhost:4200`
+
+El frontend se conecta al backend mediante la variable de entorno `API_BASE_URL` (por defecto `http://localhost:4000/api`). Esta configuración se encuentra en `newsradar_front/src/app/config/environment.ts`.
+
+> **Nota:** El mock_backend original en `news_radar_mvp/mock_backend/` también puede usarse como servidor de desarrollo alternativo en el puerto 4000.
+
+## Arquitectura del Frontend (Clean Architecture)
+
+```
+newsradar_front/src/app/
+├── config/                          # Tokens de inyección y entornos
+│   ├── api.token.ts                 # InjectionToken API_BASE_URL
+│   ├── environment.ts               # Dev: http://localhost:4000/api
+│   └── environment.prod.ts          # Prod: /api
+├── domain/noticias/                 # Capa de dominio (lógica de negocio)
+│   ├── models/                      # Interfaces TypeScript
+│   │   ├── document-result.model.ts
+│   │   ├── aras.model.ts
+│   │   ├── riesgos.model.ts
+│   │   ├── vigilancia.model.ts
+│   │   ├── trendmap.model.ts
+│   │   └── index.ts                 # Barrel export
+│   └── services/                    # Servicios de dominio
+│       ├── riesgos.service.ts       # Validación de búsquedas
+│       ├── vigilancia.service.ts    # Validación de suscripciones
+│       └── trendmap.service.ts      # Filtrado, ordenamiento, agrupación
+├── infrastructure/noticias/         # Capa de infraestructura (acceso a datos)
+│   └── services/
+│       ├── noticias-api.token.ts    # InjectionTokens y puertos (interfaces)
+│       ├── riesgos-http.service.ts  # HTTP: ARAS y Riesgos Emergentes
+│       ├── vigilancia-http.service.ts # HTTP: Vigilancia Tecnológica
+│       └── trendmap-http.service.ts # HTTP: Trend Mapping
+└── UI/                              # Capa de presentación
+    ├── features/noticias/           # Feature principal
+    │   ├── noticias.component.ts    # Tabs: Riesgos, Vigilancia, Trend Mapping
+    │   ├── noticias.routes.ts       # Rutas lazy-loadable
+    │   └── components/
+    │       ├── riesgos/             # ARAS + Riesgos Emergentes + Tabla
+    │       ├── vigilancia/          # Suscripción a boletín
+    │       └── trendmap/            # Clusters, tendencias, D3 visualizaciones
+    └── shared/components/           # Header, Footer compartidos
 ```
 
-### 3. Riesgos ad hoc (NO IMPLEMENTADO AÚN)
+## Testing
 
-> **Nota**: El modo `--focus riesgos_news --adhoc` no está habilitado en esta versión.
-> Solo ARAS ad-hoc está disponible. Riesgos se implementará en una fase posterior.
-
-### 4. Vigilancia news semanal
-
-Extracción semanal de noticias por fuentes del catálogo. No soporta adhoc.
+### Frontend (Jest 30 + fast-check 4.5)
 
 ```bash
-python -m extractor.main --catalog ../catalog.yaml --focus vigilancia_news \
-  --days 7 --out out/vigilancia_news_weekly --debug
+cd newsradar_front
+
+# Tests unitarios
+npx jest
+
+# Tests con cobertura (umbral mínimo: 80%)
+npx jest --coverage
+
+# Tests en modo watch
+npx jest --watch
 ```
 
-### 5. Vigilancia papers/repos/patentes (Search → Candidates → Ingest)
+Reporters configurados:
+- JUnit XML → `coverage/junit.xml`
+- HTML → `coverage/report-jest.html`
+- Sonar → `coverage/sonar-report.xml`
 
-Flujo en dos pasos: primero buscar candidatos, luego ingestar.
-
-#### Paso 1: Search
+### Módulos Python (pytest)
 
 ```bash
-# Papers (ArXiv) - mensual
-python -m extractor.search --terms terms_vigilancia.yaml --mode papers \
-  --since-days 30 --out out/search/papers
-
-# Repos (GitHub) - mensual
-python -m extractor.search --terms terms_vigilancia.yaml --mode repos \
-  --since-days 30 --out out/search/repos
-
-# Patentes (Google Patents SERP) - bimensual/trimestral
-python -m extractor.search --terms terms_vigilancia.yaml --mode patents \
-  --since-days 90 --out out/search/patents
+cd newsradar_back && pytest tests/
+cd newsradar_smcp && pytest tests/
+cd newsradar_aiagent && pytest tests/
 ```
 
-Produce:
-- `candidates.jsonl` — candidatos filtrados
-- `search_report.json` — resumen de búsqueda
+## Pipelines CI/CD (Azure DevOps)
 
-#### Paso 2: Ingest candidates
+Cada módulo tiene su propio pipeline de CI:
 
-```bash
-python -m extractor.main --catalog ../catalog.yaml \
-  --candidates out/search/papers/candidates.jsonl \
-  --out out/vigilancia_papers --debug
-```
+| Módulo | Pipeline | Descripción |
+|--------|----------|-------------|
+| `newsradar_front` | `azure-pipeline.yml` → `pipelines/build.yml` + `pipelines/deploy.yml` | Install, lint, test, build, SonarQube, deploy |
+| `newsradar_back` | `back-ci.yml` | Install, pytest con cobertura |
+| `newsradar_smcp` | `smcp-ci.yml` | Install, pytest con cobertura |
+| `newsradar_aiagent` | `aiagent-ci.yml` | Install, pytest con cobertura |
 
-### 6. Evaluación de nuevas fuentes (Source Evaluator)
+## Migración
 
-Evalúa nuevas fuentes para inclusión en el catálogo.
-
-```bash
-python -m extractor.source_eval --input new_sources.yaml --out out/source_eval
-```
-
-Formato de `new_sources.yaml`:
-
-```yaml
-sources:
-  - source_id: mi_fuente
-    name: Mi Fuente
-    url: https://example.com
-    type: news  # news|repo|patent|paper
-```
-
-Para news: detecta RSS, selectores, paywall, valida con 3 artículos.
-Para repos/patents/papers: clasifica si corresponde a provider conocido.
-
-Produce:
-- `catalog_patch.yaml` — patch para el catálogo
-- `source_scorecard.json` — scorecard detallado
-
-## CLI Reference
-
-### extractor.main
-
-```
-python -m extractor.main [OPTIONS]
-
-Opciones generales:
-  --catalog PATH              Ruta al catalog.yaml (default: catalog.yaml)
-  --days N                    Filtrar últimos N días (default: 7)
-  --max-items-per-source N    Máximo items por fuente (default: 20)
-  --out DIR                   Directorio de salida (default: out)
-  --debug                     Modo debug (logs verbose, límite 3 samples/fuente)
-  --dry-run                   Descubrir URLs sin descargar
-  --only-source ID            Procesar solo esta fuente
-  --no-playwright             Deshabilitar Playwright
-  --store-raw-html            Guardar HTML raw en debug
-
-Opciones ad-hoc:
-  --focus <aras_news|riesgos_news|vigilancia_news>
-  --adhoc                     Activar modo ad-hoc
-  --company "Nombre"          ARAS: nombre de empresa
-  --terms "t1,t2,t3"          Riesgos: términos separados por coma
-  --date-from YYYY-MM-DD      Inicio del rango (obligatorio en adhoc)
-  --date-to YYYY-MM-DD        Fin del rango (obligatorio en adhoc)
-  --topk-per-source K         Top K por fuente (default: 5)
-  --max-candidates-total M    Máximo total de candidatos (default: 50)
-  --match-mode metadata_only  Modo de matching (fijo en esta fase)
-
-Ingesta de candidatos:
-  --candidates PATH           Ruta a candidates.jsonl del search
-```
-
-### extractor.search
-
-```
-python -m extractor.search [OPTIONS]
-
-  --terms PATH          Ruta a terms YAML (requerido)
-  --mode papers|repos|patents  Modo de búsqueda (requerido)
-  --out DIR             Directorio de salida (requerido)
-  --since-days N        Días hacia atrás (default: 30)
-  --max-per-term N      Máximo por término (default: 20)
-  --debug               Debug logging
-```
-
-### extractor.source_eval
-
-```
-python -m extractor.source_eval [OPTIONS]
-
-  --input PATH    Ruta a new_sources.yaml (requerido)
-  --out DIR       Directorio de salida (requerido)
-  --debug         Debug logging
-```
-
-### extractor.ops
-
-```
-python -m extractor.ops tier [OPTIONS]
-
-  --catalog PATH        Ruta al catalog.yaml
-  --run-report PATH     Ruta al run_report.json
-  --out-dir DIR         Directorio de salida
-  --prod-mode A|B       Modo de producción (default: B)
-
-python -m extractor.ops diagnose-tier2 [OPTIONS]
-
-  --catalog PATH        Ruta al catalog.yaml
-  --run-report PATH     Ruta al run_report.json
-  --out-dir DIR         Directorio de salida
-```
-
-## Salida
-
-### articles.jsonl
-
-```json
-{
-  "run_id": "abc123",
-  "source_id": "infobae",
-  "pipeline_class": "news",
-  "focus": ["latam", "general"],
-  "title": "Título del artículo",
-  "url": "https://...",
-  "canonical_url": "https://...",
-  "published_at": "2024-03-09T10:00:00",
-  "fetched_at": "2024-03-09T15:30:00",
-  "language": "es",
-  "text": "Contenido extraído...",
-  "excerpt": "Primeros 500 caracteres...",
-  "raw_len": 45000,
-  "text_len": 2500,
-  "hash": "sha256...",
-  "fetch_method": "rss",
-  "status": "ok",
-  "source_url": "https://feed.url"
-}
-```
-
-### search candidates.jsonl
-
-```json
-{
-  "mode": "papers",
-  "term": "fraud detection deep learning",
-  "title": "Paper Title",
-  "url": "https://arxiv.org/abs/...",
-  "snippet": "Abstract excerpt...",
-  "published_at": "2026-03-01T...",
-  "source_provider": "arxiv",
-  "extra": {"authors": "..."}
-}
-```
-
-## Search Providers
-
-| Modo | Provider | API | Notas |
-|------|----------|-----|-------|
-| papers | ArXiv | RSS/Atom API | Búsqueda por términos, ordenado por fecha |
-| repos | GitHub | REST API v3 | Usa GITHUB_TOKEN si disponible, fallback sin auth |
-| patents | Google Patents | Google SERP | Limitado: Google SERP requiere JS, resultados variables |
-
-### Filtros en terms_vigilancia.yaml
-
-```yaml
-papers:
-  terms: ["fraud detection deep learning", ...]
-  filters:
-    require_keywords_any: ["fraud", "risk", "cyber"]
-
-repos:
-  terms: ["fraud-detection-ml", ...]
-  filters:
-    min_stars: 10
-    updated_within_days: 90
-
-patents:
-  terms: ["fraud detection AI", ...]
-  filters:
-    date_window_months: 6
-```
-
-## Operaciones (Tiering & Producción)
-
-### Generar Tiers
-
-```bash
-python -m extractor.ops tier \
-  --catalog ../catalog.yaml \
-  --run-report out/run_report.json \
-  --out-dir out/ \
-  --prod-mode B
-```
-
-### Definición de Tiers
-
-| Tier | Criterio | Descripción |
-|------|----------|-------------|
-| Tier0 | `text_ok > 0 AND errors == 0` | Prod-ready |
-| Tier1 | No es Tier0 ni Tier2 | Condicional: playwright, thin/oversized |
-| Tier2 | `errors > 0 OR discovered == 0 OR fetched_ok == 0` | Problemático |
-
-### Modo Producción B
-
-- Incluye Tier0 completo + Tier1 si `text_ok > 0 AND errors == 0`
-- Excluye `avg_text_len < 700` (thin_content) y `> 50000` (oversized)
-- Separa en `http_lane` y `browser_lane`
-
-### Diagnosticar Tier2
-
-```bash
-python -m extractor.ops diagnose-tier2 \
-  --catalog ../catalog.yaml \
-  --run-report out/run_report.json \
-  --out-dir out/
-```
-
-## Arquitectura LangGraph
-
-```
-load_catalog → select_sources → discover_items → split_lane
-                                                     ↓
-                    ┌────────────────────────────────┼────────────────────────────────┐
-                    ↓                                ↓                                ↓
-            fetch_content_http          fetch_content_browser              extract_pdf
-                    ↓                                ↓                                ↓
-                    └────────────────────────────────┼────────────────────────────────┘
-                                                     ↓
-                                          persist_and_report → END
-```
-
-En modo adhoc, `discover_items` aplica filtrado metadata-only (ARAS/Riesgos) antes de pasar al fetch.
-En modo `--candidates`, `discover_items` carga directamente desde JSONL.
-
-## Estructura del Proyecto
-
-```
-news_radar_mvp/
-├── extractor/
-│   ├── main.py              # CLI principal
-│   ├── graph.py             # LangGraph pipeline
-│   ├── state.py             # Pydantic models
-│   ├── catalog.py           # Catalog loader
-│   ├── scheduler.py         # Scheduling
-│   ├── utils.py             # Utilities
-│   ├── report.py            # Metrics & reporting
-│   ├── connectors/          # RSS, scrape, browser, PDF
-│   ├── extract/             # Text, metadata, normalize, dedupe
-│   ├── ops/                 # Tiering & producción
-│   │   ├── tiering.py
-│   │   ├── catalog_filter.py
-│   │   └── __main__.py
-│   ├── adhoc/               # ARAS & Riesgos metadata matching
-│   │   ├── match.py
-│   │   ├── aras.py
-│   │   └── riesgos.py
-│   ├── search/              # Papers, repos, patents search
-│   │   ├── orchestrator.py
-│   │   ├── models.py
-│   │   ├── loader.py
-│   │   ├── filters.py
-│   │   ├── export.py
-│   │   ├── providers/
-│   │   │   ├── arxiv.py
-│   │   │   ├── github.py
-│   │   │   └── google_patents.py
-│   │   └── __main__.py
-│   ├── source_eval/         # Source evaluator
-│   │   ├── evaluator.py
-│   │   ├── discover.py
-│   │   ├── selectors.py
-│   │   ├── outputs.py
-│   │   └── __main__.py
-│   ├── capabilities/        # Capabilities (funciones reutilizables)
-│   │   ├── registry.py      # Registro de capabilities
-│   │   ├── match.py         # Matching por metadata
-│   │   ├── ranking.py       # Ranking (placeholder)
-│   │   └── classify.py      # Clasificación (placeholder)
-│   └── skills/              # DEPRECATED shim → capabilities/
-├── playbooks/               # Skills-Docs (instrucciones operativas)
-│   ├── ARAS_ADHOC.md
-│   ├── RIESGOS_ADHOC.md
-│   ├── VIGILANCIA_TECH.md
-│   └── SOURCE_ONBOARDING.md
-├── docs/
-│   ├── VALIDATION_SNAPSHOT.md
-│   └── SKILLS_CONCEPT.md
-├── tests/
-├── terms_vigilancia.yaml
-├── pyproject.toml
-└── requirements.txt
-```
-
-## Capabilities & Playbooks
-
-El proyecto maneja tres capas:
-
-- **Playbooks** (`playbooks/`): Instrucciones operativas en Markdown. Ver `docs/SKILLS_CONCEPT.md`.
-- **Capabilities** (`extractor/capabilities/`): Funciones Python reutilizables con contrato definido.
-- **Kiro Skills** (`.kiro/skills/`): Instrucciones para el agente AI del IDE.
-
-```python
-from extractor.capabilities import get_capability, list_capabilities
-
-# Listar capabilities registradas
-for c in list_capabilities():
-    print(f"{c.name}: {c.purpose}")
-
-# Usar una capability directamente
-cap = get_capability("match_terms")
-result = cap.callable("Fraude en Bancolombia", "", ["fraude", "bancolombia"])
-print(result)  # {"score": 0.66, "matched_terms": ["fraude", "bancolombia"]}
-```
-
-> Nota: `extractor/skills/` sigue existiendo como shim backward-compatible (emite DeprecationWarning).
-
-## Tests
-
-```bash
-cd news_radar_mvp
-pytest tests/ -v
-```
-
-## Troubleshooting
-
-### SSL Errors
-
-El extractor usa `verify=False` para manejar certificados self-signed. Si persisten errores SSL con Playwright:
-
-```bash
-NODE_TLS_REJECT_UNAUTHORIZED=0 npx playwright install chromium
-```
-
-### Google Patents devuelve 0 resultados
-
-Google Patents es una SPA que requiere JavaScript. El provider usa Google SERP con `site:patents.google.com`, pero Google puede servir CAPTCHAs. Para resultados confiables, considerar SerpAPI o Playwright.
-
-### GitHub rate limit
-
-Sin `GITHUB_TOKEN`, GitHub limita a 10 requests/minuto. Exportar el token:
-
-```bash
-export GITHUB_TOKEN=ghp_...
-```
+Este repositorio fue migrado de Next.js 14 + React 18 a Angular 21. Para detalles completos de la migración, consultar `MIGRATION_NOTES.md`.

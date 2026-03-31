@@ -1,0 +1,1126 @@
+version: "0.1"
+generated_at: "2026-03-09"
+defaults:
+  user_agent: "NewsRadarMVP/0.1 (+contact: security-research@yourorg.com)"
+  timeout_seconds: 25
+  max_retries: 2
+  retry_backoff_seconds: 1.7
+  rate_limit_rps: 1.0
+  max_items_per_source: 30
+  min_text_chars: 800
+  allow_languages: ["es", "en", "pt"]
+  store_raw_html: false
+  debug_store_samples_per_source: 3
+
+pipelines:
+  vigilancia_global:
+    description: "Búsqueda global para tendencias tecnológicas, IA, blockchain, banca, etc."
+    geo: ["GLOBAL"]
+    allow_languages: ["es", "en"]
+  aras_latam:
+    description: "Noticias y evidencia Colombia/LatAm para ARAS (ambiental/social) por empresa y rango de fechas."
+    geo: ["CO", "LATAM"]
+    allow_languages: ["es", "en", "pt"]
+  riesgos_latam:
+    description: "Riesgos emergentes (ciber, operativo, fraude, ASG, IA, talento). Principalmente ES sin limitar."
+    geo: ["CO", "LATAM", "GLOBAL"]
+    allow_languages: ["es", "en", "pt"]
+
+sources:
+
+  # =========================
+  # COLOMBIA / LATAM - PRENSA (ARAS / Riesgos)
+  # =========================
+
+  - source_id: eltiempo_colombia
+    name: "El Tiempo - Colombia (RSS)"
+    enabled: true
+    availability: open
+    focus: ["aras_latam", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.eltiempo.com/"
+    rss_urls:
+      - "https://www.eltiempo.com/rss/colombia.xml"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["actualidad", "empresas", "ambiental", "social", "conflicto"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: eltiempo_justicia
+    name: "El Tiempo - Justicia (RSS)"
+    enabled: true
+    availability: open
+    focus: ["aras_latam", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.eltiempo.com/"
+    rss_urls:
+      - "https://www.eltiempo.com/rss/justicia.xml"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["justicia", "conflicto", "litigios", "sanciones"]
+    aras_tags:
+      - "Procesos ambientales sancionatorios, administrativos o litigios"
+      - "Conflictos con las comunidades/Conflicto armado"
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: eltiempo_economia
+    name: "El Tiempo - Economía (RSS)"
+    enabled: true
+    availability: open
+    focus: ["aras_latam", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.eltiempo.com/"
+    rss_urls:
+      - "https://www.eltiempo.com/rss/economia.xml"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["economia", "empresas", "sanciones", "multas"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: elcolombiano_colombia
+    name: "El Colombiano - Colombia (RSS)"
+    enabled: true
+    availability: open
+    focus: ["aras_latam", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.elcolombiano.com/"
+    rss_urls:
+      - "https://www.elcolombiano.com/rss/colombia.xml"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["actualidad", "empresas", "antioquia", "ambiental", "social"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: elcolombiano_negocios
+    name: "El Colombiano - Negocios (RSS)"
+    enabled: true
+    availability: open
+    focus: ["aras_latam", "riesgos_latam", "vigilancia_global"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.elcolombiano.com/"
+    rss_urls:
+      - "https://www.elcolombiano.com/rss/negocios.xml"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["economia", "banca", "empresas", "mercados"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: elcolombiano_tecnologia
+    name: "El Colombiano - Tecnología (Scrape sección)"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.elcolombiano.com/"
+    listing_urls:
+      - "https://www.elcolombiano.com/tecnologia"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["tecnologia", "ia", "ciberseguridad"]
+    extraction:
+      requires_playwright: false
+      selectors:
+        article_link_css: "a.priority-content, a[href*='/tecnologia/']"
+        title_css: "h1.title-article"
+        date_css: "time[datetime]"
+        content_css: "div.article-body"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+
+  - source_id: infobae_rss
+    name: "Infobae - RSS (general)"
+    enabled: true
+    availability: open
+    focus: ["aras_latam", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.infobae.com/"
+    rss_urls:
+      - "https://www.infobae.com/argentina-footer/infobae/rss/"
+    languages: ["es"]
+    geo: ["LATAM"]
+    topics: ["actualidad", "latam", "economia", "empresas", "riesgos"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: infobae_latam_listing
+    name: "Infobae - América Latina (RSS preferido)"
+    enabled: true
+    availability: open
+    focus: ["aras_latam", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.infobae.com/"
+    rss_urls:
+      - "https://www.infobae.com/argentina-footer/infobae/rss/"
+    languages: ["es"]
+    geo: ["LATAM"]
+    topics: ["latam", "politica", "economia", "seguridad", "empresas"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+    notes: "RSS detectado, preferido sobre scrape original"
+
+  - source_id: inteligencia_estrategica_ciber
+    name: "Inteligencia Estrategica (Scrape - ciber/seguridad)"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://inteligenciaestrategica.com.co/"
+    listing_urls:
+      - "https://inteligenciaestrategica.com.co/"
+    languages: ["es"]
+    geo: ["LATAM"]
+    topics: ["ciberseguridad", "fraude", "banca", "incidentes"]
+    extraction:
+      requires_playwright: true
+      selectors:
+        article_link_css: "a[href*='inteligenciaestrategica.com.co']"
+        title_css: "h1, h2.entry-title"
+        date_css: "time, span.date"
+        content_css: "div.entry-content, article"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Sitio WordPress, requiere JS para carga completa"
+
+  # =========================
+  # ARAS - EVIDENCIA / SITIOS OFICIALES (Colombia)
+  # =========================
+
+  - source_id: vital_ruia_sanciones
+    name: "VITAL - RUIA Consulta de Infracciones o Sanciones (Query/Web)"
+    enabled: false
+    availability: open
+    focus: ["aras_latam"]
+    pipeline_class: "evidence"
+    type: "query"
+    base_url: "https://vital.minambiente.gov.co/"
+    query:
+      entry_url: "https://vital.minambiente.gov.co/SILPA_UT_PRE/RUIA/ConsultarSancion.aspx?Ubic=ext"
+      method: "form_scrape"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["ambiental", "sanciones", "ruia"]
+    aras_tags:
+      - "Procesos ambientales sancionatorios, administrativos o litigios"
+      - "Cumplimiento de obligaciones derivadas de licencias/permisos"
+    extraction:
+      requires_playwright: true
+    profile_required: false
+    notes: "Requiere conector de formulario ASP.NET (Playwright) – fase 1.1"
+
+  - source_id: tremarctos_colombia
+    name: "Tremarctos Colombia - Sistema de alertas tempranas (WebApp)"
+    enabled: false
+    availability: open
+    focus: ["aras_latam"]
+    pipeline_class: "evidence"
+    type: "custom"
+    base_url: "http://200.32.81.74/"
+    listing_urls:
+      - "http://200.32.81.74/"
+      - "https://experience.arcgis.com/experience/5fdae351664e4e909a154c9a4a86db7c/page/Inicio/"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["alertas_tempranas", "biodiversidad", "territorio", "infraestructura", "mineria"]
+    aras_tags:
+      - "Traslape con áreas protegidas"
+      - "Señalamientos/Acusaciones por impactos ambientales y sociales"
+    extraction:
+      requires_playwright: true
+    profile_required: false
+    notes: "ArcGIS Experience Builder. Requiere análisis de API REST – fase 1.1"
+
+  - source_id: anm_sala_prensa
+    name: "Agencia Nacional de Minería (ANM) - Sala de prensa"
+    enabled: true
+    availability: unknown
+    focus: ["aras_latam"]
+    pipeline_class: "evidence"
+    type: "scrape"
+    base_url: "https://www.anm.gov.co/"
+    listing_urls:
+      - "https://www.anm.gov.co/sala-de-prensa"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["mineria", "comunicados", "boletines", "sanciones"]
+    extraction:
+      requires_playwright: false
+      selectors:
+        article_link_css: "a[href*='/sala-de-prensa/'], a.news-item"
+        title_css: "h1, h2.title"
+        date_css: "time[datetime], span.date"
+        content_css: "div.content, article"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: fragile
+    notes: "SSL certificate issue detectado. Verificar acceso."
+
+  - source_id: anh_noticias
+    name: "Agencia Nacional de Hidrocarburos (ANH) - Noticias"
+    enabled: true
+    availability: unknown
+    focus: ["aras_latam"]
+    pipeline_class: "evidence"
+    type: "scrape"
+    base_url: "https://www.anh.gov.co/"
+    listing_urls:
+      - "https://www.anh.gov.co/es/noticias/"
+      - "https://www.anh.gov.co/es/prensa/comunicados/"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["hidrocarburos", "comunicados", "ambiental_social", "consulta_previa"]
+    extraction:
+      requires_playwright: false
+      selectors:
+        article_link_css: "a[href*='/es/noticias/'], a[href*='/es/prensa/']"
+        title_css: "h1"
+        date_css: "time[datetime]"
+        content_css: "div.content, article"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: fragile
+    notes: "SSL certificate issue detectado. Verificar acceso."
+
+  - source_id: parques_nacionales_noticias
+    name: "Parques Nacionales Naturales - Noticias (Sala de prensa)"
+    enabled: true
+    availability: open
+    focus: ["aras_latam"]
+    pipeline_class: "evidence"
+    type: "scrape"
+    base_url: "https://www.parquesnacionales.gov.co/"
+    listing_urls:
+      - "https://www.parquesnacionales.gov.co/sala-de-prensa/noticias/"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["areas_protegidas", "biodiversidad", "territorio", "ambiental"]
+    aras_tags:
+      - "Traslape con áreas protegidas"
+      - "Señalamientos/Acusaciones por impactos ambientales y sociales"
+    extraction:
+      requires_playwright: false
+      selectors:
+        article_link_css: "a[href*='/sala-de-prensa/noticias/']"
+        title_css: "h1"
+        date_css: "time[datetime]"
+        content_css: "div.content, article"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Contenido mínimo en listing. Verificar paginación."
+
+  - source_id: urt_sala_prensa
+    name: "Unidad de Restitución de Tierras (URT) - Sala de Prensa"
+    enabled: true
+    availability: open
+    focus: ["aras_latam"]
+    pipeline_class: "evidence"
+    type: "scrape"
+    base_url: "https://www.urt.gov.co/"
+    listing_urls:
+      - "https://urt.gov.co/sala-de-prensa"
+      - "https://www.urt.gov.co/sala-de-prensa?page=0"
+    languages: ["es"]
+    geo: ["CO"]
+    topics: ["restitucion", "conflicto", "desplazamiento", "territorio"]
+    aras_tags:
+      - "Desplazamiento involuntario de comunidades"
+      - "Conflictos con las comunidades/Conflicto armado"
+    extraction:
+      requires_playwright: false
+      selectors:
+        article_link_css: "a[href*='/sala-de-prensa/']"
+        title_css: "h1"
+        date_css: "time, span.date"
+        content_css: "div.content, article"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: stable
+    notes: "Estructura Drupal típica. Contenido accesible."
+
+  # =========================
+  # CIBERSEGURIDAD (Vigilancia global + Riesgos emergentes)
+  # =========================
+
+  - source_id: the_hacker_news
+    name: "The Hacker News (RSS)"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://thehackernews.com/"
+    rss_urls:
+      - "https://feeds.feedburner.com/TheHackersNews"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["ciberseguridad", "vulnerabilidades", "malware", "fraude"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: dark_reading
+    name: "Dark Reading (RSS)"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.darkreading.com/"
+    rss_urls:
+      - "https://www.darkreading.com/rss.xml"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["ciberseguridad", "riesgo", "operaciones", "amenazas"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: securityweek_feed
+    name: "SecurityWeek (RSS)"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.securityweek.com/"
+    rss_urls:
+      - "https://www.securityweek.com/feed/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["ciberseguridad", "threat_intel", "vulnerabilidades"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: cybersecurity_dive
+    name: "Cybersecurity Dive (RSS feed endpoint)"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.cybersecuritydive.com/"
+    rss_urls:
+      - "https://www.cybersecuritydive.com/feeds/news/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["ciberseguridad", "incidentes", "breaches", "policy"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: cyberscoop
+    name: "CyberScoop (RSS detectado)"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://cyberscoop.com/"
+    rss_urls:
+      - "https://cyberscoop.com/feed/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["ciberseguridad", "gobierno", "policy", "incidentes"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+    notes: "RSS detectado y funcional"
+
+  - source_id: cisa_news
+    name: "CISA - News & Events (Scrape)"
+    enabled: false
+    availability: blocked
+    focus: ["vigilancia_global", "riesgos_latam"]
+    pipeline_class: "evidence"
+    type: "scrape"
+    base_url: "https://www.cisa.gov/"
+    listing_urls:
+      - "https://www.cisa.gov/news-events/news"
+      - "https://www.cisa.gov/news-events/cybersecurity-advisories"
+      - "https://www.cisa.gov/news-events/ics-advisories"
+    languages: ["en"]
+    geo: ["US", "GLOBAL"]
+    topics: ["advisories", "kev", "alerts", "ot"]
+    extraction:
+      requires_playwright: true
+    profile_required: false
+    notes: "Acceso bloqueado (403). Requiere headers específicos o proxy gov."
+
+  # =========================
+  # RIESGOS EMERGENTES - REPORTES (PDF/HTML)
+  # =========================
+
+  - source_id: wef_global_risks_2026
+    name: "WEF - Global Risks Report 2026 (HTML + PDF)"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam", "vigilancia_global"]
+    pipeline_class: "reports"
+    type: "pdf"
+    base_url: "https://www.weforum.org/"
+    page_urls:
+      - "https://www.weforum.org/publications/global-risks-report-2026/"
+      - "https://es.weforum.org/publications/global-risks-report-2026/"
+    pdf_urls:
+      - "https://reports.weforum.org/docs/WEF_Global_Risks_Report_2026.pdf"
+    languages: ["en", "es"]
+    geo: ["GLOBAL"]
+    topics: ["riesgo_emergente", "macro", "disinformation", "ai", "clima"]
+    extraction:
+      pdf:
+        enabled: true
+        engine: "pypdf2"
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: allianz_risk_barometer_2026
+    name: "Allianz Risk Barometer 2026 (PDF)"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam", "vigilancia_global"]
+    pipeline_class: "reports"
+    type: "pdf"
+    base_url: "https://commercial.allianz.com/"
+    pdf_urls:
+      - "https://commercial.allianz.com/content/dam/onemarketing/commercial/commercial/reports/allianz-risk-barometer-2026.pdf"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["riesgo_emergente", "ciber", "ai", "operacional"]
+    extraction:
+      pdf:
+        enabled: true
+        engine: "pypdf2"
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+
+  - source_id: marsh_global_risks_2026_press
+    name: "Marsh - Global Risks Report 2026 (press/insights)"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam", "vigilancia_global"]
+    pipeline_class: "reports"
+    type: "scrape"
+    base_url: "https://www.corporate.marsh.com/"
+    listing_urls:
+      - "https://www.corporate.marsh.com/news-events/2026/january/global-risks-report-2026.html"
+      - "https://www.marsh.com/es-es/services/risk-advisory/insights/global-risks-2026.html"
+    languages: ["en", "es"]
+    geo: ["GLOBAL"]
+    topics: ["riesgo_emergente", "macro", "geopolitica", "ai", "misinformation"]
+    extraction:
+      requires_playwright: false
+      selectors:
+        title_css: "h1"
+        content_css: "div.content, article, main"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: stable
+    notes: "Página estática de informe. Contenido accesible."
+
+  - source_id: zurich_global_risks_release
+    name: "Zurich - Commentary on Global Risks Report 2026 (release)"
+    enabled: true
+    availability: open
+    focus: ["riesgos_latam", "vigilancia_global"]
+    pipeline_class: "reports"
+    type: "scrape"
+    base_url: "https://www.zurich.com/"
+    listing_urls:
+      - "https://www.zurich.com/media/news-releases/2026/2026-0114-01"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["riesgo_emergente", "macro", "resiliencia"]
+    extraction:
+      requires_playwright: false
+      selectors:
+        title_css: "h1"
+        date_css: "time, span.date"
+        content_css: "div.content, article"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: stable
+    notes: "Press release accesible. Contenido completo."
+
+  # =========================
+  # VIGILANCIA GLOBAL - TECH / BANCA
+  # =========================
+
+  - source_id: finextra
+    name: "Finextra (RSS detectado)"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.finextra.com/"
+    rss_urls:
+      - "https://www.finextra.com/rss/headlines.aspx"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["banca", "fintech", "pagos", "ia"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+    notes: "RSS completo detectado con 50+ items"
+
+  - source_id: thefinancialbrand
+    name: "The Financial Brand"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://thefinancialbrand.com/"
+    listing_urls:
+      - "https://thefinancialbrand.com/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["banca", "marketing", "tendencias"]
+    extraction:
+      requires_playwright: true
+      selectors:
+        article_link_css: "a[href*='thefinancialbrand.com']"
+        title_css: "h1, h2"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Contenido mínimo en homepage. Requiere JS."
+
+  - source_id: finovate
+    name: "Finovate"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://finovate.com/"
+    listing_urls:
+      - "https://finovate.com/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["fintech", "banca", "innovacion"]
+    extraction:
+      requires_playwright: true
+      selectors:
+        article_link_css: "a[href*='finovate.com']"
+        title_css: "h1, h2"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Sitio de eventos. Blog disponible."
+
+  - source_id: gartner
+    name: "Gartner (paywall)"
+    enabled: false
+    availability: gated
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.gartner.com/"
+    listing_urls:
+      - "https://www.gartner.com/en/newsroom"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["tendencias", "ia", "estrategia"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    notes: "Paywall detectado; definir estrategia posterior (licencia/API/newsletter)."
+
+  - source_id: mckinsey
+    name: "McKinsey"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.mckinsey.com/"
+    listing_urls:
+      - "https://www.mckinsey.com/featured-insights"
+    languages: ["en", "es"]
+    geo: ["GLOBAL"]
+    topics: ["banca", "ia", "estrategia"]
+    extraction:
+      requires_playwright: true
+      selectors:
+        article_link_css: "a[href*='/featured-insights/']"
+        title_css: "h1"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Insights públicos accesibles."
+
+  - source_id: forrester
+    name: "Forrester (paywall parcial)"
+    enabled: false
+    availability: gated
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.forrester.com/"
+    listing_urls:
+      - "https://www.forrester.com/blogs"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["tecnologia", "tendencias", "ia"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    notes: "Paywall detectado; blog público limitado. Definir estrategia posterior."
+
+  - source_id: techcrunch
+    name: "TechCrunch (RSS detectado)"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://techcrunch.com/"
+    rss_urls:
+      - "https://techcrunch.com/feed/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["startups", "ia", "tecnologia"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+    notes: "RSS detectado"
+
+  - source_id: venturebeat
+    name: "VentureBeat (rate limited)"
+    enabled: false
+    availability: blocked
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://venturebeat.com/"
+    listing_urls:
+      - "https://venturebeat.com/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["ia", "negocios", "tecnologia"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    notes: "Rate limiting agresivo (429). Requiere throttling o proxy."
+
+  - source_id: technologyreview
+    name: "MIT Technology Review (RSS detectado)"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.technologyreview.com/"
+    rss_urls:
+      - "https://www.technologyreview.com/feed/"
+    languages: ["en", "es"]
+    geo: ["GLOBAL"]
+    topics: ["ia", "tendencias", "investigacion"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+    notes: "RSS detectado. Contenido público accesible."
+
+  - source_id: wired
+    name: "WIRED (RSS detectado)"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.wired.com/"
+    rss_urls:
+      - "https://www.wired.com/feed/rss"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["tecnologia", "sociedad", "ia"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+    notes: "RSS completo con 50+ items"
+
+  - source_id: coindesk
+    name: "CoinDesk (RSS detectado)"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "rss"
+    base_url: "https://www.coindesk.com/"
+    rss_urls:
+      - "https://www.coindesk.com/arc/outboundfeeds/rss/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["blockchain", "crypto", "regulacion"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    quality_hint: stable
+    notes: "RSS completo detectado"
+
+  - source_id: thenextweb
+    name: "The Next Web"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://thenextweb.com/"
+    listing_urls:
+      - "https://thenextweb.com/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["tecnologia", "ia", "startups"]
+    extraction:
+      requires_playwright: true
+      selectors:
+        article_link_css: "a[href*='thenextweb.com']"
+        title_css: "h1, h2"
+        content_css: "article"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Homepage mínima. Requiere navegación a secciones."
+
+  - source_id: infoworld
+    name: "InfoWorld"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.infoworld.com/"
+    listing_urls:
+      - "https://www.infoworld.com/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["cloud", "ia", "dev", "arquitectura"]
+    extraction:
+      requires_playwright: false
+      selectors:
+        article_link_css: "a[href*='infoworld.com']"
+        title_css: "h1"
+        content_css: "article, div.article-body"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: stable
+    notes: "Contenido accesible sin JS"
+
+  - source_id: cio
+    name: "CIO"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.cio.com/"
+    listing_urls:
+      - "https://www.cio.com/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["it_strategy", "ia", "seguridad"]
+    extraction:
+      requires_playwright: false
+      selectors:
+        article_link_css: "a[href*='cio.com']"
+        title_css: "h1"
+        content_css: "article, div.article-body"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: stable
+    notes: "Contenido accesible. Mismo grupo que InfoWorld."
+
+  - source_id: csoonline
+    name: "CSO Online"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.csoonline.com/"
+    listing_urls:
+      - "https://www.csoonline.com/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["ciberseguridad", "gobernanza", "riesgo"]
+    extraction:
+      requires_playwright: false
+      selectors:
+        article_link_css: "a[href*='csoonline.com']"
+        title_css: "h1"
+        content_css: "article, div.article-body"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: stable
+    notes: "Contenido de seguridad accesible."
+
+  - source_id: aws_blog
+    name: "AWS Blog"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://aws.amazon.com/"
+    listing_urls:
+      - "https://aws.amazon.com/blogs/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["cloud", "ia", "arquitectura", "seguridad"]
+    extraction:
+      requires_playwright: true
+      selectors:
+        article_link_css: "a[href*='/blogs/']"
+        title_css: "h1"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Blog público. Múltiples categorías disponibles."
+
+  - source_id: isaca
+    name: "ISACA"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global", "riesgos_latam"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.isaca.org/"
+    listing_urls:
+      - "https://www.isaca.org/resources/news-and-trends"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["gobernanza", "riesgo", "ciberseguridad"]
+    extraction:
+      requires_playwright: true
+      selectors:
+        article_link_css: "a[href*='/resources/']"
+        title_css: "h1, h2"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Contenido público en news-and-trends. Requiere JS."
+
+  - source_id: celent
+    name: "Celent (paywall)"
+    enabled: false
+    availability: gated
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.celent.com/"
+    listing_urls:
+      - "https://www.celent.com/insights"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["banca", "fintech", "tendencias"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    notes: "Paywall detectado; definir estrategia posterior (licencia/API)."
+
+  - source_id: stefanini
+    name: "Stefanini"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://stefanini.com/"
+    listing_urls:
+      - "https://stefanini.com/en/insights"
+    languages: ["en", "es", "pt"]
+    geo: ["GLOBAL"]
+    topics: ["ia", "consultoria", "tech"]
+    extraction:
+      requires_playwright: false
+      selectors:
+        article_link_css: "a[href*='/insights/']"
+        title_css: "h1, h2"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Blog corporativo accesible."
+
+  - source_id: avolutionsoftware
+    name: "Avolution (URL no disponible)"
+    enabled: false
+    availability: unknown
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.avolutionsoftware.com/"
+    listing_urls:
+      - "https://www.avolutionsoftware.com/"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["enterprise_architecture", "gobernanza"]
+    extraction:
+      requires_playwright: false
+    profile_required: false
+    notes: "Blog no encontrado (404). Verificar URL correcta."
+
+  - source_id: bizzdesign
+    name: "Bizzdesign"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://bizzdesign.com/"
+    listing_urls:
+      - "https://bizzdesign.com/blog"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["enterprise_architecture", "transformacion"]
+    extraction:
+      requires_playwright: true
+      selectors:
+        article_link_css: "a[href*='/blog/']"
+        title_css: "h1"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Blog disponible. Contenido de EA."
+
+  - source_id: openlegacy
+    name: "OpenLegacy"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.openlegacy.com/"
+    listing_urls:
+      - "https://www.openlegacy.com/blog"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["legacy_modernization", "apis", "banca"]
+    extraction:
+      requires_playwright: false
+      selectors:
+        article_link_css: "a[href*='/blog/']"
+        title_css: "h1"
+        date_css: "time, span.date"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: stable
+    notes: "Blog de modernización legacy accesible."
+
+  - source_id: hyland
+    name: "Hyland"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://www.hyland.com/"
+    listing_urls:
+      - "https://www.hyland.com/en/resources"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["content_services", "automation", "enterprise"]
+    extraction:
+      requires_playwright: true
+      selectors:
+        article_link_css: "a[href*='/resources/']"
+        title_css: "h1"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Resources hub. Contenido mixto."
+
+  - source_id: dxc
+    name: "DXC"
+    enabled: true
+    availability: open
+    focus: ["vigilancia_global"]
+    pipeline_class: "news"
+    type: "scrape"
+    base_url: "https://dxc.com/"
+    listing_urls:
+      - "https://dxc.com/us/en/insights"
+    languages: ["en"]
+    geo: ["GLOBAL"]
+    topics: ["it_services", "cloud", "security"]
+    extraction:
+      requires_playwright: true
+      selectors:
+        article_link_css: "a[href*='/insights/']"
+        title_css: "h1"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    profile_required: false
+    quality_hint: ok
+    notes: "Insights corporativos accesibles."
+
+# =========================
+# RESUMEN DE PERFILADO
+# =========================
+# Total fuentes: 47
+# Habilitadas (enabled: true): 40
+# Deshabilitadas (enabled: false): 7
+#   - Gated/Paywall: gartner, forrester, celent
+#   - Bloqueadas: cisa_news, venturebeat
+#   - Custom dev: vital_ruia_sanciones, tremarctos_colombia
+#   - URL issue: avolutionsoftware
+# 
+# Por tipo:
+#   - RSS: 15 fuentes
+#   - Scrape: 29 fuentes
+#   - PDF: 2 fuentes
+#   - Query/Custom: 2 fuentes
+#
+# Requieren Playwright: 15 fuentes
+# Sin Playwright: 32 fuentes

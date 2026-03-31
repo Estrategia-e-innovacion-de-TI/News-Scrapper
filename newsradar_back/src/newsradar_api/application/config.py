@@ -1,62 +1,33 @@
-"""API configuration and dependency injection.
-
-Loads settings from environment/YAML and wires domain use cases
-to infrastructure adapters (MCP client, SMTP, DB).
-"""
+"""API configuration."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 
 @dataclass
 class ApiConfig:
-    """Configuration for the Backend API.
-
-    Attributes
-    ----------
-    mcp_server_url : str
-        URL of the newsradar_smcp MCP server.
-    aiagent_ws_url : str
-        WebSocket URL of the newsradar_aiagent for chat proxy.
-    smtp_host : str
-        SMTP server host for newsletter delivery.
-    smtp_port : int
-        SMTP server port.
-    db_url : str
-        Database connection URL for subscriptions persistence.
-    """
-
-    mcp_server_url: str = "http://localhost:8080"
+    database_url: str = ""
     aiagent_ws_url: str = "ws://localhost:8081/chat"
-    smtp_host: str = "localhost"
-    smtp_port: int = 587
-    db_url: str = "sqlite:///subscriptions.db"
+    aws_region: str = "us-east-1"
+    bedrock_model_id: str = "anthropic.claude-3-haiku-20240307-v1:0"
+    bedrock_embed_model_id: str = "amazon.titan-embed-text-v2:0"
 
     @classmethod
     def load(cls) -> ApiConfig:
-        """Load configuration from environment variables or YAML.
-
-        Returns
-        -------
-        ApiConfig
-            Populated configuration instance.
-        """
-        # TODO: Load from env vars / YAML file
-        return cls()
-
-
-def create_container(config: ApiConfig | None = None) -> dict:
-    """Create and wire the DI container.
-
-    Parameters
-    ----------
-    config : ApiConfig | None
-        API configuration. Uses defaults if None.
-
-    Returns
-    -------
-    dict
-        Container with wired dependencies.
-    """
-    # TODO: Wire MCP client, SMTP adapter, DB adapter, and use cases
-    raise NotImplementedError("TODO: implement DI container wiring")
+        return cls(
+            database_url=os.getenv(
+                "DATABASE_URL",
+                "postgresql+asyncpg://newsradar:newsradar@localhost:5432/newsradar",
+            ),
+            aiagent_ws_url=os.getenv("AIAGENT_URL", "ws://localhost:8081/chat"),
+            aws_region=os.getenv("AWS_REGION", "us-east-1"),
+            bedrock_model_id=os.getenv(
+                "BEDROCK_MODEL_ID",
+                "anthropic.claude-3-haiku-20240307-v1:0",
+            ),
+            bedrock_embed_model_id=os.getenv(
+                "BEDROCK_EMBED_MODEL_ID",
+                "amazon.titan-embed-text-v2:0",
+            ),
+        )

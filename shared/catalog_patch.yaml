@@ -1,0 +1,415 @@
+# Catalog Patch - Generated 2026-03-09
+# Actualizar fuentes con profile_required: true
+
+sources_updates:
+
+  # ========== COLOMBIA/LATAM - SCRAPE ==========
+  
+  elcolombiano_tecnologia:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        article_link_css: "a.priority-content, a[href*='/tecnologia/']"
+        title_css: "h1.title-article"
+        date_css: "time[datetime]"
+        content_css: "div.article-body"
+        canonical_css: "link[rel='canonical']"
+
+  infobae_latam_listing:
+    type: "rss"
+    profile_required: false
+    rss_urls:
+      - "https://www.infobae.com/argentina-footer/infobae/rss/"
+    extraction:
+      use_playwright: false
+    notes: "RSS disponible, preferir sobre scrape"
+
+  inteligencia_estrategica_ciber:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: true
+      selectors:
+        article_link_css: "a[href*='inteligenciaestrategica.com.co']"
+        title_css: "h1, h2.entry-title"
+        date_css: "time, span.date"
+        content_css: "div.entry-content, article"
+        canonical_css: "link[rel='canonical']"
+    notes: "Sitio WordPress, requiere JS para carga completa"
+
+  # ========== ARAS - EVIDENCIA COLOMBIA ==========
+
+  vital_ruia_sanciones:
+    type: "query"
+    profile_required: true
+    extraction:
+      use_playwright: true
+    notes: "Formulario ASP.NET complejo. Requiere desarrollo custom."
+
+  tremarctos_colombia:
+    type: "scrape"
+    profile_required: true
+    extraction:
+      use_playwright: true
+    notes: "ArcGIS Experience Builder. Requiere análisis de API REST."
+
+  anm_sala_prensa:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        article_link_css: "a[href*='/sala-de-prensa/'], a.news-item"
+        title_css: "h1, h2.title"
+        date_css: "time[datetime], span.date"
+        content_css: "div.content, article"
+        canonical_css: "link[rel='canonical']"
+    notes: "SSL certificate issue detectado. Verificar acceso."
+
+  anh_noticias:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        article_link_css: "a[href*='/es/noticias/'], a[href*='/es/prensa/']"
+        title_css: "h1"
+        date_css: "time[datetime]"
+        content_css: "div.content, article"
+        canonical_css: "link[rel='canonical']"
+    notes: "SSL certificate issue detectado. Verificar acceso."
+
+  parques_nacionales_noticias:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        article_link_css: "a[href*='/sala-de-prensa/noticias/']"
+        title_css: "h1"
+        date_css: "time[datetime]"
+        content_css: "div.content, article"
+        canonical_css: "link[rel='canonical']"
+    notes: "Contenido mínimo en listing. Verificar paginación."
+
+  urt_sala_prensa:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        article_link_css: "a[href*='/sala-de-prensa/']"
+        title_css: "h1"
+        date_css: "time, span.date"
+        content_css: "div.content, article"
+        canonical_css: "link[rel='canonical']"
+    notes: "Estructura Drupal típica. Contenido accesible."
+
+  # ========== CIBERSEGURIDAD ==========
+
+  cyberscoop:
+    type: "rss"
+    profile_required: false
+    rss_urls:
+      - "https://cyberscoop.com/feed/"
+    extraction:
+      use_playwright: false
+    notes: "RSS detectado y funcional"
+
+  cisa_news:
+    type: "scrape"
+    profile_required: true
+    extraction:
+      use_playwright: true
+    paywall_signals: ["403 Forbidden"]
+    notes: "Acceso bloqueado (403). Requiere headers específicos o proxy."
+
+  # ========== REPORTES ==========
+
+  marsh_global_risks_2026_press:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        title_css: "h1"
+        content_css: "div.content, article, main"
+        canonical_css: "link[rel='canonical']"
+    notes: "Página estática de informe. Contenido accesible."
+
+  zurich_global_risks_release:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        title_css: "h1"
+        date_css: "time, span.date"
+        content_css: "div.content, article"
+        canonical_css: "link[rel='canonical']"
+    notes: "Press release accesible. Contenido completo."
+
+  # ========== VIGILANCIA GLOBAL - TECH/BANCA ==========
+
+  finextra:
+    type: "rss"
+    profile_required: false
+    rss_urls:
+      - "https://www.finextra.com/rss/headlines.aspx"
+    extraction:
+      use_playwright: false
+    notes: "RSS completo detectado con 50+ items"
+
+  thefinancialbrand:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: true
+      selectors:
+        article_link_css: "a[href*='thefinancialbrand.com']"
+        title_css: "h1, h2"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    notes: "Contenido mínimo en homepage. Requiere JS."
+
+  finovate:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: true
+      selectors:
+        article_link_css: "a[href*='finovate.com']"
+        title_css: "h1, h2"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    notes: "Sitio de eventos. Blog disponible."
+
+  gartner:
+    type: "scrape"
+    profile_required: true
+    paywall_signals: ["subscription required", "gated content"]
+    extraction:
+      use_playwright: true
+    notes: "Contenido mayormente gated. Newsroom público limitado."
+
+  mckinsey:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: true
+      selectors:
+        article_link_css: "a[href*='/featured-insights/']"
+        title_css: "h1"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    notes: "Insights públicos accesibles."
+
+  forrester:
+    type: "scrape"
+    profile_required: true
+    paywall_signals: ["subscription", "client access"]
+    extraction:
+      use_playwright: true
+    notes: "Blog público, research gated."
+
+  techcrunch:
+    type: "rss"
+    profile_required: false
+    rss_urls:
+      - "https://techcrunch.com/feed/"
+    extraction:
+      use_playwright: false
+    notes: "RSS detectado"
+
+  venturebeat:
+    type: "scrape"
+    profile_required: true
+    paywall_signals: ["429 Too Many Requests"]
+    extraction:
+      use_playwright: true
+    notes: "Rate limiting agresivo. Requiere throttling."
+
+  technologyreview:
+    type: "rss"
+    profile_required: false
+    rss_urls:
+      - "https://www.technologyreview.com/feed/"
+    extraction:
+      use_playwright: false
+    notes: "RSS detectado. Contenido público accesible."
+
+  wired:
+    type: "rss"
+    profile_required: false
+    rss_urls:
+      - "https://www.wired.com/feed/rss"
+    extraction:
+      use_playwright: false
+    notes: "RSS completo con 50+ items"
+
+  coindesk:
+    type: "rss"
+    profile_required: false
+    rss_urls:
+      - "https://www.coindesk.com/arc/outboundfeeds/rss/"
+    extraction:
+      use_playwright: false
+    notes: "RSS completo detectado"
+
+  thenextweb:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: true
+      selectors:
+        article_link_css: "a[href*='thenextweb.com']"
+        title_css: "h1, h2"
+        content_css: "article"
+        canonical_css: "link[rel='canonical']"
+    notes: "Homepage mínima. Requiere navegación a secciones."
+
+  infoworld:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        article_link_css: "a[href*='infoworld.com']"
+        title_css: "h1"
+        content_css: "article, div.article-body"
+        canonical_css: "link[rel='canonical']"
+    notes: "Contenido accesible sin JS"
+
+  cio:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        article_link_css: "a[href*='cio.com']"
+        title_css: "h1"
+        content_css: "article, div.article-body"
+        canonical_css: "link[rel='canonical']"
+    notes: "Contenido accesible. Mismo grupo que InfoWorld."
+
+  csoonline:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        article_link_css: "a[href*='csoonline.com']"
+        title_css: "h1"
+        content_css: "article, div.article-body"
+        canonical_css: "link[rel='canonical']"
+    notes: "Contenido de seguridad accesible."
+
+  aws_blog:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: true
+      selectors:
+        article_link_css: "a[href*='/blogs/']"
+        title_css: "h1"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    notes: "Blog público. Múltiples categorías disponibles."
+
+  isaca:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: true
+      selectors:
+        article_link_css: "a[href*='/resources/']"
+        title_css: "h1, h2"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    notes: "Contenido público en news-and-trends. Requiere JS."
+
+  celent:
+    type: "scrape"
+    profile_required: true
+    paywall_signals: ["subscription", "client access"]
+    extraction:
+      use_playwright: true
+    notes: "Contenido mayormente gated. Insights limitados."
+
+  stefanini:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        article_link_css: "a[href*='/insights/']"
+        title_css: "h1, h2"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    notes: "Blog corporativo accesible."
+
+  avolutionsoftware:
+    type: "scrape"
+    profile_required: true
+    extraction:
+      use_playwright: true
+    notes: "Blog no encontrado (404). Verificar URL."
+
+  bizzdesign:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: true
+      selectors:
+        article_link_css: "a[href*='/blog/']"
+        title_css: "h1"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    notes: "Blog disponible. Contenido de EA."
+
+  openlegacy:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: false
+      selectors:
+        article_link_css: "a[href*='/blog/']"
+        title_css: "h1"
+        date_css: "time, span.date"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    notes: "Blog de modernización legacy accesible."
+
+  hyland:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: true
+      selectors:
+        article_link_css: "a[href*='/resources/']"
+        title_css: "h1"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    notes: "Resources hub. Contenido mixto."
+
+  dxc:
+    type: "scrape"
+    profile_required: false
+    extraction:
+      use_playwright: true
+      selectors:
+        article_link_css: "a[href*='/insights/']"
+        title_css: "h1"
+        content_css: "article, div.content"
+        canonical_css: "link[rel='canonical']"
+    notes: "Insights corporativos accesibles."
+
+# ========== RESUMEN ==========
+# Total fuentes perfiladas: 37
+# Con RSS detectado: 8 (infobae, cyberscoop, finextra, techcrunch, technologyreview, wired, coindesk)
+# Requieren Playwright: 15
+# Paywall/Gated: 5 (gartner, forrester, celent, venturebeat, cisa_news)
+# Pendientes desarrollo custom: 2 (vital_ruia_sanciones, tremarctos_colombia)
+# profile_required: false aplicable: 30

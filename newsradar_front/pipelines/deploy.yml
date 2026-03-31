@@ -1,0 +1,53 @@
+steps:
+  - task: PublishBuildArtifacts@1
+    displayName: "Publish Artifact: AcceptanceTest"
+    inputs:
+      PathtoPublish: $(component-name)/tests/acceptance-test
+      ArtifactName: AcceptanceTest
+
+  - task: DeleteFiles@1
+    displayName: "Remove files not needed in artifact"
+    inputs:
+      SourceFolder: $(System.DefaultWorkingDirectory)/$(component-name)
+      Contents: |
+        .nyc_output
+        .git
+        test
+        coverage
+        .gitignore
+        .npmrc
+        README.md
+        test-reports
+        .*
+        e2e
+        node_modules
+        azure-pipeline.yml
+        pipelines
+
+  - task: ArchiveFiles@2
+    displayName: "Compress build"
+    inputs:
+      rootFolderOrFile: $(component-name)
+      includeRootFolder: false
+      archiveType: tar
+      archiveFile: $(Build.ArtifactStagingDirectory)/$(component-name)_$(Build.BuildNumber).tar.gz
+
+  - task: ArtifactoryGenericUpload@2
+    displayName: "Publish Artifact to Artifactory"
+    inputs:
+      artifactoryService: Artifactory
+      fileSpec: >-
+        {
+          "files": [
+            {
+              "pattern": "$(Build.ArtifactStagingDirectory)/$(component-name)_$(Build.BuildNumber).tar.gz",
+              "target": "$(Artifactory.Repository)/$(Build.BuildNumber)/$(component-name)_$(Build.BuildNumber).tar.gz"
+            }
+          ]
+        }
+
+  - task: PublishBuildArtifacts@1
+    displayName: "Publish Artifact: Deployable artifact"
+    inputs:
+      PathtoPublish: $(Build.ArtifactStagingDirectory)/$(component-name)_$(Build.BuildNumber).tar.gz
+      ArtifactName: Artifact

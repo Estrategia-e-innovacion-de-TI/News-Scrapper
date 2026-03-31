@@ -1,0 +1,65 @@
+name: $(Build.SourceBranchName).$(date:yyyyMMdd)$(rev:.r)
+
+variables:
+  component-name: "newsradar_back"
+  python-version: "3.11"
+
+trigger:
+  branches:
+    include:
+      - trunk
+      - feature/*
+  paths:
+    include:
+      - "newsradar_back/*"
+
+resources:
+  - repo: self
+    clean: all
+    fetchDepth: 1
+
+stages:
+  - stage: Build
+    displayName: Build and Test
+    jobs:
+      - job: Linux
+        displayName: Test Python module
+        pool:
+          name: Build
+          demands:
+            - Agent.OS -equals Linux
+        steps:
+          - task: UsePythonVersion@0
+            displayName: "Use Python $(python-version)"
+            inputs:
+              versionSpec: "$(python-version)"
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -e ".[dev]"
+            displayName: "Install dependencies"
+            workingDirectory: $(System.DefaultWorkingDirectory)/$(component-name)
+
+          - script: |
+              python -m pytest tests/ \
+                --cov=src \
+                --cov-report=xml:coverage/coverage.xml \
+                --cov-report=html:coverage/htmlcov \
+                --junitxml=coverage/junit.xml \
+                -v
+            displayName: "Run pytest with coverage"
+            workingDirectory: $(System.DefaultWorkingDirectory)/$(component-name)
+
+          - task: PublishTestResults@2
+            displayName: "Publish Test Results"
+            inputs:
+              testResultsFiles: "$(System.DefaultWorkingDirectory)/$(component-name)/coverage/junit.xml"
+              searchFolder: "$(System.DefaultWorkingDirectory)/$(component-name)"
+            condition: succeeded()
+
+          - task: PublishCodeCoverageResults@1
+            displayName: "Publish code coverage"
+            inputs:
+              codeCoverageTool: Cobertura
+              summaryFileLocation: "$(System.DefaultWorkingDirectory)/$(component-name)/coverage/coverage.xml"
+              reportDirectory: "$(System.DefaultWorkingDirectory)/$(component-name)/coverage/htmlcov"

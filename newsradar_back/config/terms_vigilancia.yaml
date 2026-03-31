@@ -1,0 +1,178 @@
+# ─────────────────────────────────────────────────────────────────────
+# Términos de vigilancia tecnológica por grupo temático.
+#
+# Cada grupo de primer nivel es un query_group al que los suscriptores
+# pueden suscribirse.  Los términos se usan para búsqueda en Google News,
+# RSS feeds, y search providers (ArXiv, GitHub, Patents).
+# ─────────────────────────────────────────────────────────────────────
+
+ia_ml:
+  terms:
+    - "inteligencia artificial"
+    - "machine learning"
+    - "deep learning"
+    - "large language model"
+    - "LLM"
+    - "generative AI"
+    - "IA generativa"
+    - "AI agents"
+    - "agentes de IA"
+    - "multimodal AI"
+    - "foundation models"
+    - "RAG retrieval augmented generation"
+    - "fine-tuning LLM"
+    - "AI regulation"
+    - "responsible AI"
+    - "MLOps"
+    - "computer vision"
+    - "NLP natural language processing"
+    - "AI in banking"
+    - "AI in finance"
+
+blockchain:
+  terms:
+    - "blockchain"
+    - "DeFi decentralized finance"
+    - "smart contracts"
+    - "tokenización"
+    - "tokenization"
+    - "CBDC central bank digital currency"
+    - "moneda digital banco central"
+    - "stablecoin"
+    - "Web3"
+    - "distributed ledger"
+    - "digital assets"
+    - "activos digitales"
+    - "crypto regulation"
+    - "regulación cripto"
+
+computacion_cuantica:
+  terms:
+    - "quantum computing"
+    - "computación cuántica"
+    - "quantum cryptography"
+    - "criptografía cuántica"
+    - "post-quantum cryptography"
+    - "quantum machine learning"
+    - "quantum advantage"
+    - "quantum supremacy"
+    - "qubit"
+    - "quantum-safe"
+    - "quantum resistant"
+    - "quantum finance"
+
+ciberseguridad:
+  terms:
+    - "cybersecurity"
+    - "ciberseguridad"
+    - "zero trust"
+    - "ransomware"
+    - "threat intelligence"
+    - "SOC security operations"
+    - "SIEM"
+    - "XDR extended detection"
+    - "identity access management"
+    - "phishing"
+    - "data breach"
+    - "vulnerability"
+    - "penetration testing"
+    - "DevSecOps"
+    - "cloud security"
+    - "API security"
+
+fintech:
+  terms:
+    - "fintech"
+    - "open banking"
+    - "open finance"
+    - "embedded finance"
+    - "banking as a service"
+    - "BaaS"
+    - "neobank"
+    - "digital payments"
+    - "pagos digitales"
+    - "instant payments"
+    - "buy now pay later"
+    - "BNPL"
+    - "regtech"
+    - "suptech"
+    - "insurtech"
+    - "wealthtech"
+    - "financial inclusion"
+    - "inclusión financiera"
+
+cloud_datos:
+  terms:
+    - "cloud computing"
+    - "multi-cloud"
+    - "hybrid cloud"
+    - "serverless"
+    - "edge computing"
+    - "data mesh"
+    - "data lakehouse"
+    - "real-time analytics"
+    - "streaming data"
+    - "data governance"
+    - "data fabric"
+    - "observability"
+    - "platform engineering"
+    - "infrastructure as code"
+    - "FinOps"
+
+banca_digital:
+  terms:
+    - "digital banking"
+    - "banca digital"
+    - "core banking modernization"
+    - "legacy modernization"
+    - "API economy"
+    - "microservices banking"
+    - "low-code banking"
+    - "conversational banking"
+    - "digital onboarding"
+    - "biometric authentication"
+    - "digital identity"
+    - "identidad digital"
+    - "eKYC"
+    - "customer experience CX"
+
+# ── Search providers (papers, repos, patents) ────────────────────────
+
+papers:
+  terms:
+    - "operational risk machine learning"
+    - "fraud detection deep learning"
+    - "AML anti money laundering NLP"
+    - "cybersecurity threat intelligence"
+    - "LLM security vulnerabilities"
+    - "quantum computing finance"
+    - "blockchain DeFi risk"
+    - "generative AI banking"
+  filters:
+    require_keywords_any: ["risk", "fraud", "AML", "cyber", "threat", "quantum", "blockchain", "LLM", "AI"]
+
+repos:
+  terms:
+    - "langgraph news extraction"
+    - "fraud-detection-ml"
+    - "threat-intelligence-platform"
+    - "AML-compliance"
+    - "quantum-computing-finance"
+    - "llm-agents"
+    - "open-banking-api"
+  filters:
+    min_stars: 10
+    updated_within_days: 90
+
+patents:
+  terms:
+    - "fraud detection neural network"
+    - "anti money laundering artificial intelligence"
+    - "blockchain financial transaction"
+    - "quantum resistant encryption"
+    - "biometric payment authentication"
+    - "digital currency central bank"
+    - "credit scoring machine learning"
+    - "ransomware detection system"
+  filters:
+    date_window_months: 1

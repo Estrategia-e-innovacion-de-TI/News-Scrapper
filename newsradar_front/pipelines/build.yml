@@ -1,0 +1,97 @@
+steps:
+  - task: NodeTool@0
+    displayName: "Use Node.js 22.x"
+    inputs:
+      versionSpec: "22.x"
+
+  - task: Npm@1
+    displayName: "npm cache clean"
+    inputs:
+      command: custom
+      workingDir: "$(System.DefaultWorkingDirectory)/$(component-name)"
+      verbose: false
+      customCommand: "cache clean --force"
+
+  - task: Npm@1
+    displayName: "npm set progress"
+    inputs:
+      command: custom
+      workingDir: "$(System.DefaultWorkingDirectory)/$(component-name)"
+      verbose: false
+      customCommand: "set progress=false"
+      customEndpoint: "npm-bancolombia"
+
+  - task: Npm@1
+    displayName: "npm install - restore node_modules"
+    inputs:
+      workingDir: "$(System.DefaultWorkingDirectory)/$(component-name)"
+      verbose: true
+      customEndpoint: "npm-bancolombia"
+
+  - task: Npm@1
+    displayName: "Lint"
+    inputs:
+      command: custom
+      workingDir: "$(System.DefaultWorkingDirectory)/$(component-name)"
+      verbose: false
+      customCommand: "run lint"
+      customEndpoint: "npm-bancolombia"
+
+  - task: Npm@1
+    displayName: "Unit Test with Coverage"
+    inputs:
+      command: custom
+      workingDir: "$(System.DefaultWorkingDirectory)/$(component-name)"
+      verbose: false
+      customCommand: "run test:coverage"
+      customEndpoint: "npm-bancolombia"
+
+  - task: PublishTestResults@2
+    displayName: "Publish Test Results (JUnit)"
+    inputs:
+      testResultsFiles: "$(System.DefaultWorkingDirectory)/$(component-name)/coverage/junit.xml"
+      searchFolder: "$(System.DefaultWorkingDirectory)/$(component-name)"
+    condition: succeeded()
+
+  - task: PublishCodeCoverageResults@1
+    displayName: "Publish code coverage"
+    inputs:
+      codeCoverageTool: Cobertura
+      summaryFileLocation: "$(System.DefaultWorkingDirectory)/$(component-name)/coverage/cobertura-coverage.xml"
+      reportDirectory: "$(System.DefaultWorkingDirectory)/$(component-name)/coverage/"
+    env:
+      DISABLE_COVERAGE_AUTOGENERATE: true
+
+  - task: SonarQubePrepare@7
+    displayName: "Prepare analysis on SonarQube"
+    inputs:
+      SonarQube: SonarQube
+      scannerMode: CLI
+      configMode: manual
+      cliProjectKey: "$(Build.Repository.Name)_$(component-name)"
+      cliProjectName: "$(Build.Repository.Name)_$(component-name)"
+      cliProjectVersion: "$(Build.BuildNumber)"
+      cliSources: $(component-name)
+      extraProperties: |
+        sonar.projectBaseDir=$(System.DefaultWorkingDirectory)/$(component-name)
+        sonar.sources=.
+        sonar.exclusions=**/node_modules/**,**/coverage/**,**/reports/**,**/*.js,**/src/__mocks__/**,**/e2e/**,**/tests/**,**/dist/**,**/setup-jest.ts,**/jest.config.js,**/environment.*,**/src/app/config/**,**/app/UI/app.component.*
+        sonar.tests=$(System.DefaultWorkingDirectory)/$(component-name)/src/app
+        sonar.test.inclusions=**/*.spec.ts
+        sonar.testExecutionReportPaths=coverage/sonar-report.xml
+        sonar.coverage.exclusions=test/**,*.test.ts,**/*.test.ts,*.spec.ts,__tests__/**
+        sonar.sourceEncoding=UTF-8
+        sonar.typescript.lcov.reportPaths=$(System.DefaultWorkingDirectory)/$(component-name)/coverage/lcov.info
+
+  - task: SonarQubeAnalyze@7
+    displayName: "Run Code Analysis"
+
+  - task: Npm@1
+    displayName: "ng build --configuration production"
+    inputs:
+      command: custom
+      workingDir: "$(System.DefaultWorkingDirectory)/$(component-name)"
+      verbose: false
+      customCommand: "run build"
+      customEndpoint: "npm-bancolombia"
+    continueOnError: false
