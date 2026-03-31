@@ -54,13 +54,103 @@ def _credential_hints_present() -> bool:
 
 
 def _extract_json(text: str) -> dict[str, Any]:
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if not match:
+    for candidate in _json_candidates(text):
+        parsed = _parse_json_candidate(candidate)
+        if parsed:
+            return parsed
+    return {}
+
+
+def _json_candidates(text: str) -> list[str]:
+    stripped = text.strip()
+    if not stripped:
+        return []
+
+    candidates: list[str] = [stripped]
+
+    fenced_blocks = re.findall(r"```(?:json)?\s*(.*?)```", stripped, flags=re.DOTALL | re.IGNORECASE)
+    candidates.extend(block.strip() for block in fenced_blocks if block.strip())
+
+    balanced = _extract_balanced_json(stripped)
+    if balanced:
+        candidates.append(balanced)
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = candidate.strip()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            deduped.append(normalized)
+    return deduped
+
+
+def _extract_balanced_json(text: str) -> str | None:
+    start = None
+    opening = ""
+    closing = ""
+    depth = 0
+    in_string = False
+    escape = False
+
+    for index, char in enumerate(text):
+        if start is None:
+            if char == "{":
+                start = index
+                opening, closing = "{", "}"
+                depth = 1
+            elif char == "[":
+                start = index
+                opening, closing = "[", "]"
+                depth = 1
+            continue
+
+        if escape:
+            escape = False
+            continue
+        if char == "\\":
+            escape = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char == opening:
+            depth += 1
+        elif char == closing:
+            depth -= 1
+            if depth == 0:
+                return text[start:index + 1]
+    return None
+
+
+def _remove_trailing_commas(text: str) -> str:
+    return re.sub(r",(\s*[}\]])", r"\1", text)
+
+
+def _parse_json_candidate(candidate: str) -> dict[str, Any]:
+    if not candidate:
         return {}
-    try:
-        return json.loads(match.group(0))
-    except json.JSONDecodeError:
-        return {}
+
+    attempts = [
+        candidate.strip(),
+        _remove_trailing_commas(candidate.strip()),
+    ]
+    for attempt in attempts:
+        try:
+            parsed = json.loads(attempt)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            pass
+
+    for attempt in attempts:
+        try:
+            parsed = yaml.safe_load(attempt)
+            return parsed if isinstance(parsed, dict) else {}
+        except yaml.YAMLError:
+            pass
+    return {}
 
 
 def _safe_string_list(value: Any, limit: int) -> list[str]:
@@ -205,7 +295,8 @@ class SnapshotLLMEnricher:
         text = self._adapter.invoke_claude(rendered, system=system_prompt, max_tokens=700)
         parsed = _extract_json(text)
         if not parsed:
-            raise ValueError("invalid JSON returned by Bedrock")
+            preview = " ".join(text.split())[:220]
+            raise ValueError(f"invalid JSON returned by Bedrock: {preview}")
         return parsed
 
     def _enrich_clusters(self, payload: dict[str, Any], bundle: PromptBundle, trace: dict[str, Any]) -> None:
