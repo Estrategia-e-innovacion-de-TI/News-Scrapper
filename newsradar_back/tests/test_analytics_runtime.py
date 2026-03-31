@@ -4,6 +4,9 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+import numpy as np
+
+from newsradar_api.shared_kernel.analytics import advanced_engine
 from newsradar_api.shared_kernel.ingestion import runtime
 from newsradar_api.shared_kernel.snapshots.report_builder import (
     build_riskmap_payload,
@@ -85,3 +88,97 @@ def test_smcp_ingestion_falls_back_to_local_runtime(monkeypatch) -> None:
 
     assert result["run_id"] == "run-123"
     assert result["execution_id"] == "exec-local"
+
+
+def test_noise_documents_remain_unclustered(monkeypatch) -> None:
+    docs = [
+        _doc("tw-a", "IA generativa en banca", source_id="rss-tech", source_type="rss", category="IA", score=91, days_ago=5, keywords=["ia", "banca"]),
+        _doc("tw-b", "Modelos agentes en seguros", source_id="rss-tech", source_type="rss", category="IA", score=85, days_ago=7, keywords=["agentes", "seguros"]),
+        _doc("tw-c", "Nueva regulación fintech", source_id="rss-reg", source_type="rss", category="Regulacion", score=69, days_ago=3, keywords=["regulacion", "fintech"]),
+        _doc("tw-d", "Demanda energética de data centers", source_id="rss-energy", source_type="rss", category="Infraestructura", score=66, days_ago=9, keywords=["energia", "data center"]),
+    ]
+
+    monkeypatch.setattr(
+        advanced_engine,
+        "_cluster_features",
+        lambda features: (np.asarray([0, 0, -1, -1], dtype=int), "hdbscan"),
+    )
+    monkeypatch.setattr(
+        advanced_engine,
+        "_project_coordinates",
+        lambda features: (
+            np.asarray(
+                [
+                    [0.0, 0.0],
+                    [0.1, 0.2],
+                    [1.0, 1.0],
+                    [1.1, 1.2],
+                ],
+                dtype=float,
+            ),
+            "mock",
+        ),
+    )
+
+    analysis = advanced_engine.generate_report_analysis(docs, "trend_mapping", 6)
+
+    assert analysis["summary"]["total_clusters"] == 1
+    assert analysis["summary"]["clustered_documents"] == 2
+    assert analysis["summary"]["unclustered_documents"] == 2
+    assert any(doc["cluster_id"] == "sin_cluster" for doc in analysis["documents"])
+    assert analysis["parameters"]["noise_label"] == "sin_cluster"
+
+
+def test_embeddings_are_preferred_for_clustering(monkeypatch) -> None:
+    docs = [
+        _doc("tw-1", "IA generativa en banca", source_id="rss-tech", source_type="rss", category="IA", score=91, days_ago=5, keywords=["ia", "banca"]),
+        _doc("tw-2", "Modelos agentes en seguros", source_id="rss-tech", source_type="rss", category="IA", score=85, days_ago=7, keywords=["agentes", "seguros"]),
+        _doc("tw-3", "Tokenizacion de activos", source_id="rss-fin", source_type="rss", category="Blockchain", score=80, days_ago=6, keywords=["tokenizacion", "activos"]),
+        _doc("tw-4", "Infraestructura para modelos", source_id="rss-cloud", source_type="rss", category="Cloud", score=77, days_ago=10, keywords=["infraestructura", "modelo"]),
+    ]
+
+    monkeypatch.setenv("NEWSRADAR_ANALYTICS_EMBEDDINGS_MODE", "enabled")
+
+    class FakeBedrockAdapter:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+        def get_embeddings(self, texts: list[str]) -> list[list[float]]:
+            return [
+                [1.0, 0.0, 0.1],
+                [0.9, 0.1, 0.1],
+                [0.0, 1.0, 0.1],
+                [0.1, 0.9, 0.0],
+            ]
+
+    monkeypatch.setattr(advanced_engine, "BedrockAdapter", FakeBedrockAdapter)
+    monkeypatch.setattr(
+        advanced_engine,
+        "_cluster_features",
+        lambda features: (np.asarray([0, 0, 1, -1], dtype=int), "hdbscan"),
+    )
+    monkeypatch.setattr(
+        advanced_engine,
+        "_project_coordinates",
+        lambda features: (
+            np.asarray(
+                [
+                    [0.0, 0.0],
+                    [0.1, 0.2],
+                    [1.0, 1.0],
+                    [1.2, 1.1],
+                ],
+                dtype=float,
+            ),
+            "mock",
+        ),
+    )
+
+    analysis = advanced_engine.generate_report_analysis(docs, "trend_mapping", 6)
+
+    assert analysis["parameters"]["feature_space"] == "bedrock_embeddings"
+    assert analysis["parameters"]["embedding_provider"] == "bedrock"
+    assert analysis["parameters"]["embedding_attempted"] is True
+    assert analysis["parameters"]["cluster_method"] == "hdbscan"
+    assert analysis["summary"]["clustered_documents"] == 3
+    assert analysis["summary"]["unclustered_documents"] == 1

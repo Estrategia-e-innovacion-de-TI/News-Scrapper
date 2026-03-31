@@ -5,7 +5,7 @@ trigger:
   on_new_execution: tech_watch
   require_relevant_execution: true
 analytics:
-  cluster_method: tfidf_hdbscan_with_fallback
+  cluster_method: bedrock_embeddings_hdbscan_with_fallback
   snapshot_llm_prompt: snapshot_trendmap.yaml
   persist_snapshots: true
 frontend:
