@@ -7,6 +7,7 @@ export type HypeStage =
 
 export interface TrendmapData {
   meta: TrendmapMeta;
+  summary?: TrendmapSummary;
   clusters: TrendmapCluster[];
   super_clusters: SuperCluster[];
   articles: TrendmapArticle[];
@@ -14,6 +15,21 @@ export interface TrendmapData {
   insights: string[];
   recommendations: string[];
   risk_signals: RiskSignal[];
+}
+
+export interface TrendmapSummary {
+  total_documents: number;
+  total_clusters: number;
+  clustered_documents?: number;
+  unclustered_documents?: number;
+  dominant_topics?: string[];
+  dominant_risks?: string[];
+  emerging_topics?: string[];
+  consolidating_topics?: string[];
+  source_diversity?: number;
+  avg_relevance?: number;
+  silhouette_score?: number;
+  executive_summary?: string;
 }
 
 export interface TrendmapMeta {

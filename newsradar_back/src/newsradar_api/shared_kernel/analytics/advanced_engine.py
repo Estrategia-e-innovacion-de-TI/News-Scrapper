@@ -394,10 +394,54 @@ def _maturity_stage(item_count: int, novelty: float, growth: float) -> str:
     return "plateau_of_productivity"
 
 
-def _cluster_summary(label: str, docs: list[Any], growth_direction: str, avg_score: float) -> str:
+def _direction_label(direction: str) -> str:
+    return {
+        "up": "creciente",
+        "down": "decreciente",
+        "stable": "estable",
+    }.get(direction, direction)
+
+
+def _cluster_signal_state(item_count: int, novelty: float, growth: float) -> str:
+    if item_count <= 3 and novelty >= 0.55:
+        return "senal temprana"
+    if growth >= 0.35 and novelty >= 0.45:
+        return "tema emergente"
+    if item_count >= 6 and growth >= 0:
+        return "tema en consolidacion"
+    if growth <= -0.25:
+        return "tema en retroceso"
+    return "tema en observacion"
+
+
+def _cluster_summary(
+    label: str,
+    docs: list[Any],
+    growth_direction: str,
+    avg_score: float,
+    novelty: float,
+    source_count: int,
+    keywords: list[str],
+) -> str:
+    keyword_text = ", ".join(keywords[:3]) if keywords else "sin palabras dominantes claras"
     return (
-        f"{label} agrupa {len(docs)} documentos con score promedio {avg_score} "
-        f"y una senal {growth_direction} en la ventana analizada."
+        f"{label} reune {len(docs)} documentos de {source_count} fuentes, "
+        f"con score medio {avg_score}, señal {_direction_label(growth_direction)} "
+        f"y novedad de {round(novelty * 100)}%. Predominan {keyword_text}."
+    )
+
+
+def _cluster_takeaway(
+    label: str,
+    item_count: int,
+    growth_direction: str,
+    novelty: float,
+    source_count: int,
+) -> str:
+    state = _cluster_signal_state(item_count, novelty, 0.35 if growth_direction == "up" else -0.3 if growth_direction == "down" else 0.0)
+    return (
+        f"{label} aparece como {state}; combina {item_count} documentos, "
+        f"{source_count} fuentes y una trayectoria {_direction_label(growth_direction)}."
     )
 
 
@@ -544,7 +588,15 @@ def generate_report_analysis(
             "cluster_id": cluster_id,
             "label": label,
             "category": category,
-            "summary": _cluster_summary(label, docs, growth_direction, avg_score),
+            "summary": _cluster_summary(
+                label,
+                docs,
+                growth_direction,
+                avg_score,
+                novelty,
+                len(cluster_sources),
+                terms or [label],
+            ),
             "keywords": terms or [label],
             "top_keywords": terms or [label],
             "relevance": "alta" if avg_score >= 75 else "media" if avg_score >= 45 else "baja",
@@ -566,8 +618,12 @@ def generate_report_analysis(
             "articles": [str(getattr(doc, "id", getattr(doc, "hash", ""))) for doc in docs],
             "top_documents": [_base_document_payload(doc) for doc in top_docs],
             "source_mix": [{"source": source, "count": count} for source, count in cluster_sources.most_common()],
-            "executive_takeaway": (
-                f"{label} combina {len(cluster_sources)} fuentes y una novedad de {round(novelty * 100)}%."
+            "executive_takeaway": _cluster_takeaway(
+                label,
+                len(docs),
+                growth_direction,
+                novelty,
+                len(cluster_sources),
             ),
             "dominant_risk": category if report_type == "risk_mapping" else None,
         }
@@ -622,11 +678,25 @@ def generate_report_analysis(
     dominant_labels = [cluster["label"] for cluster in clusters[:5]]
     unclustered_count = len(unclustered_indices)
     clustered_count = len(documents) - unclustered_count
+    paper_share = round((total_papers / max(len(documents), 1)) * 100, 1)
+    unclustered_share = round((unclustered_count / max(len(documents), 1)) * 100, 1)
+    emerging_clusters = [
+        cluster for cluster in clusters
+        if cluster["direction"] == "up" and cluster["horizon_score"] >= 0.45
+    ][:3]
+    consolidating_clusters = [
+        cluster for cluster in clusters
+        if cluster["maturity_stage"] in {"slope_of_enlightenment", "plateau_of_productivity"}
+    ][:3]
+    weak_signal_clusters = [
+        cluster for cluster in clusters
+        if cluster["item_count"] <= 3 and cluster["impact_score"] >= 60
+    ][:3]
 
     insights = [
         (
-            f"{cluster['label']} lidera con {cluster['item_count']} documentos, "
-            f"score {cluster['impact_score']} y tendencia {cluster['direction']}."
+            f"{cluster['label']} lidera el corpus con {cluster['item_count']} documentos, "
+            f"score {cluster['impact_score']} y trayectoria {_direction_label(cluster['direction'])}."
         )
         for cluster in clusters[:5]
     ]
@@ -638,21 +708,57 @@ def generate_report_analysis(
         insights.append(
             f"{unclustered_count} documentos quedaron sin cluster por baja densidad semantica."
         )
+    if emerging_clusters:
+        insights.append(
+            "Temas emergentes detectados: "
+            + ", ".join(
+                f"{cluster['label']} ({cluster['item_count']} docs, {round(cluster['horizon_score'] * 100)}% novedad)"
+                for cluster in emerging_clusters
+            )
+            + "."
+        )
+    if consolidating_clusters:
+        insights.append(
+            "Temas en consolidacion: "
+            + ", ".join(
+                f"{cluster['label']} ({cluster['item_count']} docs, etapa {cluster['maturity_stage']})"
+                for cluster in consolidating_clusters
+            )
+            + "."
+        )
+    if weak_signal_clusters:
+        insights.append(
+            "Senales tempranas que ameritan seguimiento: "
+            + ", ".join(cluster["label"] for cluster in weak_signal_clusters)
+            + "."
+        )
 
     executive_summary = (
-        f"Se analizaron {len(documents)} documentos; {clustered_count} quedaron agrupados en "
-        f"{len(clusters)} clusters coherentes y {unclustered_count} permanecen sin cluster. "
-        f"Silhouette {silhouette} y predominio de "
-        f"{', '.join(dominant_labels[:3]) or 'sin patrones dominantes'}."
+        f"Se analizaron {len(documents)} documentos en una ventana de {window_months} meses. "
+        f"{clustered_count} quedaron agrupados en {len(clusters)} clusters coherentes y "
+        f"{unclustered_count} permanecen sin cluster. Predominan "
+        f"{', '.join(dominant_labels[:3]) or 'temas dispersos'}, con silhouette {silhouette}, "
+        f"{paper_share}% de contenido tipo paper/patente y una fraccion no agrupada de {unclustered_share}%."
     )
 
     recommendations = [
-        f"Profundizar monitoreo sobre {cluster['label']} y validar si su tendencia {cluster['direction']} persiste."
+        f"Profundizar monitoreo sobre {cluster['label']} y validar si su trayectoria {_direction_label(cluster['direction'])} persiste."
         for cluster in clusters[:3]
     ] or ["No hay recomendaciones analiticas disponibles."]
     if unclustered_count and (unclustered_count / max(len(documents), 1)) >= 0.35:
         recommendations.append(
             "Revisar el corpus sin cluster para detectar ruido editorial o temas demasiado dispersos."
+        )
+    if source_mix:
+        main_source, main_count = source_mix.most_common(1)[0]
+        source_share = round((main_count / max(len(documents), 1)) * 100, 1)
+        if source_share >= 45:
+            recommendations.append(
+                f"Reducir dependencia de la fuente {main_source}; hoy explica {source_share}% del corpus."
+            )
+    if weak_signal_clusters:
+        recommendations.append(
+            "Separar senales tempranas de temas consolidados para seguimiento ejecutivo y validacion con expertos."
         )
 
     risk_signals = [
@@ -672,6 +778,8 @@ def generate_report_analysis(
         "unclustered_documents": unclustered_count,
         "dominant_topics": dominant_labels if report_type == "trend_mapping" else [],
         "dominant_risks": dominant_labels if report_type == "risk_mapping" else [],
+        "emerging_topics": [cluster["label"] for cluster in emerging_clusters],
+        "consolidating_topics": [cluster["label"] for cluster in consolidating_clusters],
         "source_diversity": len(source_mix),
         "avg_relevance": round(mean((getattr(doc, "relevance_score", 0) or 0) for doc in documents), 1),
         "silhouette_score": silhouette,

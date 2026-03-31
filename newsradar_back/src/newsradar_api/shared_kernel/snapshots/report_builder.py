@@ -23,6 +23,14 @@ from newsradar_api.shared_kernel.bedrock import SnapshotLLMEnricher
 from newsradar_api.shared_kernel.analytics import generate_report_analysis
 
 
+def _legacy_direction(direction: str | None) -> str:
+    return {
+        "up": "creciente",
+        "down": "decreciente",
+        "stable": "estable",
+    }.get(direction or "", "estable")
+
+
 def _document_source_kind(doc: Document) -> str:
     if doc.source_type in {"paper", "patent"}:
         return doc.source_type
@@ -323,8 +331,16 @@ async def persist_snapshot(
                 Trend(
                     trend=cluster["label"],
                     category=cluster.get("category") or "Otros",
-                    direction=cluster.get("direction") or "stable",
-                    momentum=float(cluster.get("impact_score") or 0.0),
+                    direction=_legacy_direction(cluster.get("direction")),
+                    momentum=float(
+                        max(
+                            0.0,
+                            min(
+                                1.0,
+                                0.5 + float(cluster.get("growth_ratio") or 0.0) * 0.35,
+                            ),
+                        )
+                    ),
                     maturity_stage=cluster.get("maturity_stage") or "plateau_of_productivity",
                     description=cluster.get("summary") or "",
                     impact_on_finance=cluster.get("executive_takeaway") or "",
