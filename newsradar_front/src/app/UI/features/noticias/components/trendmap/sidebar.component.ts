@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, input, output } from '@angular/core';
 import { TrendmapCluster } from '../../../../../domain/noticias/models';
 
@@ -64,6 +65,7 @@ import { TrendmapCluster } from '../../../../../domain/noticias/models';
       </div>
     </aside>
   `,
+  imports: [DecimalPipe],
 })
 export class TrendmapSidebarComponent {
   readonly clusters = input<TrendmapCluster[]>([]);

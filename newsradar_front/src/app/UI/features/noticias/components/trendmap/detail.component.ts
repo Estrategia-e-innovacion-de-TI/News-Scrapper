@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, input, signal, computed } from '@angular/core';
 import { TrendmapArticle } from '../../../../../domain/noticias/models';
 
@@ -70,7 +71,7 @@ type SortDir = 'asc' | 'desc';
       }
     </div>
   `,
-  imports: [],
+  imports: [DecimalPipe],
 })
 export class TrendmapDetailComponent {
   readonly articles = input<TrendmapArticle[]>([]);
