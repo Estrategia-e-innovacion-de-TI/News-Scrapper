@@ -1,5 +1,26 @@
 # Runbook local
 
+## Script rapido en macOS / zsh
+
+En la raiz del repo existe `run_local_newsradar.zsh`.
+
+Permisos y ayuda:
+
+```bash
+chmod +x run_local_newsradar.zsh
+./run_local_newsradar.zsh help
+```
+
+Flujo minimo sin Docker:
+
+```bash
+./run_local_newsradar.zsh bootstrap
+./run_local_newsradar.zsh start-smcp
+./run_local_newsradar.zsh start-backend
+./run_local_newsradar.zsh generate-snapshots
+./run_local_newsradar.zsh smoke
+```
+
 ## 1. Stack completo con Docker
 
 Desde la raiz:
