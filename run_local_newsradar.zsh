@@ -10,7 +10,10 @@ DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_USER="${DB_USER:-newsradar}"
 DB_PASSWORD="${DB_PASSWORD:-newsradar}"
+DB_ADMIN_USER="${DB_ADMIN_USER:-$DB_USER}"
+DB_ADMIN_PASSWORD="${DB_ADMIN_PASSWORD:-$DB_PASSWORD}"
 DB_ADMIN_DB="${DB_ADMIN_DB:-postgres}"
+DB_SCHEMA="${DB_SCHEMA:-public}"
 DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}}"
 
 BACKEND_URL="${BACKEND_URL:-http://localhost:8000}"
@@ -114,8 +117,20 @@ function maybe_start_postgres_service() {
   log "No intento iniciar Postgres por brew. Asegura que localhost:5432 este disponible."
 }
 
-function pg_env() {
-  export PGPASSWORD="$DB_PASSWORD"
+function app_pg_env() {
+  if [[ -n "${DB_PASSWORD}" ]]; then
+    export PGPASSWORD="$DB_PASSWORD"
+  else
+    unset PGPASSWORD
+  fi
+}
+
+function admin_pg_env() {
+  if [[ -n "${DB_ADMIN_PASSWORD}" ]]; then
+    export PGPASSWORD="$DB_ADMIN_PASSWORD"
+  else
+    unset PGPASSWORD
+  fi
 }
 
 function reset_db() {
@@ -123,12 +138,43 @@ function reset_db() {
   ensure_command dropdb
   ensure_command createdb
   maybe_start_postgres_service
-  pg_env
+  admin_pg_env
   log "Reseteando base de datos '$DB_NAME'"
-  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_ADMIN_DB" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB_NAME}' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true
-  dropdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" --if-exists "$DB_NAME"
-  createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME"
-  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN_USER" -d "$DB_ADMIN_DB" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB_NAME}' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true
+  dropdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN_USER" --if-exists "$DB_NAME"
+  createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN_USER" -O "$DB_USER" "$DB_NAME"
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN_USER" -d "$DB_NAME" -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
+}
+
+function repair_db_permissions() {
+  ensure_command psql
+  maybe_start_postgres_service
+  admin_pg_env
+  log "Reparando permisos de '$DB_NAME' en esquema '$DB_SCHEMA' para el rol '$DB_USER'"
+  psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN_USER" -d "$DB_NAME" <<SQL
+GRANT CONNECT ON DATABASE "$DB_NAME" TO "$DB_USER";
+GRANT USAGE, CREATE ON SCHEMA "$DB_SCHEMA" TO "$DB_USER";
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA "$DB_SCHEMA" TO "$DB_USER";
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA "$DB_SCHEMA" TO "$DB_USER";
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA "$DB_SCHEMA" TO "$DB_USER";
+ALTER DEFAULT PRIVILEGES FOR ROLE "$DB_ADMIN_USER" IN SCHEMA "$DB_SCHEMA" GRANT ALL PRIVILEGES ON TABLES TO "$DB_USER";
+ALTER DEFAULT PRIVILEGES FOR ROLE "$DB_ADMIN_USER" IN SCHEMA "$DB_SCHEMA" GRANT ALL PRIVILEGES ON SEQUENCES TO "$DB_USER";
+ALTER DEFAULT PRIVILEGES FOR ROLE "$DB_ADMIN_USER" IN SCHEMA "$DB_SCHEMA" GRANT ALL PRIVILEGES ON FUNCTIONS TO "$DB_USER";
+SQL
+  cat <<EOF
+
+Permisos reparados.
+
+Rol de aplicacion:
+  $DB_USER
+
+Rol admin usado para el repair:
+  $DB_ADMIN_USER
+
+Base/esquema:
+  $DB_NAME / $DB_SCHEMA
+
+EOF
 }
 
 function migrate_db() {
@@ -321,6 +367,7 @@ Comandos:
   reset-full           Borra la base, la recrea y corre migraciones
   reset-full-smoke     Reset completo + datos semilla de smoke
   reset-full-demo      Reset completo + dataset demo completo
+  repair-db-permissions Repara grants sobre tablas, secuencias y defaults
   migrate-db           Ejecuta alembic upgrade head
   seed-smoke           Inserta datos semilla para smoke
   seed-demo            Inserta dataset demo completo con scripts/seed.py
@@ -342,7 +389,11 @@ Variables utiles:
   DB_HOST=$DB_HOST
   DB_PORT=$DB_PORT
   DB_USER=$DB_USER
+  DB_PASSWORD=${DB_PASSWORD:+***}
+  DB_ADMIN_USER=$DB_ADMIN_USER
+  DB_ADMIN_PASSWORD=${DB_ADMIN_PASSWORD:+***}
   DB_ADMIN_DB=$DB_ADMIN_DB
+  DB_SCHEMA=$DB_SCHEMA
   DATABASE_URL=$DATABASE_URL
   BACKEND_URL=$BACKEND_URL
   NEWSRADAR_SMCP_URL=$NEWSRADAR_SMCP_URL
@@ -364,6 +415,7 @@ case "${1:-help}" in
   reset-full) reset_full ;;
   reset-full-smoke) reset_full_smoke ;;
   reset-full-demo) reset_full_demo ;;
+  repair-db-permissions) repair_db_permissions ;;
   migrate-db) migrate_db ;;
   seed-smoke) seed_smoke ;;
   seed-demo) seed_demo ;;

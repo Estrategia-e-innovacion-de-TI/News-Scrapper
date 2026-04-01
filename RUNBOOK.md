@@ -29,6 +29,21 @@ Reset completo local sin Docker:
 ./run_local_newsradar.zsh reset-full-demo
 ```
 
+Reparacion de permisos sobre una base ya existente:
+
+```bash
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_NAME=newsradar
+export DB_USER=newsradar
+export DB_PASSWORD=newsradar
+export DB_ADMIN_USER=tu_usuario_admin
+export DB_ADMIN_PASSWORD=tu_password_admin
+./run_local_newsradar.zsh repair-db-permissions
+```
+
+Si tu Postgres local usa el mismo usuario para administrar y ejecutar la app, `DB_ADMIN_USER` puede ser igual a `DB_USER`.
+
 Si tu Postgres local no usa el usuario por defecto del repo:
 
 ```bash
