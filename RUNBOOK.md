@@ -21,6 +21,25 @@ Flujo minimo sin Docker:
 ./run_local_newsradar.zsh smoke
 ```
 
+Reset completo local sin Docker:
+
+```bash
+./run_local_newsradar.zsh reset-full
+./run_local_newsradar.zsh reset-full-smoke
+./run_local_newsradar.zsh reset-full-demo
+```
+
+Si tu Postgres local no usa el usuario por defecto del repo:
+
+```bash
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=tu_usuario
+export DB_PASSWORD=tu_password
+export DB_NAME=newsradar
+./run_local_newsradar.zsh reset-full
+```
+
 ## 1. Stack completo con Docker
 
 Desde la raiz:

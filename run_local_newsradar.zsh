@@ -6,7 +6,12 @@ SCRIPT_DIR=${0:A:h}
 REPO_DIR="${NEWSRADAR_REPO_DIR:-$SCRIPT_DIR}"
 
 DB_NAME="${DB_NAME:-newsradar}"
-DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://localhost:5432/${DB_NAME}}"
+DB_HOST="${DB_HOST:-localhost}"
+DB_PORT="${DB_PORT:-5432}"
+DB_USER="${DB_USER:-newsradar}"
+DB_PASSWORD="${DB_PASSWORD:-newsradar}"
+DB_ADMIN_DB="${DB_ADMIN_DB:-postgres}"
+DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}}"
 
 BACKEND_URL="${BACKEND_URL:-http://localhost:8000}"
 NEWSRADAR_BACK_URL="${NEWSRADAR_BACK_URL:-$BACKEND_URL}"
@@ -100,8 +105,17 @@ function maybe_start_postgres_service() {
       brew services start postgresql@16 >/dev/null
       return
     fi
+    if brew services list 2>/dev/null | grep -q '^postgresql '; then
+      log "Asegurando servicio postgresql"
+      brew services start postgresql >/dev/null
+      return
+    fi
   fi
   log "No intento iniciar Postgres por brew. Asegura que localhost:5432 este disponible."
+}
+
+function pg_env() {
+  export PGPASSWORD="$DB_PASSWORD"
 }
 
 function reset_db() {
@@ -109,11 +123,12 @@ function reset_db() {
   ensure_command dropdb
   ensure_command createdb
   maybe_start_postgres_service
+  pg_env
   log "Reseteando base de datos '$DB_NAME'"
-  psql postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB_NAME}' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true
-  dropdb --if-exists "$DB_NAME"
-  createdb "$DB_NAME"
-  psql -d "$DB_NAME" -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_ADMIN_DB" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB_NAME}' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true
+  dropdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" --if-exists "$DB_NAME"
+  createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME"
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
 }
 
 function migrate_db() {
@@ -134,6 +149,44 @@ function seed_smoke() {
     export DATABASE_URL
     ./.venv/bin/python scripts/seed_smoke_data.py
   )
+}
+
+function seed_demo() {
+  install_backend
+  log "Cargando datos demo completos"
+  (
+    cd "$BACKEND_DIR"
+    export DATABASE_URL
+    ./.venv/bin/python scripts/seed.py
+  )
+}
+
+function reset_full() {
+  reset_db
+  migrate_db
+  cat <<EOF
+
+Reset completo terminado.
+
+Base recreada y migrada contra:
+  $DATABASE_URL
+
+Si quieres cargar datos:
+  ./run_local_newsradar.zsh seed-smoke
+  ./run_local_newsradar.zsh seed-demo
+
+EOF
+}
+
+function reset_full_smoke() {
+  reset_db
+  migrate_db
+  seed_smoke
+}
+
+function reset_full_demo() {
+  reset_db
+  seed_demo
 }
 
 function start_backend() {
@@ -265,8 +318,12 @@ Uso: ./run_local_newsradar.zsh <comando>
 Comandos:
   bootstrap            Resetea DB, migra y carga datos semilla
   reset-db             Borra la base anterior y la recrea
+  reset-full           Borra la base, la recrea y corre migraciones
+  reset-full-smoke     Reset completo + datos semilla de smoke
+  reset-full-demo      Reset completo + dataset demo completo
   migrate-db           Ejecuta alembic upgrade head
   seed-smoke           Inserta datos semilla para smoke
+  seed-demo            Inserta dataset demo completo con scripts/seed.py
   setup-backend        Crea venv e instala backend
   setup-smcp           Crea venv e instala smcp
   setup-aiagent        Crea venv e instala aiagent
@@ -282,6 +339,10 @@ Comandos:
 
 Variables utiles:
   DB_NAME=$DB_NAME
+  DB_HOST=$DB_HOST
+  DB_PORT=$DB_PORT
+  DB_USER=$DB_USER
+  DB_ADMIN_DB=$DB_ADMIN_DB
   DATABASE_URL=$DATABASE_URL
   BACKEND_URL=$BACKEND_URL
   NEWSRADAR_SMCP_URL=$NEWSRADAR_SMCP_URL
@@ -300,8 +361,12 @@ EOF
 case "${1:-help}" in
   bootstrap) bootstrap ;;
   reset-db) reset_db ;;
+  reset-full) reset_full ;;
+  reset-full-smoke) reset_full_smoke ;;
+  reset-full-demo) reset_full_demo ;;
   migrate-db) migrate_db ;;
   seed-smoke) seed_smoke ;;
+  seed-demo) seed_demo ;;
   setup-backend) install_backend ;;
   setup-smcp) install_smcp ;;
   setup-aiagent) install_aiagent ;;
