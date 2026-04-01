@@ -90,6 +90,18 @@ interface VolumePoint {
                 {{ data().quality_checks?.weak_signal_clusters ?? 0 }}
               </p>
             </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Cobertura</p>
+              <p class="mt-2 text-xl font-semibold text-dark-text">
+                {{ (data().quality_checks?.cluster_coverage ?? (100 - (data().quality_checks?.unclustered_ratio ?? 0))) | number:'1.0-0' }}%
+              </p>
+            </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Estabilidad</p>
+              <p class="mt-2 text-xl font-semibold text-dark-text">
+                {{ (data().quality_checks?.stability_score_avg ?? 0) | number:'1.0-0' }}
+              </p>
+            </div>
           </div>
         </section>
       </div>
@@ -123,6 +135,11 @@ interface VolumePoint {
                       <span class="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-[10px] text-sky-200">
                         {{ formatStage(card.hype_stage) }}
                       </span>
+                      @if (card.comparative_signal) {
+                        <span class="rounded-full border border-dark-border bg-dark-bg px-2 py-1 text-[10px] text-dark-muted">
+                          {{ card.comparative_signal.status }}
+                        </span>
+                      }
                     </div>
                     <h5 class="mt-3 text-lg font-semibold leading-6 text-dark-text">{{ card.label }}</h5>
                     <p class="mt-2 text-xs leading-5 text-dark-muted">{{ card.subtitle }}</p>

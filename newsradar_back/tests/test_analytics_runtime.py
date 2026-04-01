@@ -9,6 +9,7 @@ import numpy as np
 from newsradar_api.shared_kernel.analytics import advanced_engine
 from newsradar_api.shared_kernel.ingestion import runtime
 from newsradar_api.shared_kernel.snapshots.report_builder import (
+    _attach_comparative_signals,
     build_riskmap_payload,
     build_trendmap_payload,
 )
@@ -66,7 +67,8 @@ def test_snapshot_builders_emit_advanced_analytics_payloads() -> None:
     assert trend_payload["charts"]["embedding_scatter"]
     assert trend_payload["clusters"]
     assert "executive_summary" in trend_payload["summary"]
-    assert trend_payload["quality_checks"]["methodology_version"] == "analytics_methodology_v3"
+    assert trend_payload["quality_checks"]["methodology_version"] == "analytics_methodology_v4"
+    assert trend_payload["quality_checks"]["cluster_coverage"] >= 0
     assert "cluster_cards" in trend_payload
 
     assert risk_payload["version"] == 3
@@ -74,6 +76,7 @@ def test_snapshot_builders_emit_advanced_analytics_payloads() -> None:
     assert risk_payload["charts"]["hype_cycle"]
     assert risk_payload["summary"]["dominant_risks"]
     assert "filters_metadata" in risk_payload
+    assert "severity_bands" in risk_payload["filters_metadata"]
 
 
 def test_smcp_ingestion_falls_back_to_local_runtime(monkeypatch) -> None:
@@ -197,7 +200,7 @@ def test_cluster_labels_filter_noise_and_infer_category(monkeypatch) -> None:
     monkeypatch.setattr(
         advanced_engine,
         "_build_embedding_features",
-        lambda documents: (None, {
+        lambda documents, report_type: (None, {
             "feature_space": "tfidf_lexical",
             "embedding_provider": None,
             "embedding_model_id": None,
@@ -269,3 +272,63 @@ def test_hdbscan_all_noise_falls_back_to_kmeans(monkeypatch) -> None:
 
     assert method == "kmeans"
     assert labels.tolist() == [0, 0, 1, 1]
+
+
+def test_comparative_signals_reuse_lineage_and_update_quality_checks() -> None:
+    payload = {
+        "report_type": "trend_mapping",
+        "clusters": [
+            {
+                "cluster_id": "trend-ai-new",
+                "label": "Agentes de IA para servicio",
+                "category": "Inteligencia Artificial",
+                "keywords": ["agentes de ia", "copilots", "service automation"],
+                "top_keywords": ["agentes de ia", "copilots", "service automation"],
+                "taxonomy_matches": [{"name": "Inteligencia Artificial", "score": 0.9}],
+                "item_count": 6,
+                "impact_score": 78.0,
+                "momentum_score": 71.0,
+                "lineage_id": "trend-ai-new",
+                "history_depth": 1,
+            }
+        ],
+        "documents": [
+            {"id": "doc-1", "cluster_id": "trend-ai-new"},
+        ],
+        "timeline": [
+            {"cluster_id": "trend-ai-new", "topic": "Agentes de IA para servicio"},
+        ],
+        "cluster_cards": [
+            {"cluster_id": "trend-ai-new", "label": "Agentes de IA para servicio"},
+        ],
+        "weak_signals": [],
+        "risk_signals": [],
+        "quality_checks": {},
+        "filters_metadata": {},
+    }
+    previous = {
+        "clusters": [
+            {
+                "cluster_id": "trend-ai-stable",
+                "lineage_id": "trend-ai-stable",
+                "history_depth": 3,
+                "label": "Agentes de IA para servicio",
+                "category": "Inteligencia Artificial",
+                "keywords": ["agentes de ia", "copilots", "service automation"],
+                "top_keywords": ["agentes de ia", "copilots", "service automation"],
+                "taxonomy_matches": [{"name": "Inteligencia Artificial", "score": 0.9}],
+                "item_count": 4,
+                "impact_score": 72.0,
+                "momentum_score": 58.0,
+            }
+        ]
+    }
+
+    _attach_comparative_signals(payload, previous)
+
+    cluster = payload["clusters"][0]
+    assert cluster["cluster_id"] == "trend-ai-stable"
+    assert cluster["history_depth"] == 4
+    assert cluster["comparative_signal"]["status"] == "accelerating"
+    assert payload["quality_checks"]["lineage_reused_clusters"] == 1
+    assert payload["quality_checks"]["stability_score_avg"] > 0

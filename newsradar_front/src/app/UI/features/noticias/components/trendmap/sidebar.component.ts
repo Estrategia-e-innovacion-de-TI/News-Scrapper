@@ -196,6 +196,18 @@ const SORT_OPTIONS: SortOption[] = [
                 {{ qualityChecks()!.unclustered_ratio | number:'1.0-0' }}%
               </p>
             </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Cobertura</p>
+              <p class="mt-2 text-lg font-semibold text-dark-text">
+                {{ (qualityChecks()!.cluster_coverage ?? (100 - qualityChecks()!.unclustered_ratio)) | number:'1.0-0' }}%
+              </p>
+            </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Estabilidad</p>
+              <p class="mt-2 text-lg font-semibold text-dark-text">
+                {{ (qualityChecks()!.stability_score_avg ?? 0) | number:'1.0-0' }}
+              </p>
+            </div>
           </div>
         </section>
       }
@@ -272,7 +284,11 @@ const SORT_OPTIONS: SortOption[] = [
 
               <div class="mt-3 flex items-center justify-between gap-3 text-xs text-dark-muted">
                 <span>{{ cluster.item_count }} docs</span>
-                @if (cluster.weak_signal_flag) {
+                @if (cluster.comparative_signal) {
+                  <span class="rounded-full border border-dark-border bg-dark-surface px-2 py-1">
+                    {{ cluster.comparative_signal.status }} · {{ cluster.comparative_signal.stability_score ?? 0 | number:'1.0-0' }}
+                  </span>
+                } @else if (cluster.weak_signal_flag) {
                   <span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-300">
                     weak signal
                   </span>

@@ -121,6 +121,20 @@
               </label>
 
               <label class="grid gap-1">
+                <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Madurez</span>
+                <select
+                  class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+                  [value]="filterMaturityStage() ?? ''"
+                  (change)="setFilterMaturityStage(onSelectValue($event))"
+                >
+                  <option value="">Todas</option>
+                  @for (item of maturityStages(); track item) {
+                    <option [value]="item">{{ stageLabel(item) }}</option>
+                  }
+                </select>
+              </label>
+
+              <label class="grid gap-1">
                 <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Hype stage</span>
                 <select
                   class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
@@ -130,6 +144,34 @@
                   <option value="">Todos</option>
                   @for (item of hypeStages(); track item) {
                     <option [value]="item">{{ stageLabel(item) }}</option>
+                  }
+                </select>
+              </label>
+
+              <label class="grid gap-1">
+                <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Severidad</span>
+                <select
+                  class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+                  [value]="filterSeverityBand() ?? ''"
+                  (change)="setFilterSeverityBand(onBandValue($event))"
+                >
+                  <option value="">Todas</option>
+                  @for (item of severityBands(); track item) {
+                    <option [value]="item">{{ item }}</option>
+                  }
+                </select>
+              </label>
+
+              <label class="grid gap-1">
+                <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Novedad</span>
+                <select
+                  class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+                  [value]="filterNoveltyBand() ?? ''"
+                  (change)="setFilterNoveltyBand(onBandValue($event))"
+                >
+                  <option value="">Todas</option>
+                  @for (item of noveltyBands(); track item) {
+                    <option [value]="item">{{ item }}</option>
                   }
                 </select>
               </label>
@@ -189,6 +231,18 @@
                   {{ snapshot()!.quality_checks?.weak_signal_clusters ?? 0 }}
                 </p>
               </div>
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Cobertura</p>
+                <p class="mt-2 text-lg font-semibold text-dark-text">
+                  {{ (snapshot()!.quality_checks?.cluster_coverage ?? (100 - (snapshot()!.quality_checks?.unclustered_ratio ?? 0))) | number:'1.0-0' }}%
+                </p>
+              </div>
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Estabilidad</p>
+                <p class="mt-2 text-lg font-semibold text-dark-text">
+                  {{ (snapshot()!.quality_checks?.stability_score_avg ?? 0) | number:'1.0-0' }}
+                </p>
+              </div>
             </div>
           </section>
 
@@ -210,6 +264,12 @@
                       </p>
                       <h5 class="mt-1 text-sm font-semibold text-dark-text">{{ cluster.label }}</h5>
                       <p class="mt-1 text-xs text-dark-muted">{{ cluster.subtitle }}</p>
+                      @if (cluster.comparative_signal) {
+                        <p class="mt-2 text-[11px] text-dark-muted">
+                          {{ cluster.comparative_signal.status }} ·
+                          estabilidad {{ (cluster.comparative_signal.stability_score ?? 0) | number:'1.0-0' }}
+                        </p>
+                      }
                     </div>
                     <span [class]="stageBadge(cluster.hype_stage)">{{ stageLabel(cluster.hype_stage) }}</span>
                   </div>
@@ -393,6 +453,13 @@
                     <p class="text-xs uppercase tracking-[0.18em] text-dark-muted">{{ selectedCluster()!.dominant_risk }}</p>
                     <h4 class="mt-2 text-xl font-semibold text-dark-text">{{ selectedCluster()!.label }}</h4>
                     <p class="mt-2 text-sm text-dark-muted">{{ selectedCluster()!.subtitle }}</p>
+                    @if (selectedCluster()!.comparative_signal) {
+                      <p class="mt-2 text-xs text-dark-muted">
+                        Estado {{ selectedCluster()!.comparative_signal!.status }} · estabilidad
+                        {{ (selectedCluster()!.comparative_signal!.stability_score ?? 0) | number:'1.0-0' }} ·
+                        lineage {{ selectedCluster()!.history_depth ?? 1 }}
+                      </p>
+                    }
                   </div>
                   <div class="flex flex-wrap gap-2">
                     <span [class]="stageBadge(selectedCluster()!.hype_stage)">{{ stageLabel(selectedCluster()!.hype_stage) }}</span>
@@ -437,6 +504,13 @@
                             <span class="text-xs text-dark-muted">{{ item.score | number:'1.0-0' }}</span>
                           </div>
                           <p class="mt-1 text-xs leading-5 text-dark-muted">{{ item.formula }}</p>
+                        </div>
+                      }
+                    </div>
+                    <div class="mt-3 space-y-2">
+                      @for (evidence of selectedCluster()!.insight_evidence; track evidence.type + evidence.detail) {
+                        <div class="rounded-lg border border-dark-border bg-dark-surface/70 px-3 py-2 text-sm text-dark-text/90">
+                          <span class="font-medium capitalize">{{ evidence.type }}</span>: {{ evidence.detail }}
                         </div>
                       }
                     </div>

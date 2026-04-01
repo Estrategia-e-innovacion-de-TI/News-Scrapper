@@ -1,4 +1,4 @@
-# Analytics Mapping Methodology v3
+# Analytics Mapping Methodology v4
 
 ## 1. Diagnostico comparativo actual vs viejo
 
@@ -24,7 +24,7 @@
 - menor explicabilidad por cluster
 - Risk Mapping demasiado superficial frente a Trend Mapping
 
-### Que se recupera y mejora en v3
+### Que se recupera y mejora en v4
 
 - representacion documental hibrida
 - taxonomia configurable para trends y riesgos
@@ -32,6 +32,8 @@
 - score breakdowns interpretables
 - comparative signals entre snapshots
 - weak signal detection explicita
+- lineage reuse y estabilidad historica por cluster
+- persistence_score_breakdown en Risk Mapping
 - Risk Mapping comparable con Trend Mapping en estructura y UX
 
 ## 2. Problemas detectados en Trend Mapping
@@ -68,6 +70,7 @@
   - duplicate_signature
   - duplicate_flag
   - duplicate_pressure por cluster
+  - firma enriquecida con titulo + excerpt + keywords para near-duplicates
 
 ### Clasificacion y taxonomia
 
@@ -89,6 +92,7 @@
 - proyeccion 2D para coordenadas de snapshot
 - ruido manejado con `sin_cluster`
 - deteccion explicita de `weak_signal_flag`
+- cluster IDs semanticamente estables por fingerprint
 - `cluster_quality` por cluster:
   - coherence
   - separation
@@ -151,7 +155,8 @@
 ### Comparative signals
 
 - si existe snapshot previo:
-  - se busca cluster similar por keywords/categoria
+  - se busca cluster similar por keywords/categoria/taxonomia/fingerprint
+  - si el match supera threshold configurable, se reutiliza el `cluster_id` previo
   - se estima status:
     - new
     - accelerating
@@ -162,6 +167,9 @@
   - delta_impact
   - delta_momentum
   - similarity
+  - stability_score
+  - history_depth
+  - lineage_id
 
 ## 5. Cambios de backend
 
@@ -217,7 +225,7 @@
 - taxonomy/source mix/temporal bars
 - documentos representativos y tabla documental
 
-## 7. Contrato de snapshots v3
+## 7. Contrato de snapshots version 3 con metodologia v4
 
 Campos relevantes agregados o reforzados:
 
@@ -231,9 +239,15 @@ Campos relevantes agregados o reforzados:
 - `uncertainty_score_breakdown`
 - `risk_severity`
 - `risk_severity_breakdown`
+- `persistence_score_breakdown`
 - `persistence_score`
 - `hype_stage`
 - `weak_signal_flag`
+- `novelty_band`
+- `severity_band`
+- `lineage_id`
+- `cluster_fingerprint`
+- `history_depth`
 - `representative_documents`
 - `insight_evidence`
 - `cluster_cards`
@@ -259,16 +273,16 @@ Campos relevantes agregados o reforzados:
 
 - backend:
   - `python -m pytest -q tests/test_analytics_runtime.py`
-  - resultado: `5 passed`
+  - resultado: `7 passed`
 
 ## 10. Riesgos y trade-offs
 
 - si no hay runtime Bedrock, el sistema cae a modo heuristico/estadistico; mejora mucho frente a v2, pero la calidad de relabeling puede bajar.
 - si `node`/`npm` no estan disponibles en el entorno, no se puede ejecutar `ng build` aunque el codigo quede preparado.
-- Risk Mapping ahora depende de que el snapshot backend incluya la metadata enriquecida v3; snapshots viejos pueden verse menos completos.
+- Risk Mapping ahora depende de que el snapshot backend incluya la metadata enriquecida v4 sobre `version: 3`; snapshots viejos pueden verse menos completos.
 
 ## 11. Pendientes reales
 
 - correr build Angular en un entorno con Node/NPM disponible
-- regenerar snapshots reales v3 y revisar calibracion con datos productivos
-- si se requiere, actualizar ejemplos JSON en `shared/examples/` con snapshots reales v3
+- regenerar snapshots reales con metodologia v4 y revisar calibracion con datos productivos
+- revisar calibracion de thresholds y taxonomia con datos productivos antes de promover los ejemplos a baseline operativa

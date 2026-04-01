@@ -20,6 +20,13 @@ type SortDir = 'asc' | 'desc';
               </p>
               <h4 class="mt-2 text-xl font-semibold text-dark-text">{{ cluster()!.label }}</h4>
               <p class="mt-2 text-sm text-dark-muted">{{ cluster()!.subtitle }}</p>
+              @if (cluster()!.comparative_signal) {
+                <p class="mt-2 text-xs text-dark-muted">
+                  Estado {{ cluster()!.comparative_signal!.status }} frente al snapshot previo ·
+                  estabilidad {{ (cluster()!.comparative_signal!.stability_score ?? 0) | number:'1.0-0' }} ·
+                  lineage {{ cluster()!.history_depth ?? 1 }}
+                </p>
+              }
             </div>
             <div class="flex flex-wrap gap-2">
               <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
@@ -221,7 +228,11 @@ export class TrendmapDetailComponent {
       { label: 'Madurez', breakdown: cluster.maturity_score_breakdown },
       { label: 'Momentum', breakdown: cluster.momentum_score_breakdown },
       { label: 'Novedad', breakdown: cluster.novelty_score_breakdown },
+      { label: 'Incertidumbre', breakdown: cluster.uncertainty_score_breakdown },
     ];
+    if (cluster.persistence_score_breakdown) {
+      entries.splice(1, 0, { label: 'Persistencia', breakdown: cluster.persistence_score_breakdown });
+    }
     if (cluster.risk_severity_breakdown) {
       entries.unshift({ label: 'Severidad', breakdown: cluster.risk_severity_breakdown });
     }

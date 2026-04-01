@@ -108,7 +108,7 @@ Los snapshots se generan en backend y quedan persistidos/versionados para consum
 - enriquecimiento opcional con LLM en Bedrock para relabeling de clusters, `executive_summary`, `insights` y `recommendations`
 - trazabilidad LLM en `parameters.llm_enrichment` y persistencia de prompts en `llm_prompts`
 
-### Metodologia v3
+### Metodologia v4 sobre snapshots v3
 
 - documento tecnico: `docs/analytics-mapping-methodology.md`
 - snapshots `version: 3`
@@ -120,7 +120,13 @@ Los snapshots se generan en backend y quedan persistidos/versionados para consum
   - `maturity_score_breakdown`
   - `momentum_score_breakdown`
   - `novelty_score_breakdown`
+  - `persistence_score_breakdown`
   - `risk_severity`
+  - `novelty_band`
+  - `severity_band`
+  - `lineage_id`
+  - `cluster_fingerprint`
+  - `history_depth`
   - `representative_documents`
   - `insight_evidence`
   - `quality_checks`
@@ -171,7 +177,7 @@ Puertos:
 
 ## Validacion ejecutada
 
-- `python -m pytest -q tests/test_analytics_runtime.py` en `newsradar_back` -> `5 passed`
+- `python -m pytest -q tests/test_analytics_runtime.py` en `newsradar_back` -> `7 passed`
 - `python -m pytest -q` en `newsradar_aiagent` -> `3 passed`
 - `python -m compileall newsradar_back/src newsradar_smcp/src newsradar_aiagent/src`
 

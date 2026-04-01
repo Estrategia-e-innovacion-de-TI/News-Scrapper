@@ -21,6 +21,7 @@ from newsradar_api.infrastructure.driven_adapters.db_models import (
 )
 from newsradar_api.shared_kernel.bedrock import SnapshotLLMEnricher
 from newsradar_api.shared_kernel.analytics import generate_report_analysis
+from newsradar_api.shared_kernel.config.paths import load_yaml_file, resolve_flow_path
 
 
 def _legacy_direction(direction: str | None) -> str:
@@ -74,6 +75,82 @@ def _category_value(cluster: dict[str, Any]) -> str:
     return str(cluster.get("dominant_risk") or cluster.get("category") or "").strip().lower()
 
 
+def _flow_analytics_settings(report_type: str) -> dict[str, Any]:
+    filename = "risk_mapping.yaml" if report_type == "risk_mapping" else "trend_mapping.yaml"
+    path = resolve_flow_path(filename)
+    if not path.exists():
+        return {}
+    analytics = load_yaml_file(path).get("analytics") or {}
+    return analytics if isinstance(analytics, dict) else {}
+
+
+def _cluster_taxonomy_set(cluster: dict[str, Any]) -> set[str]:
+    values = set()
+    for item in cluster.get("taxonomy_matches") or []:
+        name = str(item.get("name") or "").strip().lower()
+        if name:
+            values.add(name)
+    return values
+
+
+def _rewrite_cluster_ids(payload: dict[str, Any], mapping: dict[str, str]) -> None:
+    if not mapping:
+        return
+    for cluster in payload.get("clusters", []):
+        cluster_id = cluster.get("cluster_id")
+        if cluster_id in mapping:
+            cluster["cluster_id"] = mapping[cluster_id]
+        lineage_id = cluster.get("lineage_id")
+        if lineage_id in mapping:
+            cluster["lineage_id"] = mapping[lineage_id]
+        comparative = cluster.get("comparative_signal")
+        if isinstance(comparative, dict):
+            current_id = comparative.get("cluster_id")
+            if current_id in mapping:
+                comparative["cluster_id"] = mapping[current_id]
+    for collection_key in ("documents", "articles"):
+        for item in payload.get(collection_key) or []:
+            cluster_id = item.get("cluster_id")
+            if cluster_id in mapping:
+                item["cluster_id"] = mapping[cluster_id]
+    for entry in payload.get("timeline") or payload.get("trends") or []:
+        cluster_id = entry.get("cluster_id")
+        if cluster_id in mapping:
+            entry["cluster_id"] = mapping[cluster_id]
+    for collection_key in ("cluster_cards", "weak_signals"):
+        for item in payload.get(collection_key) or []:
+            cluster_id = item.get("cluster_id")
+            if cluster_id in mapping:
+                item["cluster_id"] = mapping[cluster_id]
+    for group in payload.get("super_clusters") or []:
+        cluster_ids = group.get("clusters") or group.get("sub_cluster_ids")
+        if isinstance(cluster_ids, list):
+            for index, cluster_id in enumerate(cluster_ids):
+                if cluster_id in mapping:
+                    cluster_ids[index] = mapping[cluster_id]
+    for signal in payload.get("risk_signals") or []:
+        related = signal.get("related_clusters")
+        if isinstance(related, list):
+            signal["related_clusters"] = [mapping.get(cluster_id, cluster_id) for cluster_id in related]
+
+
+def _sync_cluster_cards(payload: dict[str, Any]) -> None:
+    cluster_index = {
+        str(cluster.get("cluster_id")): cluster
+        for cluster in payload.get("clusters", [])
+        if cluster.get("cluster_id")
+    }
+    for key in ("cluster_cards", "weak_signals"):
+        for card in payload.get(key) or []:
+            cluster = cluster_index.get(str(card.get("cluster_id")))
+            if not cluster:
+                continue
+            if cluster.get("comparative_signal") is not None:
+                card["comparative_signal"] = cluster["comparative_signal"]
+            if cluster.get("signal_state"):
+                card["signal_state"] = cluster["signal_state"]
+
+
 def _cluster_similarity(current: dict[str, Any], previous: dict[str, Any]) -> float:
     current_keywords = _normalized_keyword_set(current)
     previous_keywords = _normalized_keyword_set(previous)
@@ -86,81 +163,166 @@ def _cluster_similarity(current: dict[str, Any], previous: dict[str, Any]) -> fl
     label_previous = str(previous.get("label") or "").strip().lower()
     label_score = 1.0 if label_current and label_current == label_previous else 0.0
     category_score = 1.0 if _category_value(current) and _category_value(current) == _category_value(previous) else 0.0
-    return 0.55 * keyword_overlap + 0.25 * label_score + 0.20 * category_score
+    taxonomy_current = _cluster_taxonomy_set(current)
+    taxonomy_previous = _cluster_taxonomy_set(previous)
+    taxonomy_overlap = (
+        len(taxonomy_current & taxonomy_previous) / len(taxonomy_current | taxonomy_previous)
+        if taxonomy_current and taxonomy_previous
+        else 0.0
+    )
+    fingerprint_score = 1.0 if current.get("cluster_fingerprint") and current.get("cluster_fingerprint") == previous.get("cluster_fingerprint") else 0.0
+    return 0.40 * keyword_overlap + 0.18 * label_score + 0.18 * category_score + 0.14 * taxonomy_overlap + 0.10 * fingerprint_score
 
 
 def _attach_comparative_signals(payload: dict[str, Any], previous_payload: dict[str, Any] | None) -> None:
+    report_type = str(payload.get("report_type") or "trend_mapping")
+    analytics_settings = _flow_analytics_settings(report_type)
+    similarity_threshold = float(analytics_settings.get("lineage_similarity_threshold") or 0.52)
+    reuse_previous_cluster_ids = bool(analytics_settings.get("reuse_previous_cluster_ids", True))
+    quality_checks = payload.setdefault("quality_checks", {})
+    filters_metadata = payload.setdefault("filters_metadata", {})
+
     if not previous_payload:
         payload["comparative_signals"] = {
             "previous_snapshot_available": False,
             "summary": "No hay snapshot previo comparable.",
             "clusters": [],
+            "matched_clusters": 0,
+            "new_clusters": len(payload.get("clusters") or []),
+            "accelerating_clusters": 0,
+            "cooling_clusters": 0,
+            "stable_clusters": 0,
+            "stability_score_avg": 0.0,
         }
+        quality_checks["stability_score_avg"] = 0.0
+        quality_checks["lineage_reused_clusters"] = 0
+        quality_checks["new_cluster_ratio"] = 0.0 if not payload.get("clusters") else 100.0
+        filters_metadata["comparative_statuses"] = ["new", "accelerating", "cooling", "stable"]
+        _sync_cluster_cards(payload)
         return
 
+    current_clusters = list(payload.get("clusters") or [])
     previous_clusters = list(previous_payload.get("clusters") or [])
-    cluster_comparisons: list[dict[str, Any]] = []
-    new_count = accelerating_count = cooling_count = 0
+    candidate_pairs: list[tuple[float, int, int]] = []
+    for current_index, current in enumerate(current_clusters):
+        for previous_index, candidate in enumerate(previous_clusters):
+            candidate_pairs.append((_cluster_similarity(current, candidate), current_index, previous_index))
+    candidate_pairs.sort(key=lambda item: item[0], reverse=True)
 
-    for cluster in payload.get("clusters", []):
-        best_match = None
-        best_score = 0.0
-        for candidate in previous_clusters:
-            similarity = _cluster_similarity(cluster, candidate)
-            if similarity > best_score:
-                best_match = candidate
-                best_score = similarity
+    matched_current: set[int] = set()
+    matched_previous: set[int] = set()
+    matches: dict[int, tuple[int, float]] = {}
+    for score, current_index, previous_index in candidate_pairs:
+        if score < similarity_threshold:
+            break
+        if current_index in matched_current or previous_index in matched_previous:
+            continue
+        matched_current.add(current_index)
+        matched_previous.add(previous_index)
+        matches[current_index] = (previous_index, score)
 
-        if best_match is None or best_score < 0.45:
-            status = "new"
+    id_mapping: dict[str, str] = {}
+    new_count = accelerating_count = cooling_count = stable_count = 0
+    stability_scores: list[float] = []
+
+    for current_index, cluster in enumerate(current_clusters):
+        match = matches.get(current_index)
+        if match is None:
             new_count += 1
             comparison = {
                 "cluster_id": cluster["cluster_id"],
+                "lineage_id": cluster.get("lineage_id") or cluster["cluster_id"],
                 "matched_previous_cluster": None,
-                "status": status,
+                "previous_label": None,
+                "history_depth": int(cluster.get("history_depth") or 1),
+                "status": "new",
                 "delta_documents": cluster.get("item_count") or cluster.get("documents") or 0,
                 "delta_impact": cluster.get("impact_score") or 0,
                 "delta_momentum": cluster.get("momentum_score") or 0,
-                "similarity": round(best_score, 3),
+                "similarity": 0.0,
+                "stability_score": 0.0,
             }
+            cluster["comparative_signal"] = comparison
+            cluster["lineage_id"] = comparison["lineage_id"]
+            cluster["history_depth"] = comparison["history_depth"]
+            continue
+
+        previous_index, best_score = match
+        previous_cluster = previous_clusters[previous_index]
+        previous_cluster_id = str(previous_cluster.get("cluster_id") or "")
+        current_docs = float(cluster.get("item_count") or cluster.get("documents") or 0)
+        previous_docs = float(previous_cluster.get("item_count") or previous_cluster.get("documents") or 0)
+        current_impact = float(cluster.get("impact_score") or cluster.get("avg_score") or 0)
+        previous_impact = float(previous_cluster.get("impact_score") or previous_cluster.get("avg_score") or 0)
+        current_momentum = float(cluster.get("momentum_score") or 0)
+        previous_momentum = float(previous_cluster.get("momentum_score") or 0)
+        delta_documents = round(current_docs - previous_docs, 1)
+        delta_impact = round(current_impact - previous_impact, 1)
+        delta_momentum = round(current_momentum - previous_momentum, 1)
+        if delta_momentum >= 8 or delta_documents >= 2:
+            status = "accelerating"
+            accelerating_count += 1
+        elif delta_momentum <= -8:
+            status = "cooling"
+            cooling_count += 1
         else:
-            current_docs = float(cluster.get("item_count") or cluster.get("documents") or 0)
-            previous_docs = float(best_match.get("item_count") or best_match.get("documents") or 0)
-            current_impact = float(cluster.get("impact_score") or cluster.get("avg_score") or 0)
-            previous_impact = float(best_match.get("impact_score") or best_match.get("avg_score") or 0)
-            current_momentum = float(cluster.get("momentum_score") or 0)
-            previous_momentum = float(best_match.get("momentum_score") or 0)
-            delta_documents = round(current_docs - previous_docs, 1)
-            delta_impact = round(current_impact - previous_impact, 1)
-            delta_momentum = round(current_momentum - previous_momentum, 1)
-            if delta_momentum >= 8 or delta_documents >= 2:
-                status = "accelerating"
-                accelerating_count += 1
-            elif delta_momentum <= -8:
-                status = "cooling"
-                cooling_count += 1
-            else:
-                status = "stable"
-            comparison = {
-                "cluster_id": cluster["cluster_id"],
-                "matched_previous_cluster": best_match.get("cluster_id"),
-                "status": status,
-                "delta_documents": delta_documents,
-                "delta_impact": delta_impact,
-                "delta_momentum": delta_momentum,
-                "similarity": round(best_score, 3),
-            }
+            status = "stable"
+            stable_count += 1
+
+        lineage_id = str(previous_cluster.get("lineage_id") or previous_cluster_id or cluster["cluster_id"])
+        history_depth = int(previous_cluster.get("history_depth") or 1) + 1
+        stability_score = round(best_score * 100, 1)
+        stability_scores.append(stability_score)
+        if reuse_previous_cluster_ids and previous_cluster_id and previous_cluster_id != cluster["cluster_id"]:
+            id_mapping[str(cluster["cluster_id"])] = previous_cluster_id
+        comparison = {
+            "cluster_id": cluster["cluster_id"],
+            "lineage_id": lineage_id,
+            "matched_previous_cluster": previous_cluster_id or None,
+            "previous_label": previous_cluster.get("label"),
+            "history_depth": history_depth,
+            "status": status,
+            "delta_documents": delta_documents,
+            "delta_impact": delta_impact,
+            "delta_momentum": delta_momentum,
+            "similarity": round(best_score, 3),
+            "stability_score": stability_score,
+        }
         cluster["comparative_signal"] = comparison
-        cluster_comparisons.append(comparison)
+        cluster["lineage_id"] = lineage_id
+        cluster["history_depth"] = history_depth
+
+    if id_mapping:
+        _rewrite_cluster_ids(payload, id_mapping)
+
+    cluster_comparisons = [
+        cluster["comparative_signal"]
+        for cluster in payload.get("clusters", [])
+        if isinstance(cluster.get("comparative_signal"), dict)
+    ]
+    stability_avg = round(sum(stability_scores) / len(stability_scores), 1) if stability_scores else 0.0
+    matched_count = len(stability_scores)
+    total_clusters = len(payload.get("clusters", []) or [])
+    quality_checks["stability_score_avg"] = stability_avg
+    quality_checks["lineage_reused_clusters"] = matched_count
+    quality_checks["new_cluster_ratio"] = round((new_count / max(total_clusters, 1)) * 100, 1)
+    filters_metadata["comparative_statuses"] = ["new", "accelerating", "cooling", "stable"]
 
     payload["comparative_signals"] = {
         "previous_snapshot_available": True,
         "summary": (
-            f"{new_count} clusters nuevos, {accelerating_count} acelerando y {cooling_count} enfriandose "
-            f"frente al snapshot previo."
+            f"{matched_count} clusters con continuidad historica, {new_count} nuevos, "
+            f"{accelerating_count} acelerando y {cooling_count} enfriandose frente al snapshot previo."
         ),
         "clusters": cluster_comparisons,
+        "matched_clusters": matched_count,
+        "new_clusters": new_count,
+        "accelerating_clusters": accelerating_count,
+        "cooling_clusters": cooling_count,
+        "stable_clusters": stable_count,
+        "stability_score_avg": stability_avg,
     }
+    _sync_cluster_cards(payload)
 
 
 def build_trendmap_payload(documents: list[Document], window_months: int) -> dict[str, Any]:
@@ -198,8 +360,13 @@ def build_trendmap_payload(documents: list[Document], window_months: int) -> dic
                 "acceleration_ratio": cluster["acceleration_ratio"],
                 "momentum_score": cluster["momentum_score"],
                 "novelty_score": cluster["novelty_score"],
+                "novelty_band": cluster.get("novelty_band"),
                 "uncertainty_score": cluster["uncertainty_score"],
                 "weak_signal_flag": cluster["weak_signal_flag"],
+                "signal_state": cluster.get("signal_state"),
+                "lineage_id": cluster.get("lineage_id"),
+                "cluster_fingerprint": cluster.get("cluster_fingerprint"),
+                "history_depth": cluster.get("history_depth"),
                 "subtitle": cluster["subtitle"],
                 "rationale": cluster["rationale"],
                 "taxonomy_matches": cluster["taxonomy_matches"],
@@ -318,13 +485,20 @@ def build_riskmap_payload(documents: list[Document], window_months: int) -> dict
                 "horizon_score": cluster["horizon_score"],
                 "momentum_score": cluster["momentum_score"],
                 "novelty_score": cluster["novelty_score"],
+                "novelty_band": cluster.get("novelty_band"),
                 "uncertainty_score": cluster["uncertainty_score"],
                 "persistence_score": cluster["persistence_score"],
+                "persistence_score_breakdown": cluster.get("persistence_score_breakdown"),
                 "risk_severity": cluster["risk_severity"],
+                "severity_band": cluster.get("severity_band"),
                 "risk_severity_breakdown": cluster["risk_severity_breakdown"],
                 "maturity_stage": cluster["maturity_stage"],
                 "hype_stage": cluster["hype_stage"],
                 "weak_signal_flag": cluster["weak_signal_flag"],
+                "signal_state": cluster.get("signal_state"),
+                "lineage_id": cluster.get("lineage_id"),
+                "cluster_fingerprint": cluster.get("cluster_fingerprint"),
+                "history_depth": cluster.get("history_depth"),
                 "subtitle": cluster["subtitle"],
                 "rationale": cluster["rationale"],
                 "taxonomy_matches": cluster["taxonomy_matches"],

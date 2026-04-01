@@ -117,39 +117,29 @@ export class D3ScatterComponent implements AfterViewInit {
     // Build cluster map for quick lookup
     const clusterMap = new Map(clusters.map((c) => [c.cluster_id, c]));
 
-    // Draw hull polygons per cluster
-    const articlesByCluster = d3.group(articles, (a) => a.cluster_id);
-
-    articlesByCluster.forEach((clusterArticles, clusterId) => {
-      if (clusterArticles.length < 3) return;
-
-      const points: [number, number][] = clusterArticles.map((a) => [
-        x(a.x_embed),
-        y(a.y_embed),
-      ]);
-
-      const hull = d3.polygonHull(points);
-      if (!hull) return;
-
-      const cluster = clusterMap.get(clusterId);
-      const cat = cluster?.category ?? 'unknown';
-      const isSelected = selectedCluster?.cluster_id === clusterId;
+    // Draw hull polygons from backend snapshot to keep geometry snapshot-driven.
+    clusters.forEach((cluster) => {
+      if ((cluster.hull_polygon?.length ?? 0) < 3) return;
+      const polygon = (cluster.hull_polygon ?? []).map(([px, py]) => [x(px), y(py)] as [number, number]);
+      const isSelected = selectedCluster?.cluster_id === cluster.cluster_id;
 
       g.append('path')
-        .datum(hull)
+        .datum(polygon)
         .attr('d', (d) => `M${d.join('L')}Z`)
-        .attr('fill', color(cat))
+        .attr('fill', color(cluster.category))
         .attr('fill-opacity', isSelected ? 0.25 : 0.08)
-        .attr('stroke', color(cat))
+        .attr('stroke', color(cluster.category))
         .attr('stroke-opacity', isSelected ? 0.8 : 0.3)
         .attr('stroke-width', isSelected ? 2 : 1)
         .attr('cursor', 'pointer')
         .on('click', () => {
           this.clusterSelected.emit(
-            selectedCluster?.cluster_id === clusterId ? null : (cluster ?? null),
+            selectedCluster?.cluster_id === cluster.cluster_id ? null : cluster,
           );
         });
     });
+
+    const articlesByCluster = d3.group(articles, (a) => a.cluster_id);
 
     // Draw article points
     g.selectAll('circle.article')
@@ -177,10 +167,14 @@ export class D3ScatterComponent implements AfterViewInit {
       .on('mouseenter', (event: MouseEvent, d: TrendmapArticle) => {
         const safeTitle = this.escapeHtml(d.title);
         const safeUrl = this.escapeHtml(d.url || 'sin URL');
+        const safeCluster = this.escapeHtml(d.cluster_label || clusterMap.get(d.cluster_id)?.label || d.cluster_id);
+        const safeSource = this.escapeHtml(d.source || 'fuente');
         tooltip
           .style('opacity', 1)
           .html(
             `<div style="font-weight:600; margin-bottom:6px;">${safeTitle}</div>` +
+              `<div style="margin-bottom:6px; color:${DARK_THEME.textMuted};">${safeCluster} | ${safeSource}</div>` +
+              `<div style="margin-bottom:6px; color:${DARK_THEME.textMuted};">Score ${d.score.toFixed(0)} | ${this.escapeHtml(d.source_type)}</div>` +
               `<div style="color:${DARK_THEME.textMuted}; word-break:break-word;">${safeUrl}</div>`,
           );
         tooltip

@@ -5,6 +5,7 @@ only receives prepared snapshots and chart payloads.
 """
 from __future__ import annotations
 
+import hashlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -27,7 +28,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from newsradar_api.application.config import ApiConfig
 from newsradar_api.infrastructure.driven_adapters.bedrock_adapter import BedrockAdapter
-from newsradar_api.shared_kernel.config.paths import load_yaml_file, shared_path
+from newsradar_api.shared_kernel.config.paths import load_yaml_file, resolve_flow_path, shared_path
 
 try:
     import hdbscan  # type: ignore[import-not-found]
@@ -175,6 +176,26 @@ _HYPE_STAGE_ORDER = (
 )
 
 _MIN_RELEVANCE_FOR_CLUSTERING = 40.0
+_BOILERPLATE_PATTERNS = (
+    r"https?://\S+",
+    r"\b(read more|continue reading|learn more|click here|subscribe|sign up)\b",
+    r"\b(all rights reserved|privacy policy|cookie policy|terms of use)\b",
+    r"\b(advertisement|sponsored|sponsor content)\b",
+    r"\bthe post .* appeared first on .*\b",
+)
+_DEFAULT_ANALYTICS_SETTINGS = {
+    "min_relevance_for_clustering": _MIN_RELEVANCE_FOR_CLUSTERING,
+    "weak_signal_max_documents": 4,
+    "weak_signal_novelty_min": 58.0,
+    "weak_signal_momentum_min": 42.0,
+    "weak_signal_avg_score_min": 70.0,
+    "duplicate_signature_terms": 12,
+    "representation_text_chars": 3200,
+    "embedding_text_chars": 2200,
+    "lineage_similarity_threshold": 0.52,
+    "reuse_previous_cluster_ids": True,
+    "full_reclustering_policy": "full_recluster_each_snapshot_with_lineage_reuse",
+}
 
 _DEFAULT_TAXONOMY = {
     "version": "analytics_taxonomy_fallback_v1",
@@ -296,6 +317,31 @@ def _configured_generic_terms() -> set[str]:
     return _GENERIC_TERMS | {str(item).lower() for item in value}
 
 
+@lru_cache(maxsize=2)
+def _analytics_settings(report_type: str) -> dict[str, Any]:
+    filename = "risk_mapping.yaml" if report_type == "risk_mapping" else "trend_mapping.yaml"
+    settings = dict(_DEFAULT_ANALYTICS_SETTINGS)
+    path = resolve_flow_path(filename)
+    if path.exists():
+        analytics = load_yaml_file(path).get("analytics") or {}
+        if isinstance(analytics, dict):
+            for key in settings:
+                if key in analytics:
+                    settings[key] = analytics[key]
+    settings["min_relevance_for_clustering"] = float(settings["min_relevance_for_clustering"] or _MIN_RELEVANCE_FOR_CLUSTERING)
+    settings["weak_signal_max_documents"] = int(settings["weak_signal_max_documents"] or 4)
+    settings["weak_signal_novelty_min"] = float(settings["weak_signal_novelty_min"] or 58.0)
+    settings["weak_signal_momentum_min"] = float(settings["weak_signal_momentum_min"] or 42.0)
+    settings["weak_signal_avg_score_min"] = float(settings["weak_signal_avg_score_min"] or 70.0)
+    settings["duplicate_signature_terms"] = int(settings["duplicate_signature_terms"] or 12)
+    settings["representation_text_chars"] = int(settings["representation_text_chars"] or 3200)
+    settings["embedding_text_chars"] = int(settings["embedding_text_chars"] or 2200)
+    settings["lineage_similarity_threshold"] = float(settings["lineage_similarity_threshold"] or 0.52)
+    settings["reuse_previous_cluster_ids"] = bool(settings["reuse_previous_cluster_ids"])
+    settings["full_reclustering_policy"] = str(settings["full_reclustering_policy"] or _DEFAULT_ANALYTICS_SETTINGS["full_reclustering_policy"])
+    return settings
+
+
 def _as_utc(value: datetime | None) -> datetime:
     if value is None:
         return datetime.now(timezone.utc)
@@ -316,6 +362,20 @@ def _safe_text(value: Any) -> str:
     if isinstance(value, str):
         return value
     return str(value)
+
+
+def _strip_editorial_boilerplate(value: str, *, max_chars: int | None = None) -> str:
+    text = _safe_text(value)
+    if not text:
+        return ""
+    cleaned = text.replace("\u00a0", " ").replace("\r", " ")
+    for pattern in _BOILERPLATE_PATTERNS:
+        cleaned = re.sub(pattern, " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(?:share|tweet|facebook|linkedin|instagram|whatsapp)\b", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if max_chars is not None:
+        cleaned = cleaned[:max_chars]
+    return cleaned
 
 
 def _normalize_text(value: str) -> str:
@@ -439,32 +499,38 @@ def _fallback_terms_from_docs(docs: list[Any], limit: int = 6) -> list[str]:
     return [term for term, _ in counter.most_common(limit)]
 
 
-def _document_text(doc: Any) -> str:
+def _representation_fragments(doc: Any, report_type: str, *, embedding: bool) -> list[str]:
+    settings = _analytics_settings(report_type)
+    text_limit = settings["embedding_text_chars"] if embedding else settings["representation_text_chars"]
+    title = _strip_editorial_boilerplate(_safe_text(getattr(doc, "title", "")), max_chars=220)
+    excerpt = _strip_editorial_boilerplate(_safe_text(getattr(doc, "excerpt", "")), max_chars=480)
+    body = _strip_editorial_boilerplate(_safe_text(getattr(doc, "text", "")), max_chars=text_limit)
+    category = _safe_text(getattr(doc, "category", ""))
+    risk_type = _safe_text(getattr(doc, "risk_type", ""))
+    source_id = _safe_text(getattr(doc, "source_id", ""))
+    source_type = _safe_text(getattr(doc, "source_type", ""))
+    keywords = [item for item in (getattr(doc, "matched_keywords", []) or []) if _safe_text(item).strip()]
+    events = [item for item in (getattr(doc, "materialized_events", []) or []) if _safe_text(item).strip()]
+    focus = category or risk_type
     fragments = [
-        _safe_text(getattr(doc, "title", "")),
-        _safe_text(getattr(doc, "excerpt", "")),
-        _safe_text(getattr(doc, "category", "")),
-        _safe_text(getattr(doc, "risk_type", "")),
-        " ".join(getattr(doc, "matched_keywords", []) or []),
-        " ".join(getattr(doc, "materialized_events", []) or []),
-        _safe_text(getattr(doc, "source_id", "")),
-        _safe_text(getattr(doc, "source_type", "")),
-        _safe_text(getattr(doc, "text", ""))[:5000],
+        title,
+        title,
+        excerpt,
+        focus,
+        " ".join(keywords[:10]),
+        " ".join(events[:8]),
+        f"{source_id} {source_type}".strip(),
+        body,
     ]
-    return " ".join(part for part in fragments if part).strip()
+    return [fragment for fragment in fragments if fragment]
 
 
-def _embedding_text(doc: Any) -> str:
-    fragments = [
-        _safe_text(getattr(doc, "title", "")),
-        _safe_text(getattr(doc, "excerpt", "")),
-        _safe_text(getattr(doc, "category", "")),
-        _safe_text(getattr(doc, "risk_type", "")),
-        " ".join(getattr(doc, "matched_keywords", []) or []),
-        " ".join(getattr(doc, "materialized_events", []) or []),
-        _safe_text(getattr(doc, "text", ""))[:2500],
-    ]
-    return " ".join(part for part in fragments if part).strip()
+def _document_text(doc: Any, report_type: str = "trend_mapping") -> str:
+    return " ".join(_representation_fragments(doc, report_type, embedding=False)).strip()
+
+
+def _embedding_text(doc: Any, report_type: str = "trend_mapping") -> str:
+    return " ".join(_representation_fragments(doc, report_type, embedding=True)).strip()
 
 
 def _document_source_kind(doc: Any) -> str:
@@ -545,11 +611,11 @@ def _match_taxonomy(doc: Any, report_type: str) -> list[dict[str, Any]]:
     categories = _taxonomy_categories(report_type)
     if not categories:
         fallback = _safe_text(getattr(doc, "risk_type", None) if report_type == "risk_mapping" else getattr(doc, "category", None))
-        return [{"name": fallback or ("Otros riesgos" if report_type == "risk_mapping" else "Innovacion general"), "score": 0.4, "matched_terms": []}]
+        return [{"name": fallback or ("Otros riesgos" if report_type == "risk_mapping" else "Innovacion general"), "score": 0.4, "matched_terms": [], "matched_fields": []}]
 
-    title = _normalize_text(_safe_text(getattr(doc, "title", "")))
-    excerpt = _normalize_text(_safe_text(getattr(doc, "excerpt", "")))
-    text = _normalize_text(_safe_text(getattr(doc, "text", ""))[:1800])
+    title = _normalize_text(_strip_editorial_boilerplate(_safe_text(getattr(doc, "title", "")), max_chars=220))
+    excerpt = _normalize_text(_strip_editorial_boilerplate(_safe_text(getattr(doc, "excerpt", "")), max_chars=420))
+    text = _normalize_text(_strip_editorial_boilerplate(_safe_text(getattr(doc, "text", "")), max_chars=1800))
     keywords = _normalize_text(" ".join(getattr(doc, "matched_keywords", []) or []))
     explicit = _normalize_text(_safe_text(getattr(doc, "risk_type", None) if report_type == "risk_mapping" else getattr(doc, "category", None)))
 
@@ -561,6 +627,8 @@ def _match_taxonomy(doc: Any, report_type: str) -> list[dict[str, Any]]:
             continue
         score = 0.0
         matched_terms: list[str] = []
+        matched_fields: set[str] = set()
+        category_tokens = set(_tokenize(name))
         for keyword in keywords_list:
             norm_kw = _normalize_text(keyword)
             if not norm_kw:
@@ -569,55 +637,84 @@ def _match_taxonomy(doc: Any, report_type: str) -> list[dict[str, Any]]:
             if norm_kw in explicit:
                 score += 3.2
                 matched = True
+                matched_fields.add("explicit")
             if norm_kw in keywords:
                 score += 2.8
                 matched = True
+                matched_fields.add("matched_keywords")
             if norm_kw in title:
                 score += 2.7
                 matched = True
+                matched_fields.add("title")
             if norm_kw in excerpt:
                 score += 1.8
                 matched = True
+                matched_fields.add("excerpt")
             if norm_kw in text:
                 score += 1.0
                 matched = True
+                matched_fields.add("body")
             if matched and norm_kw not in matched_terms:
                 matched_terms.append(norm_kw)
         if score > 0:
+            overlap = 0.0
+            if category_tokens:
+                overlap = len(category_tokens & set(_tokenize(" ".join(matched_terms)))) / len(category_tokens)
+            field_coverage = min(len(matched_fields) / 3.0, 1.0)
             results.append(
                 {
                     "name": name,
-                    "score": round(min(1.0, score / 8.0), 3),
+                    "score": round(min(1.0, (score / 8.2) + 0.12 * field_coverage + 0.08 * overlap), 3),
                     "matched_terms": matched_terms[:6],
+                    "matched_fields": sorted(matched_fields),
                     "sector_tags": list(category.get("sector_tags") or category.get("impact_areas") or []),
                     "capability_tags": list(category.get("capability_tags") or []),
                 }
             )
 
     if results:
-        results.sort(key=lambda item: (item["score"], len(item["matched_terms"])), reverse=True)
+        results.sort(key=lambda item: (item["score"], len(item["matched_terms"]), len(item.get("matched_fields") or [])), reverse=True)
         return results[:3]
 
     explicit_value = _safe_text(getattr(doc, "risk_type", None) if report_type == "risk_mapping" else getattr(doc, "category", None)).strip()
     if explicit_value:
-        return [{"name": explicit_value, "score": 0.45, "matched_terms": []}]
-    return [{"name": "Otros riesgos" if report_type == "risk_mapping" else "Innovacion general", "score": 0.35, "matched_terms": []}]
+        return [{"name": explicit_value, "score": 0.45, "matched_terms": [], "matched_fields": ["explicit"]}]
+    return [{"name": "Otros riesgos" if report_type == "risk_mapping" else "Innovacion general", "score": 0.35, "matched_terms": [], "matched_fields": []}]
 
 
 def _document_profile(doc: Any, report_type: str, window_months: int) -> DocumentProfile:
+    settings = _analytics_settings(report_type)
     doc_date = _document_date(doc)
     now = datetime.now(timezone.utc)
     window_days = max(window_months, 1) * 30
-    normalized_title = _normalize_text(_safe_text(getattr(doc, "title", "")))
-    normalized_excerpt = _normalize_text(_safe_text(getattr(doc, "excerpt", "")))
-    normalized_text = _normalize_text(_document_text(doc))
+    normalized_title = _normalize_text(_strip_editorial_boilerplate(_safe_text(getattr(doc, "title", "")), max_chars=220))
+    normalized_excerpt = _normalize_text(_strip_editorial_boilerplate(_safe_text(getattr(doc, "excerpt", "")), max_chars=420))
+    normalized_text = _normalize_text(_document_text(doc, report_type))
     normalized_keywords = _normalize_text(" ".join(getattr(doc, "matched_keywords", []) or []))
     age_days = max(0.0, (now - (doc_date or now)).total_seconds() / 86400.0)
     recency_signal = max(0.0, 1.0 - min(age_days / window_days, 1.0))
     taxonomy_matches = _match_taxonomy(doc, report_type)
     primary = taxonomy_matches[0] if taxonomy_matches else {"name": "", "score": 0.0}
-    duplicate_tokens = _tokenize(_safe_text(getattr(doc, "title", "")))[:8]
-    duplicate_signature = " ".join(sorted(set(duplicate_tokens))) or _safe_text(getattr(doc, "id", ""))
+    signature_limit = settings["duplicate_signature_terms"]
+    duplicate_tokens = (
+        _tokenize(normalized_title)[:signature_limit]
+        + _tokenize(normalized_excerpt)[: max(3, signature_limit // 2)]
+        + _tokenize(normalized_keywords)[:4]
+    )
+    ordered_signature: list[str] = []
+    seen_signature: set[str] = set()
+    for token in duplicate_tokens:
+        if token not in seen_signature:
+            seen_signature.add(token)
+            ordered_signature.append(token)
+        if len(ordered_signature) >= signature_limit:
+            break
+    signature_seed = " ".join(ordered_signature)
+    duplicate_signature = (
+        hashlib.sha1(signature_seed.encode("utf-8")).hexdigest()[:16]
+        if signature_seed
+        else _safe_text(getattr(doc, "id", ""))
+    )
     return DocumentProfile(
         document_id=str(getattr(doc, "id", getattr(doc, "hash", ""))),
         normalized_title=normalized_title,
@@ -660,8 +757,8 @@ def _select_hdbscan_params(document_count: int) -> tuple[int, int]:
     return min_cluster_size, min_samples
 
 
-def _build_lexical_features(documents: list[Any]) -> tuple[list[str], Any, np.ndarray, np.ndarray]:
-    corpus = [_document_text(doc) for doc in documents]
+def _build_lexical_features(documents: list[Any], report_type: str) -> tuple[list[str], Any, np.ndarray, np.ndarray]:
+    corpus = [_document_text(doc, report_type) for doc in documents]
     max_df = 0.42 if len(documents) >= 30 else 1.0
     min_df = 2 if len(documents) >= 60 else 1
     vectorizer = TfidfVectorizer(
@@ -707,7 +804,7 @@ def _embedding_cache_dir() -> Path:
     return Path("data") / "embeddings_cache" / "analytics"
 
 
-def _build_embedding_features(documents: list[Any]) -> tuple[np.ndarray | None, dict[str, Any]]:
+def _build_embedding_features(documents: list[Any], report_type: str) -> tuple[np.ndarray | None, dict[str, Any]]:
     metadata = {
         "feature_space": "tfidf_lexical",
         "embedding_provider": None,
@@ -719,7 +816,7 @@ def _build_embedding_features(documents: list[Any]) -> tuple[np.ndarray | None, 
         return None, metadata
 
     cfg = ApiConfig.load()
-    texts = [_embedding_text(doc) or _document_text(doc)[:2500] for doc in documents]
+    texts = [_embedding_text(doc, report_type) or _document_text(doc, report_type)[:2500] for doc in documents]
     metadata["embedding_attempted"] = True
 
     try:
@@ -923,11 +1020,12 @@ def _normalize_labels(labels: np.ndarray) -> np.ndarray:
     return np.asarray(normalized, dtype=int)
 
 
-def _eligible_cluster_indices(documents: list[Any]) -> list[int]:
+def _eligible_cluster_indices(documents: list[Any], report_type: str) -> list[int]:
+    min_relevance = _analytics_settings(report_type)["min_relevance_for_clustering"]
     return [
         index
         for index, doc in enumerate(documents)
-        if float(getattr(doc, "relevance_score", 0) or 0) >= _MIN_RELEVANCE_FOR_CLUSTERING
+        if float(getattr(doc, "relevance_score", 0) or 0) >= min_relevance
     ]
 
 
@@ -1005,9 +1103,10 @@ def _refine_labels_by_centroid_distance(
 def _assign_cluster_labels(
     features: np.ndarray,
     documents: list[Any],
+    report_type: str,
 ) -> tuple[np.ndarray, str, set[int]]:
     labels = np.full(len(documents), -1, dtype=int)
-    eligible_indices = _eligible_cluster_indices(documents)
+    eligible_indices = _eligible_cluster_indices(documents, report_type)
     if not eligible_indices:
         return labels, "relevance_gate", set()
 
@@ -1037,36 +1136,39 @@ def _cluster_taxonomy_matches(report_type: str, docs: list[Any], profiles: list[
     for doc, profile in zip(docs, profiles, strict=False):
         explicit = _document_category(doc, report_type)
         if explicit and explicit not in {"Otros temas", "Otros riesgos"}:
-            entry = counter.setdefault(explicit, {"name": explicit, "score": 0.0, "matched_terms": set(), "sector_tags": set(), "capability_tags": set()})
+            entry = counter.setdefault(explicit, {"name": explicit, "score": 0.0, "matched_terms": set(), "matched_fields": set(), "sector_tags": set(), "capability_tags": set()})
             entry["score"] += 0.6
+            entry["matched_fields"].add("explicit")
         for match in profile.taxonomy_matches:
             name = str(match.get("name") or "").strip()
             if not name:
                 continue
-            entry = counter.setdefault(name, {"name": name, "score": 0.0, "matched_terms": set(), "sector_tags": set(), "capability_tags": set()})
+            entry = counter.setdefault(name, {"name": name, "score": 0.0, "matched_terms": set(), "matched_fields": set(), "sector_tags": set(), "capability_tags": set()})
             entry["score"] += float(match.get("score") or 0.0)
             entry["matched_terms"].update(match.get("matched_terms") or [])
+            entry["matched_fields"].update(match.get("matched_fields") or [])
             entry["sector_tags"].update(match.get("sector_tags") or [])
             entry["capability_tags"].update(match.get("capability_tags") or [])
 
     matches: list[dict[str, Any]] = []
     for entry in counter.values():
         matches.append(
-            {
-                "name": entry["name"],
-                "score": round(min(1.0, entry["score"] / max(len(docs), 1)), 3),
-                "matched_terms": sorted(entry["matched_terms"])[:6],
-                "sector_tags": sorted(entry["sector_tags"])[:6],
-                "capability_tags": sorted(entry["capability_tags"])[:6],
-            }
-        )
+                {
+                    "name": entry["name"],
+                    "score": round(min(1.0, entry["score"] / max(len(docs), 1)), 3),
+                    "matched_terms": sorted(entry["matched_terms"])[:6],
+                    "matched_fields": sorted(entry["matched_fields"])[:5],
+                    "sector_tags": sorted(entry["sector_tags"])[:6],
+                    "capability_tags": sorted(entry["capability_tags"])[:6],
+                }
+            )
     matches.sort(key=lambda item: (item["score"], len(item["matched_terms"])), reverse=True)
     if matches:
         return matches[:3]
     fallback = _dominant_category_from_docs(report_type, docs)
     if fallback:
-        return [{"name": fallback, "score": 0.45, "matched_terms": []}]
-    return [{"name": "Otros riesgos" if report_type == "risk_mapping" else "Innovacion general", "score": 0.35, "matched_terms": []}]
+        return [{"name": fallback, "score": 0.45, "matched_terms": [], "matched_fields": ["explicit"]}]
+    return [{"name": "Otros riesgos" if report_type == "risk_mapping" else "Innovacion general", "score": 0.35, "matched_terms": [], "matched_fields": []}]
 
 
 def _candidate_title_phrases(docs: list[Any], limit: int = 8) -> list[str]:
@@ -1087,7 +1189,13 @@ def _candidate_title_phrases(docs: list[Any], limit: int = 8) -> list[str]:
     return _meaningful_terms(phrases, limit=limit)
 
 
-def _cluster_terms(matrix: Any, indices: list[int], feature_names: np.ndarray, docs: list[Any]) -> list[str]:
+def _cluster_terms(
+    matrix: Any,
+    indices: list[int],
+    feature_names: np.ndarray,
+    docs: list[Any],
+    profiles: list[DocumentProfile] | None = None,
+) -> list[str]:
     if not indices:
         return []
     row = np.asarray(matrix[indices].mean(axis=0)).ravel()
@@ -1112,6 +1220,17 @@ def _cluster_terms(matrix: Any, indices: list[int], feature_names: np.ndarray, d
             cleaned = _clean_term(_safe_text(keyword))
             if cleaned and not _is_generic_label_candidate(cleaned):
                 scores[cleaned] += 2.1
+
+    for profile in profiles or []:
+        for match in profile.taxonomy_matches:
+            match_weight = float(match.get("score") or 0.0)
+            for term in (match.get("matched_terms") or [])[:4]:
+                cleaned = _clean_term(_safe_text(term))
+                if cleaned and not _is_generic_label_candidate(cleaned):
+                    scores[cleaned] += 1.7 + match_weight
+            category_name = _clean_term(_safe_text(match.get("name")))
+            if category_name and not _is_generic_label_candidate(category_name):
+                scores[category_name] += 0.9 + match_weight
 
     selected: list[str] = []
     for term, _ in scores.most_common(30):
@@ -1147,9 +1266,9 @@ def _cluster_label(docs: list[Any], report_type: str, terms: list[str], category
         focus = descriptive_terms[0]
         if len(descriptive_terms) >= 2:
             focus = f"{descriptive_terms[0]} y {descriptive_terms[1]}"
-        if category not in {"Innovacion general", "Otros temas", "Otros riesgos"}:
-            return f"{category}: {focus}"[:72]
-        return focus[:72]
+        if _normalize_text(focus) != _normalize_text(category):
+            return focus[:72]
+        return f"{focus} {descriptive_terms[1]}"[:72] if len(descriptive_terms) >= 2 else focus[:72]
 
     phrases = _candidate_title_phrases(docs, limit=8)
     for phrase in phrases:
@@ -1157,15 +1276,11 @@ def _cluster_label(docs: list[Any], report_type: str, terms: list[str], category
             continue
         display = _display_term(phrase)
         if display and _normalize_text(display) != _normalize_text(category):
-            if category not in {"Innovacion general", "Otros temas", "Otros riesgos"}:
-                return f"{category}: {display}"[:72]
             return display[:72]
 
     if len(descriptive_terms) >= 2:
         return " / ".join(descriptive_terms[:2])[:72]
     if descriptive_terms:
-        if category not in {"Innovacion general", "Otros temas", "Otros riesgos"}:
-            return f"{descriptive_terms[0]} - {category}"[:72]
         return descriptive_terms[0][:72]
     if terms:
         fallback_terms = _display_terms(terms[:2], limit=2)
@@ -1174,6 +1289,32 @@ def _cluster_label(docs: list[Any], report_type: str, terms: list[str], category
         return category
     title = _safe_text(getattr(docs[0], "title", "")).strip()
     return title[:80] if title else "Cluster sin etiqueta"
+
+
+def _slugify(value: str, limit: int = 42) -> str:
+    tokens = _tokenize(value)
+    if not tokens:
+        return "cluster"
+    return "-".join(tokens[:6])[:limit].strip("-") or "cluster"
+
+
+def _cluster_identifier(
+    report_type: str,
+    category: str,
+    terms: list[str],
+    taxonomy_matches: list[dict[str, Any]],
+    docs: list[Any],
+) -> tuple[str, str]:
+    dominant_taxonomy = str((taxonomy_matches[0].get("name") if taxonomy_matches else category) or category)
+    seed_terms = [dominant_taxonomy]
+    seed_terms.extend(_meaningful_terms(terms, limit=4))
+    if len(seed_terms) <= 1:
+        seed_terms.extend(_candidate_title_phrases(docs, limit=3))
+    fingerprint_source = " | ".join(part for part in seed_terms if part)
+    fingerprint = hashlib.sha1(_normalize_text(fingerprint_source).encode("utf-8")).hexdigest()[:10]
+    prefix = "risk" if report_type == "risk_mapping" else "trend"
+    slug = _slugify(" ".join(seed_terms), limit=42)
+    return f"{prefix}-{slug}-{fingerprint}", fingerprint
 
 
 def _cluster_evidence_line(
@@ -1442,6 +1583,14 @@ def _maturity_from_score(score: float) -> str:
     return "plateau_of_productivity"
 
 
+def _score_band(score: float) -> str:
+    if score >= 70:
+        return "high"
+    if score >= 40:
+        return "medium"
+    return "low"
+
+
 def _hype_stage(
     report_type: str,
     *,
@@ -1641,7 +1790,9 @@ def generate_report_analysis(
     window_months: int,
 ) -> dict[str, Any]:
     generated_at = datetime.now(timezone.utc).isoformat()
-    methodology_version = "analytics_methodology_v3"
+    methodology_version = "analytics_methodology_v4"
+    analytics_settings = _analytics_settings(report_type)
+    min_relevance = analytics_settings["min_relevance_for_clustering"]
 
     if not documents:
         empty_summary = {
@@ -1658,7 +1809,7 @@ def generate_report_analysis(
         }
         return {
             "generated_at": generated_at,
-            "summary": empty_summary,
+        "summary": empty_summary,
             "meta": {
                 "generated_at": generated_at,
                 "total_filtered": 0,
@@ -1683,40 +1834,53 @@ def generate_report_analysis(
             "quality_checks": {
                 "methodology_version": methodology_version,
                 "cluster_coherence_avg": 0.0,
+                "cluster_quality_avg": 0.0,
+                "cluster_coverage": 0.0,
+                "noise_ratio": 0.0,
                 "unclustered_ratio": 0.0,
                 "taxonomy_coverage": 0.0,
                 "keyword_usefulness_ratio": 0.0,
+                "weak_signal_clusters": 0,
+                "low_quality_clusters": 0,
+                "duplicate_pressure_avg": 0.0,
+                "stability_score_avg": 0.0,
             },
             "filters_metadata": {
                 "categories": [],
                 "source_types": [],
                 "sources": [],
-                "maturity_stages": list(_GARTNER_STAGES),
-                "hype_stages": list(_HYPE_STAGE_ORDER),
-                "recommended_sort_orders": ["impact", "momentum", "novelty", "size", "quality"],
-            },
+                    "maturity_stages": list(_GARTNER_STAGES),
+                    "hype_stages": list(_HYPE_STAGE_ORDER),
+                    "recommended_sort_orders": ["impact", "momentum", "novelty", "size", "quality"],
+                    "signal_states": [],
+                    "comparative_statuses": [],
+                    "severity_bands": [],
+                    "novelty_bands": [],
+                },
             "insights": ["No hay documentos persistidos para la ventana solicitada."],
             "executive_summary": "No hay evidencia suficiente para construir un mapa analitico.",
             "recommendations": ["Ejecutar una nueva corrida de ingesta antes de recalcular el reporte."],
             "risk_signals": [],
             "parameters": {
                 "window_months": window_months,
-                "cluster_method": "none",
-                "vectorizer": "tfidf_ngram_v1",
-                "projection_method": "none",
-                "feature_space": "none",
-                "representation_mode": "none",
-                "methodology_version": methodology_version,
-            },
-        }
+                    "cluster_method": "none",
+                    "vectorizer": "tfidf_ngram_v1",
+                    "projection_method": "none",
+                    "feature_space": "none",
+                    "representation_mode": "none",
+                    "methodology_version": methodology_version,
+                    "lineage_similarity_threshold": analytics_settings["lineage_similarity_threshold"],
+                    "full_reclustering_policy": analytics_settings["full_reclustering_policy"],
+                },
+            }
 
     profiles = [_document_profile(doc, report_type, window_months) for doc in documents]
     duplicate_counts = Counter(profile.duplicate_signature for profile in profiles)
     profile_by_id = {profile.document_id: profile for profile in profiles}
 
-    _, matrix, feature_names, lexical_features = _build_lexical_features(documents)
+    _, matrix, feature_names, lexical_features = _build_lexical_features(documents, report_type)
     auxiliary_features, auxiliary_feature_names = _build_auxiliary_features(profiles, report_type)
-    embedding_features, embedding_meta = _build_embedding_features(documents)
+    embedding_features, embedding_meta = _build_embedding_features(documents, report_type)
     clustering_features, representation_mode = _combine_feature_spaces(
         lexical_features,
         auxiliary_features,
@@ -1724,11 +1888,12 @@ def generate_report_analysis(
     )
     low_relevance_indices = {
         index for index, doc in enumerate(documents)
-        if float(getattr(doc, "relevance_score", 0) or 0) < _MIN_RELEVANCE_FOR_CLUSTERING
+        if float(getattr(doc, "relevance_score", 0) or 0) < min_relevance
     }
     labels, cluster_method, centroid_pruned_indices = _assign_cluster_labels(
         clustering_features,
         documents,
+        report_type,
     )
     coordinates, projection_method = _project_coordinates(clustering_features)
 
@@ -1765,7 +1930,7 @@ def generate_report_analysis(
         indices = grouped_indices[label_index]
         docs = [documents[index] for index in indices]
         local_profiles = [profiles[index] for index in indices]
-        terms = _cluster_terms(matrix, indices, feature_names, docs)
+        terms = _cluster_terms(matrix, indices, feature_names, docs, profiles=local_profiles)
         taxonomy_matches = _cluster_taxonomy_matches(report_type, docs, local_profiles)
         category = _heuristic_category(report_type, terms, docs, local_profiles)
         label = _cluster_label(docs, report_type, terms, category)
@@ -1818,7 +1983,14 @@ def generate_report_analysis(
             novelty_components,
         )
         novelty_score = novelty_breakdown["score"]
-        weak_signal_flag = len(docs) <= 3 and novelty_score >= 60 and (momentum_score >= 45 or avg_score >= 70)
+        weak_signal_flag = (
+            len(docs) <= analytics_settings["weak_signal_max_documents"]
+            and novelty_score >= analytics_settings["weak_signal_novelty_min"]
+            and (
+                momentum_score >= analytics_settings["weak_signal_momentum_min"]
+                or avg_score >= analytics_settings["weak_signal_avg_score_min"]
+            )
+        )
 
         if report_type == "risk_mapping":
             severity_breakdown = _build_breakdown(
@@ -1922,7 +2094,7 @@ def generate_report_analysis(
             uncertainty_score=uncertainty_score,
             weak_signal_flag=weak_signal_flag,
         )
-        cluster_id = f"{report_type}_cluster_{label_index + 1}"
+        cluster_id, cluster_fingerprint = _cluster_identifier(report_type, category, terms, taxonomy_matches, docs)
         cluster_x = round(float(np.mean([coordinates[index][0] for index in indices])), 3)
         cluster_y = round(float(np.mean([coordinates[index][1] for index in indices])), 3)
         top_docs = _top_documents(docs, local_profiles)
@@ -2002,6 +2174,7 @@ def generate_report_analysis(
             growth_ratio=growth_ratio,
             focus_terms=focus_terms,
         )
+        signal_state = _cluster_signal_state(len(docs), novelty, growth_ratio)
         strategic_readout = _cluster_strategic_readout(
             report_type=report_type,
             label=label,
@@ -2019,13 +2192,18 @@ def generate_report_analysis(
         )
         cluster_payload = {
             "cluster_id": cluster_id,
+            "lineage_id": cluster_id,
+            "cluster_fingerprint": cluster_fingerprint,
+            "history_depth": 1,
             "label": label,
-            "subtitle": f"{dominant_taxonomy} | {_cluster_signal_state(len(docs), novelty, growth_ratio)} | {focus_text}",
+            "subtitle": f"{dominant_taxonomy} | {signal_state} | {focus_text}",
             "category": category,
             "summary": summary,
             "rationale": (
-                f"Etiqueta construida con taxonomia dominante {dominant_taxonomy}, "
-                f"foco en {focus_text or 'N/D'} y documentos representativos de mayor score."
+                f"Etiqueta construida desde taxonomia dominante {dominant_taxonomy}, "
+                f"terminos centroidales {', '.join(_display_terms(terms, limit=3)) or 'N/D'}, "
+                f"campos taxonomicos {', '.join(taxonomy_matches[0].get('matched_fields') or []) if taxonomy_matches else 'N/D'} "
+                f"y documentos representativos de mayor score."
             ),
             "keywords": _display_terms(terms, limit=6) or [label],
             "top_keywords": _display_terms(terms, limit=6) or [label],
@@ -2039,16 +2217,18 @@ def generate_report_analysis(
             "horizon_score": round(maturity_score / 100.0, 3),
             "momentum_score": momentum_score,
             "novelty_score": novelty_score,
+            "novelty_band": _score_band(novelty_score),
             "uncertainty_score": uncertainty_score,
             "persistence_score": persistence_score,
             "risk_severity": risk_severity if report_type == "risk_mapping" else None,
+            "severity_band": _score_band(risk_severity) if report_type == "risk_mapping" else None,
             "maturity_stage": maturity_stage,
             "hype_stage": hype_stage,
             "direction": direction,
             "growth_ratio": round(growth_ratio, 2),
             "acceleration_ratio": round(acceleration_ratio, 2),
             "weak_signal_flag": weak_signal_flag,
-            "signal_state": _cluster_signal_state(len(docs), novelty, growth_ratio),
+            "signal_state": signal_state,
             "taxonomy_matches": taxonomy_matches,
             "cluster_quality": {
                 "score": quality_score,
@@ -2063,6 +2243,7 @@ def generate_report_analysis(
             "novelty_score_breakdown": novelty_breakdown,
             "uncertainty_score_breakdown": uncertainty_breakdown,
             "risk_severity_breakdown": severity_breakdown if report_type == "risk_mapping" else None,
+            "persistence_score_breakdown": persistence_breakdown if report_type == "risk_mapping" else None,
             "hull_polygon": _cluster_hull([(float(coordinates[index][0]), float(coordinates[index][1])) for index in indices]),
             "coords": {"x": cluster_x, "y": cluster_y},
             "articles": [str(getattr(doc, "id", getattr(doc, "hash", ""))) for doc in docs],
@@ -2076,14 +2257,16 @@ def generate_report_analysis(
             "insight_evidence": [
                 {"type": "coverage", "detail": f"{len(docs)} documentos, {source_count} fuentes, {temporal['active_months']} meses activos"},
                 {"type": "tempo", "detail": f"direccion {_direction_label(direction)}, crecimiento {round(growth_ratio * 100)}%, aceleracion {round(acceleration_ratio * 100)}%"},
-                {"type": "taxonomy", "detail": f"dominante {dominant_taxonomy}"},
+                {"type": "taxonomy", "detail": f"dominante {dominant_taxonomy}; campos {', '.join(taxonomy_matches[0].get('matched_fields') or ['taxonomia']) if taxonomy_matches else 'sin match fuerte'}"},
                 {"type": "quality", "detail": f"coherencia {round(coherence * 100)} / calidad {round(quality_score)}"},
+                {"type": "duplicates", "detail": f"{round(duplicate_ratio * 100)}% de presion por near-duplicates; {max(1, len({profile.duplicate_signature for profile in local_profiles}))} documentos efectivos"},
             ],
             "executive_takeaway": strategic_readout,
             "what_is_happening": summary,
             "why_it_matters": (
                 f"Importa por su efecto potencial sobre {', '.join(impact_targets[:3])}, respaldado por {len(docs)} documentos, "
-                f"{source_count} fuentes y senales como {focus_text}."
+                f"{source_count} fuentes, coherencia {round(coherence * 100)} y senales como {focus_text}. "
+                f"El cluster muestra novedad {round(novelty_score)} y estado {signal_state}."
             ),
             "decision_prompt": _cluster_recommendation(
                 {
@@ -2157,10 +2340,12 @@ def generate_report_analysis(
     unclustered_count = len(unclustered_indices)
     clustered_count = len(documents) - unclustered_count
     unclustered_share = round((unclustered_count / max(len(documents), 1)) * 100, 1)
+    cluster_coverage = round((clustered_count / max(len(documents), 1)) * 100, 1)
     taxonomy_coverage = round(sum(profile.primary_taxonomy_score for profile in profiles) / max(len(profiles), 1), 3)
     keyword_usefulness_ratio = round(min(1.0, len({term for term in keyword_pool if term not in _configured_generic_terms()}) / max(sum(keyword_pool.values()), 1)), 3)
     weak_signal_clusters = [cluster for cluster in clusters if cluster["weak_signal_flag"]][:4]
     quality_avg = round(float(np.mean(quality_scores)) if quality_scores else 0.0, 1)
+    duplicate_pressure_avg = round(float(np.mean([cluster["cluster_quality"]["duplicate_pressure"] for cluster in clusters])) if clusters else 0.0, 1)
 
     insights = [_top_level_insight(cluster, report_type) for cluster in clusters[:4]]
     if weak_signal_clusters:
@@ -2173,7 +2358,7 @@ def generate_report_analysis(
         f"El snapshot concentra {len(clusters)} clusters utiles, {clustered_count} documentos agrupados y {unclustered_count} sin cluster. "
         f"Los temas/riesgos mas relevantes son {', '.join(dominant_labels[:3]) or 'dispersos'}, con calidad media {quality_avg}/100, "
         f"cobertura taxonomica {round(taxonomy_coverage * 100)}% y silhouette {silhouette}. "
-        f"La clusterizacion excluye relevancia < {_MIN_RELEVANCE_FOR_CLUSTERING:.0f} y envia a sin cluster los registros alejados de centroides."
+        f"La clusterizacion excluye relevancia < {min_relevance:.0f} y envia a sin cluster los registros alejados de centroides."
     )
 
     recommendations = []
@@ -2277,11 +2462,15 @@ def generate_report_analysis(
         "methodology_version": methodology_version,
         "cluster_coherence_avg": round(float(np.mean([cluster["cluster_quality"]["coherence"] for cluster in clusters])) if clusters else 0.0, 1),
         "cluster_quality_avg": quality_avg,
+        "cluster_coverage": cluster_coverage,
+        "noise_ratio": unclustered_share,
         "unclustered_ratio": unclustered_share,
         "taxonomy_coverage": round(taxonomy_coverage * 100, 1),
         "keyword_usefulness_ratio": round(keyword_usefulness_ratio * 100, 1),
         "weak_signal_clusters": len(weak_signal_clusters),
         "low_quality_clusters": len([cluster for cluster in clusters if cluster["cluster_quality"]["score"] < 55]),
+        "duplicate_pressure_avg": duplicate_pressure_avg,
+        "stability_score_avg": 0.0,
     }
 
     filters_metadata = {
@@ -2290,6 +2479,10 @@ def generate_report_analysis(
         "sources": [source for source, _ in source_mix.most_common(20)],
         "maturity_stages": list(_GARTNER_STAGES),
         "hype_stages": list(_HYPE_STAGE_ORDER),
+        "signal_states": sorted({cluster["signal_state"] for cluster in clusters}),
+        "comparative_statuses": ["new", "accelerating", "cooling", "stable"],
+        "severity_bands": ["low", "medium", "high"] if report_type == "risk_mapping" else [],
+        "novelty_bands": ["low", "medium", "high"],
         "recommended_sort_orders": ["impact", "momentum", "novelty", "size", "quality"],
         "date_range": {
             "start": min((_document_date(doc) for doc in documents if _document_date(doc) is not None), default=None),
@@ -2324,14 +2517,14 @@ def generate_report_analysis(
         "methodology": {
             "methodology_version": methodology_version,
             "representation": {
-                "document_text": "titulo + excerpt + texto normalizado + keywords + categoria/risk_type + metadata de fuente",
+                "document_text": "titulo ponderado + excerpt depurado + cuerpo sin boilerplate + keywords + categoria/risk_type + metadata de fuente",
                 "feature_space": representation_mode,
                 "embedding_usage": embedding_meta["feature_space"],
                 "auxiliary_features": auxiliary_feature_names,
             },
             "clustering": {"cluster_method": cluster_method, "projection_method": projection_method, "noise_label": "sin_cluster"},
             "clustering_constraints": {
-                "min_relevance_for_clustering": _MIN_RELEVANCE_FOR_CLUSTERING,
+                "min_relevance_for_clustering": min_relevance,
                 "centroid_distance_validation": "enabled",
             },
             "scoring": {
@@ -2340,6 +2533,10 @@ def generate_report_analysis(
                 "momentum": "crecimiento + aceleracion + recencia + visibilidad",
                 "novelty": "recencia + baja recurrencia + exploracion",
                 "uncertainty": "exploracion + baja coherencia + baja autoridad + duplicidad",
+            },
+            "tracking": {
+                "lineage_similarity_threshold": analytics_settings["lineage_similarity_threshold"],
+                "full_reclustering_policy": analytics_settings["full_reclustering_policy"],
             },
         },
         "parameters": {
@@ -2354,7 +2551,7 @@ def generate_report_analysis(
             "embedding_attempted": embedding_meta["embedding_attempted"],
             "embedding_error": embedding_meta["embedding_error"],
             "noise_label": "sin_cluster",
-            "min_relevance_for_clustering": _MIN_RELEVANCE_FOR_CLUSTERING,
+            "min_relevance_for_clustering": min_relevance,
             "clustered_documents": clustered_count,
             "unclustered_documents": unclustered_count,
             "unclustered_low_relevance_documents": len(low_relevance_indices),
@@ -2363,6 +2560,9 @@ def generate_report_analysis(
             "auxiliary_feature_count": len(auxiliary_feature_names),
             "taxonomy_version": _taxonomy_config().get("version"),
             "methodology_version": methodology_version,
+            "lineage_similarity_threshold": analytics_settings["lineage_similarity_threshold"],
+            "reuse_previous_cluster_ids": analytics_settings["reuse_previous_cluster_ids"],
+            "full_reclustering_policy": analytics_settings["full_reclustering_policy"],
             **(
                 {
                     "hdbscan_min_cluster_size": _select_hdbscan_params(len(documents))[0],

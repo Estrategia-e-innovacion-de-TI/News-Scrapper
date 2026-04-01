@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../../../../../config/api.token';
 import { DARK_THEME, LifecycleStage, RiskmapCluster, RiskmapData } from '../../../../../domain/noticias/models';
 
 type RiskSort = 'severity' | 'momentum' | 'persistence' | 'impact' | 'novelty' | 'size';
+type RiskBand = 'low' | 'medium' | 'high';
 
 @Component({
   selector: 'app-riskmap',
@@ -32,13 +33,19 @@ export class RiskmapComponent implements OnInit {
   readonly selectedCluster = signal<RiskmapCluster | null>(null);
   readonly filterCategory = signal<string | null>(null);
   readonly filterSourceType = signal<string | null>(null);
+  readonly filterMaturityStage = signal<string | null>(null);
   readonly filterHypeStage = signal<LifecycleStage | null>(null);
+  readonly filterSeverityBand = signal<RiskBand | null>(null);
+  readonly filterNoveltyBand = signal<RiskBand | null>(null);
   readonly weakSignalsOnly = signal(false);
   readonly sortBy = signal<RiskSort>('severity');
 
   readonly categories = computed(() => this.snapshot()?.filters_metadata?.categories ?? [...new Set((this.snapshot()?.clusters ?? []).map((cluster) => cluster.category))]);
   readonly sourceTypes = computed(() => this.snapshot()?.filters_metadata?.source_types ?? [...new Set((this.snapshot()?.documents ?? []).map((doc) => doc.source_type))]);
+  readonly maturityStages = computed(() => this.snapshot()?.filters_metadata?.maturity_stages ?? [...new Set((this.snapshot()?.clusters ?? []).map((cluster) => cluster.maturity_stage))]);
   readonly hypeStages = computed(() => this.snapshot()?.filters_metadata?.hype_stages ?? [...new Set((this.snapshot()?.clusters ?? []).map((cluster) => cluster.hype_stage))]);
+  readonly severityBands = computed<RiskBand[]>(() => ((this.snapshot()?.filters_metadata?.severity_bands as RiskBand[] | undefined) ?? ['low', 'medium', 'high']));
+  readonly noveltyBands = computed<RiskBand[]>(() => ((this.snapshot()?.filters_metadata?.novelty_bands as RiskBand[] | undefined) ?? ['low', 'medium', 'high']));
   readonly taxonomyBreakdown = computed(() => this.snapshot()?.taxonomy_breakdown ?? []);
   readonly sourceMix = computed(() => (this.snapshot()?.charts?.['source_mix'] as Array<{ source: string; count: number }> | undefined) ?? []);
   readonly monthlyVolume = computed(() => (this.snapshot()?.charts?.['monthly_volume'] as Array<{ bucket: string; count: number }> | undefined) ?? []);
@@ -49,7 +56,10 @@ export class RiskmapComponent implements OnInit {
     if (!data) return [];
     const items = data.clusters.filter((cluster) => {
       if (this.filterCategory() && cluster.category !== this.filterCategory()) return false;
+      if (this.filterMaturityStage() && cluster.maturity_stage !== this.filterMaturityStage()) return false;
       if (this.filterHypeStage() && cluster.hype_stage !== this.filterHypeStage()) return false;
+      if (this.filterSeverityBand() && cluster.severity_band !== this.filterSeverityBand()) return false;
+      if (this.filterNoveltyBand() && cluster.novelty_band !== this.filterNoveltyBand()) return false;
       if (this.weakSignalsOnly() && !cluster.weak_signal_flag) return false;
       if (this.filterSourceType()) {
         const hasSource = data.documents.some((doc) => doc.cluster_id === cluster.cluster_id && doc.source_type === this.filterSourceType());
@@ -95,7 +105,10 @@ export class RiskmapComponent implements OnInit {
     const tags: string[] = [];
     if (this.filterCategory()) tags.push(`Categoria: ${this.filterCategory()}`);
     if (this.filterSourceType()) tags.push(`Fuente: ${this.filterSourceType()}`);
+    if (this.filterMaturityStage()) tags.push(`Madurez: ${this.stageLabel(this.filterMaturityStage()!)}`);
     if (this.filterHypeStage()) tags.push(`Hype: ${this.stageLabel(this.filterHypeStage()!)}`);
+    if (this.filterSeverityBand()) tags.push(`Severidad: ${this.filterSeverityBand()}`);
+    if (this.filterNoveltyBand()) tags.push(`Novedad: ${this.filterNoveltyBand()}`);
     if (this.weakSignalsOnly()) tags.push('Solo weak signals');
     tags.push(`Orden: ${this.sortBy()}`);
     return tags;
@@ -169,9 +182,12 @@ export class RiskmapComponent implements OnInit {
     if (!cluster) return [];
     return [
       { label: 'Severidad', score: cluster.risk_severity_breakdown?.score ?? 0, formula: cluster.risk_severity_breakdown?.formula ?? '' },
+      { label: 'Persistencia', score: cluster.persistence_score_breakdown?.score ?? cluster.persistence_score ?? 0, formula: cluster.persistence_score_breakdown?.formula ?? '' },
       { label: 'Impacto', score: cluster.impact_score_breakdown.score, formula: cluster.impact_score_breakdown.formula },
       { label: 'Madurez', score: cluster.maturity_score_breakdown.score, formula: cluster.maturity_score_breakdown.formula },
       { label: 'Momentum', score: cluster.momentum_score_breakdown.score, formula: cluster.momentum_score_breakdown.formula },
+      { label: 'Novedad', score: cluster.novelty_score_breakdown.score, formula: cluster.novelty_score_breakdown.formula },
+      { label: 'Incertidumbre', score: cluster.uncertainty_score_breakdown.score, formula: cluster.uncertainty_score_breakdown.formula },
     ];
   }
 
@@ -181,14 +197,20 @@ export class RiskmapComponent implements OnInit {
 
   setFilterCategory(value: string | null): void { this.filterCategory.set(value); this.syncSelectedCluster(); }
   setFilterSourceType(value: string | null): void { this.filterSourceType.set(value); this.syncSelectedCluster(); }
+  setFilterMaturityStage(value: string | null): void { this.filterMaturityStage.set(value); this.syncSelectedCluster(); }
   setFilterHypeStage(value: LifecycleStage | null): void { this.filterHypeStage.set(value); this.syncSelectedCluster(); }
+  setFilterSeverityBand(value: RiskBand | null): void { this.filterSeverityBand.set(value); this.syncSelectedCluster(); }
+  setFilterNoveltyBand(value: RiskBand | null): void { this.filterNoveltyBand.set(value); this.syncSelectedCluster(); }
   setWeakSignalsOnly(value: boolean): void { this.weakSignalsOnly.set(value); this.syncSelectedCluster(); }
   setSortBy(value: RiskSort): void { this.sortBy.set(value); this.syncSelectedCluster(); }
 
   clearFilters(): void {
     this.filterCategory.set(null);
     this.filterSourceType.set(null);
+    this.filterMaturityStage.set(null);
     this.filterHypeStage.set(null);
+    this.filterSeverityBand.set(null);
+    this.filterNoveltyBand.set(null);
     this.weakSignalsOnly.set(false);
     this.sortBy.set('severity');
     this.syncSelectedCluster();
@@ -196,6 +218,7 @@ export class RiskmapComponent implements OnInit {
 
   onSelectValue(event: Event): string | null { return (event.target as HTMLSelectElement).value || null; }
   onStageValue(event: Event): LifecycleStage | null { return ((event.target as HTMLSelectElement).value as LifecycleStage) || null; }
+  onBandValue(event: Event): RiskBand | null { return ((event.target as HTMLSelectElement).value as RiskBand) || null; }
   onSortValue(event: Event): RiskSort { return (event.target as HTMLSelectElement).value as RiskSort; }
   onCheckboxValue(event: Event): boolean { return (event.target as HTMLInputElement).checked; }
 

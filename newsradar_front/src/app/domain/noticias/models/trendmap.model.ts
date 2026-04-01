@@ -31,6 +31,7 @@ export interface TaxonomyMatch {
   name: string;
   score: number;
   matched_terms: string[];
+  matched_fields?: string[];
   sector_tags?: string[];
   capability_tags?: string[];
 }
@@ -50,29 +51,45 @@ export interface InsightEvidence {
 
 export interface ComparativeClusterSignal {
   cluster_id: string;
+  lineage_id?: string;
   matched_previous_cluster: string | null;
+  previous_label?: string | null;
+  history_depth?: number;
   status: 'new' | 'accelerating' | 'cooling' | 'stable';
   delta_documents: number;
   delta_impact: number;
   delta_momentum: number;
   similarity: number;
+  stability_score?: number;
 }
 
 export interface ComparativeSignals {
   previous_snapshot_available: boolean;
   summary: string;
   clusters: ComparativeClusterSignal[];
+  matched_clusters?: number;
+  new_clusters?: number;
+  accelerating_clusters?: number;
+  cooling_clusters?: number;
+  stable_clusters?: number;
+  stability_score_avg?: number;
 }
 
 export interface QualityChecks {
   methodology_version: string;
   cluster_coherence_avg: number;
   cluster_quality_avg: number;
+  cluster_coverage?: number;
+  noise_ratio?: number;
   unclustered_ratio: number;
   taxonomy_coverage: number;
   keyword_usefulness_ratio: number;
   weak_signal_clusters: number;
   low_quality_clusters: number;
+  duplicate_pressure_avg?: number;
+  stability_score_avg?: number;
+  lineage_reused_clusters?: number;
+  new_cluster_ratio?: number;
 }
 
 export interface FiltersMetadata {
@@ -81,6 +98,10 @@ export interface FiltersMetadata {
   sources: string[];
   maturity_stages: HypeStage[];
   hype_stages: LifecycleStage[];
+  signal_states?: string[];
+  comparative_statuses?: Array<'new' | 'accelerating' | 'cooling' | 'stable'>;
+  severity_bands?: string[];
+  novelty_bands?: string[];
   recommended_sort_orders: string[];
   date_range?: {
     start: string | null;
@@ -106,6 +127,7 @@ export interface ClusterCardSummary {
   maturity_score: number;
   momentum_score: number;
   novelty_score: number;
+  comparative_signal?: ComparativeClusterSignal;
   hype_stage: LifecycleStage;
   weak_signal_flag: boolean;
   item_count: number;
@@ -202,9 +224,12 @@ export interface TrendmapCluster {
   horizon_score: number;
   momentum_score: number;
   novelty_score: number;
+  novelty_band?: string | null;
   uncertainty_score: number;
   persistence_score?: number;
+  persistence_score_breakdown?: ScoreBreakdown | null;
   risk_severity?: number | null;
+  severity_band?: string | null;
   maturity_stage: HypeStage | string;
   hype_stage: LifecycleStage;
   weak_signal_flag: boolean;
@@ -222,6 +247,9 @@ export interface TrendmapCluster {
   risk_severity_breakdown?: ScoreBreakdown | null;
   hull_polygon: [number, number][];
   coords: { x: number; y: number };
+  lineage_id?: string;
+  cluster_fingerprint?: string;
+  history_depth?: number;
   articles: string[];
   top_documents: TrendmapArticle[];
   representative_documents: TrendmapArticle[];
