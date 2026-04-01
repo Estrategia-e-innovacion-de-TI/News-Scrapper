@@ -136,6 +136,54 @@ const SORT_OPTIONS: SortOption[] = [
 
           <label class="grid gap-1">
             <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+              Estado de senal
+            </span>
+            <select
+              class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+              [value]="filterSignalState() ?? ''"
+              (change)="onSignalStateChange($event)"
+            >
+              <option value="">Todos</option>
+              @for (item of signalStates(); track item) {
+                <option [value]="item">{{ item }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="grid gap-1">
+            <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+              Comparativo
+            </span>
+            <select
+              class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+              [value]="filterComparativeStatus() ?? ''"
+              (change)="onComparativeStatusChange($event)"
+            >
+              <option value="">Todos</option>
+              @for (item of comparativeStatuses(); track item) {
+                <option [value]="item">{{ item }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="grid gap-1">
+            <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+              Banda de novedad
+            </span>
+            <select
+              class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+              [value]="filterNoveltyBand() ?? ''"
+              (change)="onNoveltyBandChange($event)"
+            >
+              <option value="">Todas</option>
+              @for (item of noveltyBands(); track item) {
+                <option [value]="item">{{ item }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="grid gap-1">
+            <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
               Orden
             </span>
             <select
@@ -316,6 +364,9 @@ export class TrendmapSidebarComponent {
   readonly filterSourceType = input<string | null>(null);
   readonly filterMaturityStage = input<string | null>(null);
   readonly filterHypeStage = input<LifecycleStage | null>(null);
+  readonly filterSignalState = input<string | null>(null);
+  readonly filterComparativeStatus = input<'new' | 'accelerating' | 'cooling' | 'stable' | null>(null);
+  readonly filterNoveltyBand = input<string | null>(null);
   readonly weakSignalsOnly = input(false);
   readonly sortBy = input<ClusterSort>('impact');
   readonly qualityChecks = input<QualityChecks | null>(null);
@@ -325,6 +376,9 @@ export class TrendmapSidebarComponent {
   readonly sourceTypeChanged = output<string | null>();
   readonly maturityStageChanged = output<string | null>();
   readonly hypeStageChanged = output<LifecycleStage | null>();
+  readonly signalStateChanged = output<string | null>();
+  readonly comparativeStatusChanged = output<'new' | 'accelerating' | 'cooling' | 'stable' | null>();
+  readonly noveltyBandChanged = output<string | null>();
   readonly weakSignalsChanged = output<boolean>();
   readonly sortChanged = output<ClusterSort>();
   readonly clearRequested = output<void>();
@@ -350,6 +404,18 @@ export class TrendmapSidebarComponent {
 
   readonly hypeStages = computed(
     () => this.filtersMetadata()?.hype_stages ?? [],
+  );
+
+  readonly signalStates = computed(
+    () => this.filtersMetadata()?.signal_states ?? [],
+  );
+
+  readonly comparativeStatuses = computed(
+    () => this.filtersMetadata()?.comparative_statuses ?? [],
+  );
+
+  readonly noveltyBands = computed(
+    () => this.filtersMetadata()?.novelty_bands ?? [],
   );
 
   onClusterClick(cluster: TrendmapCluster): void {
@@ -379,6 +445,21 @@ export class TrendmapSidebarComponent {
 
   onWeakSignalsChange(event: Event): void {
     this.weakSignalsChanged.emit((event.target as HTMLInputElement).checked);
+  }
+
+  onSignalStateChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.signalStateChanged.emit(value || null);
+  }
+
+  onComparativeStatusChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as 'new' | 'accelerating' | 'cooling' | 'stable' | '';
+    this.comparativeStatusChanged.emit(value || null);
+  }
+
+  onNoveltyBandChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.noveltyBandChanged.emit(value || null);
   }
 
   onSortChange(event: Event): void {

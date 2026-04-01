@@ -27,6 +27,9 @@ export class TrendmapSignalService {
   readonly filterSourceType = signal<string | null>(null);
   readonly filterMaturityStage = signal<string | null>(null);
   readonly filterHypeStage = signal<LifecycleStage | null>(null);
+  readonly filterSignalState = signal<string | null>(null);
+  readonly filterComparativeStatus = signal<'new' | 'accelerating' | 'cooling' | 'stable' | null>(null);
+  readonly filterNoveltyBand = signal<string | null>(null);
   readonly weakSignalsOnly = signal(false);
   readonly sortBy = signal<ClusterSort>('impact');
 
@@ -43,6 +46,9 @@ export class TrendmapSignalService {
     const category = this.filterCategory();
     const maturityStage = this.filterMaturityStage();
     const hypeStage = this.filterHypeStage();
+    const signalState = this.filterSignalState();
+    const comparativeStatus = this.filterComparativeStatus();
+    const noveltyBand = this.filterNoveltyBand();
     const weakOnly = this.weakSignalsOnly();
     const sortBy = this.sortBy();
 
@@ -50,6 +56,9 @@ export class TrendmapSignalService {
       if (category && cluster.category !== category) return false;
       if (maturityStage && cluster.maturity_stage !== maturityStage) return false;
       if (hypeStage && cluster.hype_stage !== hypeStage) return false;
+      if (signalState && cluster.signal_state !== signalState) return false;
+      if (comparativeStatus && cluster.comparative_signal?.status !== comparativeStatus) return false;
+      if (noveltyBand && cluster.novelty_band !== noveltyBand) return false;
       if (weakOnly && !cluster.weak_signal_flag) return false;
       return true;
     });
@@ -113,6 +122,9 @@ export class TrendmapSignalService {
     if (this.filterSourceType()) active.push(`Fuente: ${this.filterSourceType()}`);
     if (this.filterMaturityStage()) active.push(`Madurez: ${this.filterMaturityStage()}`);
     if (this.filterHypeStage()) active.push(`Hype: ${this.filterHypeStage()}`);
+    if (this.filterSignalState()) active.push(`Estado: ${this.filterSignalState()}`);
+    if (this.filterComparativeStatus()) active.push(`Comparativo: ${this.filterComparativeStatus()}`);
+    if (this.filterNoveltyBand()) active.push(`Novedad: ${this.filterNoveltyBand()}`);
     if (this.weakSignalsOnly()) active.push('Solo weak signals');
     active.push(`Orden: ${this.sortBy()}`);
     return active;
@@ -169,6 +181,21 @@ export class TrendmapSignalService {
     this.syncSelectedCluster();
   }
 
+  setFilterSignalState(state: string | null): void {
+    this.filterSignalState.set(state);
+    this.syncSelectedCluster();
+  }
+
+  setFilterComparativeStatus(status: 'new' | 'accelerating' | 'cooling' | 'stable' | null): void {
+    this.filterComparativeStatus.set(status);
+    this.syncSelectedCluster();
+  }
+
+  setFilterNoveltyBand(band: string | null): void {
+    this.filterNoveltyBand.set(band);
+    this.syncSelectedCluster();
+  }
+
   setWeakSignalsOnly(enabled: boolean): void {
     this.weakSignalsOnly.set(enabled);
     this.syncSelectedCluster();
@@ -184,6 +211,9 @@ export class TrendmapSignalService {
     this.filterSourceType.set(null);
     this.filterMaturityStage.set(null);
     this.filterHypeStage.set(null);
+    this.filterSignalState.set(null);
+    this.filterComparativeStatus.set(null);
+    this.filterNoveltyBand.set(null);
     this.weakSignalsOnly.set(false);
     this.sortBy.set('impact');
     this.syncSelectedCluster();

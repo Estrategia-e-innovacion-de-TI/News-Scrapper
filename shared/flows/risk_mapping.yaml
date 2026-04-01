@@ -6,6 +6,12 @@ sources:
     schedule: weekly
     focus: riesgos_news
     enabled: true
+  google_news:
+    schedule: weekly
+    provider: google_news
+    enabled: true
+    max_queries: 6
+    max_items: 30
   institutional_reports:
     schedule: bimonthly
     type: institutional_report

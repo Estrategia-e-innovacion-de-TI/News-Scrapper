@@ -6,6 +6,18 @@ sources:
     schedule: weekly
     focus: vigilancia_news
     enabled: true
+  google_news:
+    schedule: weekly
+    provider: google_news
+    enabled: true
+    max_queries: 5
+    max_items: 25
+  arxiv_papers:
+    schedule: weekly
+    provider: arxiv
+    enabled: true
+    max_terms: 10
+    max_items_per_term: 6
   papers:
     schedule: monthly
     mode: papers

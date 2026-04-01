@@ -34,6 +34,11 @@ SOURCE_TYPE_MAP = {
     "custom": "institutional_report",
 }
 
+SYNTHETIC_SOURCE_TYPE_MAP = {
+    "google_news": "news",
+    "arxiv": "paper",
+}
+
 
 def resolve_business_flow(state: GraphState) -> str:
     if state.adhoc:
@@ -44,7 +49,7 @@ def resolve_business_flow(state: GraphState) -> str:
 def resolve_source_type(source_id: str, state: GraphState) -> str | None:
     source = next((item for item in state.selected_sources if item.source_id == source_id), None)
     if source is None:
-        return None
+        return SYNTHETIC_SOURCE_TYPE_MAP.get(source_id)
     return SOURCE_TYPE_MAP.get(source.type, source.type)
 
 

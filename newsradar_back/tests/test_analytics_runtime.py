@@ -2,10 +2,21 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+import importlib
+import sys
 from types import SimpleNamespace
+import types
 
 import numpy as np
 
+from newsradar_api.domain.model.pipeline_models import (
+    FetchMethod,
+    GraphState,
+    QueueItem,
+    SourceConfig,
+    SourceMetrics,
+)
+from newsradar_api.infrastructure.connectors.search_models import SearchCandidate
 from newsradar_api.shared_kernel.analytics import advanced_engine
 from newsradar_api.shared_kernel.ingestion import runtime
 from newsradar_api.shared_kernel.snapshots.report_builder import (
@@ -68,7 +79,7 @@ def test_snapshot_builders_emit_advanced_analytics_payloads() -> None:
     assert trend_payload["charts"]["embedding_scatter"]
     assert trend_payload["clusters"]
     assert "executive_summary" in trend_payload["summary"]
-    assert trend_payload["quality_checks"]["methodology_version"] == "analytics_methodology_v4"
+    assert trend_payload["quality_checks"]["methodology_version"] == "analytics_methodology_v5"
     assert trend_payload["quality_checks"]["cluster_coverage"] >= 0
     assert "cluster_cards" in trend_payload
 
@@ -343,3 +354,85 @@ def test_legacy_cluster_id_compacts_long_identifiers_stably() -> None:
     assert len(compact) <= 50
     assert compact == _legacy_cluster_id(original)
     assert compact != original
+
+
+def test_batch_discovery_adds_google_news_and_arxiv_for_tech_watch(monkeypatch) -> None:
+    fake_langgraph = types.ModuleType("langgraph")
+    fake_langgraph_graph = types.ModuleType("langgraph.graph")
+    fake_langgraph_graph.END = object()
+
+    class _FakeStateGraph:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+    fake_langgraph_graph.StateGraph = _FakeStateGraph
+    fake_bs4 = types.ModuleType("bs4")
+
+    class _FakeBeautifulSoup:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+    fake_bs4.BeautifulSoup = _FakeBeautifulSoup
+    monkeypatch.setitem(sys.modules, "langgraph", fake_langgraph)
+    monkeypatch.setitem(sys.modules, "langgraph.graph", fake_langgraph_graph)
+    monkeypatch.setitem(sys.modules, "bs4", fake_bs4)
+
+    nodes = importlib.import_module("newsradar_api.infrastructure.pipeline.nodes")
+
+    async def _fake_google_news_search(company=None, terms=None, date_from=None, date_to=None, max_items=30):
+        return [
+            QueueItem(
+                source_id="google_news",
+                url=f"https://example.com/news/{'-'.join(terms or ['none'])}",
+                source_url="google_news_rss",
+                fetch_method=FetchMethod.HTTP,
+                title="Resultado Google News",
+            )
+        ]
+
+    async def _fake_search_arxiv(term: str, max_results: int = 20, since_days: int = 30, timeout: int = 30):
+        return [
+            SearchCandidate(
+                mode="papers",
+                term=term,
+                title=f"Paper {term}",
+                url=f"https://arxiv.org/abs/{term.replace(' ', '-')}",
+                snippet=f"Abstract sobre {term}",
+                source_provider="arxiv",
+            )
+        ]
+
+    monkeypatch.setattr("newsradar_api.infrastructure.connectors.google_news_connector.search", _fake_google_news_search)
+    monkeypatch.setattr("newsradar_api.infrastructure.connectors.providers.arxiv_provider.search_arxiv", _fake_search_arxiv)
+
+    state = GraphState(
+        focus="vigilancia_news",
+        adhoc=False,
+        selected_sources=[],
+        source_metrics={},
+    )
+
+    result = asyncio.run(nodes.discover_items_node(state))
+
+    assert any(item.source_id == "google_news" for item in result["queue"])
+    assert any(item.source_id == "arxiv" for item in result["queue"])
+    assert any(source.source_id == "google_news" for source in result["selected_sources"])
+    assert any(source.source_id == "arxiv" for source in result["selected_sources"])
+    assert all(item.query_terms for item in result["queue"] if item.source_id in {"google_news", "arxiv"})
+
+
+def test_top_documents_reduce_duplicates_and_repeat_sources() -> None:
+    docs = [
+        _doc("tw-r1", "AI agents for banking", source_id="rss-a", source_type="rss", category="IA", score=94, keywords=["ai", "agents", "banking"]),
+        _doc("tw-r2", "AI agents for banking", source_id="rss-a", source_type="rss", category="IA", score=92, keywords=["ai", "agents", "banking"]),
+        _doc("tw-r3", "Foundation models for insurance", source_id="rss-b", source_type="rss", category="IA", score=88, keywords=["foundation models", "insurance"]),
+        _doc("tw-r4", "Tokenization pilots in banking", source_id="rss-c", source_type="rss", category="Blockchain", score=84, keywords=["tokenization", "banking"]),
+    ]
+
+    profiles = [advanced_engine._document_profile(doc, "trend_mapping", 6) for doc in docs]
+    selected = advanced_engine._top_documents(docs, profiles, limit=3)
+    selected_ids = {doc.id for doc in selected}
+
+    assert len(selected) == 3
+    assert len({doc.source_id for doc in selected}) >= 2
+    assert not {"tw-r1", "tw-r2"} <= selected_ids

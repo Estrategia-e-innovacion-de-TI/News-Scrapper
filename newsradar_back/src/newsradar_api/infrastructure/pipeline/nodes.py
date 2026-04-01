@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -71,6 +72,137 @@ def _truncate_text(text: str, max_len: int = 500) -> str:
 
 def _query_terms_list(value: str | None) -> list[str]:
     return [item.strip() for item in (value or "").split(",") if item.strip()]
+
+
+def _dedupe_terms(terms: list[str], limit: int | None = None) -> list[str]:
+    values: list[str] = []
+    seen: set[str] = set()
+    for raw in terms:
+        term = str(raw).strip()
+        if not term:
+            continue
+        key = term.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        values.append(term)
+        if limit is not None and len(values) >= limit:
+            break
+    return values
+
+
+def _batch_flow_filename(focus: str | None) -> str | None:
+    if focus == "vigilancia_news":
+        return "tech_watch.yaml"
+    if focus == "riesgos_news":
+        return "risk_mapping.yaml"
+    return None
+
+
+def _batch_flow_sources(focus: str | None) -> dict[str, Any]:
+    from newsradar_api.shared_kernel.config.paths import load_yaml_file, resolve_flow_path
+
+    filename = _batch_flow_filename(focus)
+    if not filename:
+        return {}
+    path = resolve_flow_path(filename)
+    if not path.exists():
+        return {}
+    data = load_yaml_file(path)
+    sources = data.get("sources")
+    return sources if isinstance(sources, dict) else {}
+
+
+def _enabled_flow_source(focus: str | None, key: str) -> dict[str, Any]:
+    sources = _batch_flow_sources(focus)
+    raw = sources.get(key)
+    if isinstance(raw, dict) and raw.get("enabled", False):
+        return raw
+    return {}
+
+
+def _batch_search_groups(focus: str | None) -> list[list[str]]:
+    from newsradar_api.shared_kernel.config.paths import load_yaml_file, shared_path
+
+    if focus == "vigilancia_news":
+        data = load_yaml_file(shared_path("topics", "tech_watch.yaml"))
+        groups: list[list[str]] = []
+        for value in data.values():
+            if not isinstance(value, dict):
+                continue
+            terms = _dedupe_terms([str(item) for item in value.get("terms") or []], limit=4)
+            if terms:
+                groups.append(terms)
+        return groups
+
+    if focus == "riesgos_news":
+        taxonomy = load_yaml_file(shared_path("topics", "analytics_taxonomy.yaml"))
+        groups = []
+        for category in taxonomy.get("risk_categories") or []:
+            if not isinstance(category, dict):
+                continue
+            terms = [str(category.get("name") or "").replace("/", " ")]
+            terms.extend(str(item) for item in (category.get("keywords") or [])[:3])
+            group = _dedupe_terms(terms, limit=4)
+            if group:
+                groups.append(group)
+        return groups
+
+    return []
+
+
+def _batch_arxiv_terms(focus: str | None, max_terms: int = 10) -> list[str]:
+    if focus != "vigilancia_news":
+        return []
+    values: list[str] = []
+    for group in _batch_search_groups(focus):
+        values.extend(group[:2])
+        if len(values) >= max_terms:
+            break
+    return _dedupe_terms(values, limit=max_terms)
+
+
+def _ensure_synthetic_source(
+    selected_sources: list[SourceConfig],
+    *,
+    source_id: str,
+    name: str,
+    source_type: str = "scrape",
+    pipeline_class: str = "news",
+    min_text_chars: int = 120,
+    timeout_seconds: int = 20,
+) -> None:
+    if any(source.source_id == source_id for source in selected_sources):
+        return
+    selected_sources.append(
+        SourceConfig(
+            source_id=source_id,
+            name=name,
+            type=source_type,  # type: ignore[arg-type]
+            enabled=True,
+            focus=[],
+            pipeline_class=pipeline_class,
+            min_text_chars=min_text_chars,
+            timeout_seconds=timeout_seconds,
+        )
+    )
+
+
+def _append_unique_queue_items(queue: list[QueueItem], items: list[QueueItem]) -> int:
+    existing = {
+        (item.source_id, item.url.strip().lower())
+        for item in queue
+        if item.url
+    }
+    added = 0
+    for item in items:
+        key = (item.source_id, item.url.strip().lower())
+        if not item.url or key in existing:
+            continue
+        existing.add(key)
+        queue.append(item)
+        added += 1
+    return added
 
 
 def _init_source_metrics(source_id: str, requires_playwright: bool = False) -> SourceMetrics:
@@ -150,6 +282,126 @@ async def select_sources_node(state: GraphState) -> dict[str, Any]:
     return {"selected_sources": selected, "source_metrics": source_metrics}
 
 
+async def _augment_with_batch_google_news(
+    state: GraphState,
+    *,
+    queue: list[QueueItem],
+    source_metrics: dict[str, SourceMetrics],
+    selected_sources: list[SourceConfig],
+) -> None:
+    from newsradar_api.infrastructure.connectors import google_news_connector
+
+    source_cfg = _enabled_flow_source(state.focus, "google_news")
+    if not source_cfg:
+        return
+
+    search_groups = _batch_search_groups(state.focus)
+    if not search_groups:
+        return
+
+    max_queries = int(source_cfg.get("max_queries", 6))
+    max_items = int(source_cfg.get("max_items", 18))
+    per_query = max(4, min(max_items, max(4, math.ceil(max_items / max(max_queries, 1)))))
+
+    batch_items: list[QueueItem] = []
+    for group in search_groups[:max_queries]:
+        items = await google_news_connector.search(
+            terms=group,
+            date_from=state.date_from,
+            date_to=state.date_to,
+            max_items=per_query,
+        )
+        for item in items:
+            item.query_terms = list(group)
+            batch_items.append(item)
+
+    if not batch_items:
+        return
+
+    _ensure_synthetic_source(
+        selected_sources,
+        source_id="google_news",
+        name="Google News",
+        source_type="scrape",
+        pipeline_class="news",
+        min_text_chars=120,
+        timeout_seconds=20,
+    )
+    if "google_news" not in source_metrics:
+        source_metrics["google_news"] = _init_source_metrics("google_news", False)
+    discovered = _append_unique_queue_items(queue, batch_items)
+    if discovered:
+        source_metrics["google_news"] = _update_source_metrics(
+            source_metrics["google_news"],
+            discovered=discovered,
+        )
+        logger.info("Batch Google News added %d items for focus=%s", discovered, state.focus)
+
+
+async def _augment_with_batch_arxiv(
+    state: GraphState,
+    *,
+    queue: list[QueueItem],
+    source_metrics: dict[str, SourceMetrics],
+    selected_sources: list[SourceConfig],
+) -> None:
+    from newsradar_api.infrastructure.connectors.providers.arxiv_provider import search_arxiv
+
+    source_cfg = _enabled_flow_source(state.focus, "arxiv_papers")
+    if not source_cfg:
+        return
+
+    terms = _batch_arxiv_terms(
+        state.focus,
+        max_terms=int(source_cfg.get("max_terms", 10)),
+    )
+    if not terms:
+        return
+
+    max_items_per_term = int(source_cfg.get("max_items_per_term", 6))
+    batch_items: list[QueueItem] = []
+    for term in terms:
+        for candidate in await search_arxiv(
+            term,
+            max_results=max_items_per_term,
+            since_days=max(state.days, 30),
+        ):
+            batch_items.append(
+                QueueItem(
+                    source_id="arxiv",
+                    url=candidate.url,
+                    source_url="arxiv_api",
+                    fetch_method=FetchMethod.HTTP,
+                    title=candidate.title,
+                    published_at=candidate.published_at,
+                    snippet=candidate.snippet,
+                    query_terms=[candidate.term],
+                )
+            )
+
+    if not batch_items:
+        return
+
+    _ensure_synthetic_source(
+        selected_sources,
+        source_id="arxiv",
+        name="ArXiv",
+        source_type="scrape",
+        pipeline_class="paper",
+        min_text_chars=80,
+        timeout_seconds=20,
+    )
+    if "arxiv" not in source_metrics:
+        source_metrics["arxiv"] = _init_source_metrics("arxiv", False)
+    discovered = _append_unique_queue_items(queue, batch_items)
+    if discovered:
+        source_metrics["arxiv"] = _update_source_metrics(
+            source_metrics["arxiv"],
+            discovered=discovered,
+        )
+        logger.info("Batch ArXiv added %d items for focus=%s", discovered, state.focus)
+
+
 # ======================================================================
 # NODE: discover_items
 # ======================================================================
@@ -159,6 +411,7 @@ async def discover_items_node(state: GraphState) -> dict[str, Any]:
     """Discover items from all selected sources, with ad-hoc / candidates support."""
     queue: list[QueueItem] = []
     source_metrics = {k: v.model_copy() for k, v in state.source_metrics.items()}
+    selected_sources = list(state.selected_sources)
     errors = list(state.errors)
 
     # --- Candidates ingestion mode ---
@@ -177,10 +430,17 @@ async def discover_items_node(state: GraphState) -> dict[str, Any]:
                         source_url=data.get("url", ""),
                         fetch_method=FetchMethod.HTTP,
                         title=data.get("title", ""),
+                        snippet=data.get("snippet"),
+                        query_terms=_dedupe_terms(data.get("query_terms") or ([data.get("term")] if data.get("term") else [])),
                     )
                     queue.append(qi)
             logger.info("Loaded %d candidates from %s", len(queue), state.candidates_path)
-            return {"queue": queue, "source_metrics": source_metrics, "errors": errors}
+            return {
+                "queue": queue,
+                "source_metrics": source_metrics,
+                "selected_sources": selected_sources,
+                "errors": errors,
+            }
 
     # --- Determine if catalog RSS/scrape discovery should be skipped ---
     _skip_catalog = False
@@ -270,6 +530,8 @@ async def discover_items_node(state: GraphState) -> dict[str, Any]:
             max_items=30,
         )
         if gn_items:
+            for item in gn_items:
+                item.query_terms = _dedupe_terms(terms_list or ([state.company] if state.company else []))
             queue.extend(gn_items)
             if "google_news" not in source_metrics:
                 source_metrics["google_news"] = _update_source_metrics(
@@ -327,8 +589,28 @@ async def discover_items_node(state: GraphState) -> dict[str, Any]:
             pre_count, len(queue),
         )
 
+    if not state.adhoc and state.focus in {"vigilancia_news", "riesgos_news"}:
+        await _augment_with_batch_google_news(
+            state,
+            queue=queue,
+            source_metrics=source_metrics,
+            selected_sources=selected_sources,
+        )
+        if state.focus == "vigilancia_news":
+            await _augment_with_batch_arxiv(
+                state,
+                queue=queue,
+                source_metrics=source_metrics,
+                selected_sources=selected_sources,
+            )
+
     logger.info("Total items in queue: %d", len(queue))
-    return {"queue": queue, "source_metrics": source_metrics, "errors": errors}
+    return {
+        "queue": queue,
+        "source_metrics": source_metrics,
+        "selected_sources": selected_sources,
+        "errors": errors,
+    }
 
 
 # ======================================================================
@@ -426,20 +708,26 @@ async def _process_html(
     # Determine provenance
     origin = "catalog"
     query_type: str | None = None
-    query_terms: list[str] = []
+    query_terms: list[str] = list(item.query_terms or [])
     query_range: dict[str, str] = {}
     if state.candidates_path:
         origin = "search_ingest"
+    elif item.source_id in {"google_news", "arxiv"}:
+        origin = "search_ingest"
+        if state.focus == "vigilancia_news":
+            query_type = "vigilancia"
+        elif state.focus == "riesgos_news":
+            query_type = "riesgos"
     elif state.adhoc and state.focus:
         origin = "adhoc_query"
         if state.focus == "aras_news":
             query_type = "aras"
-            query_terms = [state.company] if state.company else []
+            query_terms = query_terms or ([state.company] if state.company else [])
         elif state.focus == "riesgos_news":
             query_type = "riesgos"
-            query_terms = _query_terms_list(state.terms)
-        if state.date_from and state.date_to:
-            query_range = {"from": state.date_from, "to": state.date_to}
+            query_terms = query_terms or _query_terms_list(state.terms)
+    if state.date_from and state.date_to:
+        query_range = {"from": state.date_from, "to": state.date_to}
 
     return Document(
         run_id=state.run_id,
@@ -465,6 +753,65 @@ async def _process_html(
         query_type=query_type,
         query_terms=query_terms,
         query_range=query_range,
+    )
+
+
+def _document_from_search_metadata(
+    item: QueueItem,
+    source: SourceConfig,
+    state: GraphState,
+    seen_hashes: set[str],
+) -> Document | None:
+    text = " ".join(
+        part for part in [item.title or "", item.snippet or "", " ".join(item.query_terms or [])] if part
+    ).strip()
+    if not text:
+        item.status = ItemStatus.ERROR
+        item.error_type = ErrorType.EMPTY
+        return None
+
+    content_hash = _compute_content_hash(item.title or item.url, text)
+    if content_hash in seen_hashes:
+        item.status = ItemStatus.OK
+        return None
+
+    if len(text) > state.max_text_chars:
+        text = text[: state.max_text_chars]
+
+    query_type: str | None = None
+    if state.focus == "vigilancia_news":
+        query_type = "vigilancia"
+    elif state.focus == "riesgos_news":
+        query_type = "riesgos"
+
+    return Document(
+        run_id=state.run_id,
+        source_id=item.source_id,
+        pipeline_class=source.pipeline_class,
+        focus=source.focus or ([state.focus] if state.focus else []),
+        title=item.title or item.url,
+        url=item.url,
+        canonical_url=item.url,
+        published_at=item.published_at,
+        fetched_at=datetime.utcnow().isoformat(),
+        language=_detect_language(text),
+        text=text,
+        excerpt=_truncate_text(item.snippet or text, 500),
+        raw_len=len(text),
+        text_len=len(text),
+        text_capped=False,
+        hash=content_hash,
+        fetch_method=item.fetch_method.value,
+        status="ok",
+        source_url=item.source_url,
+        origin="search_ingest",
+        query_type=query_type,
+        query_terms=list(item.query_terms or []),
+        query_range=(
+            {"from": state.date_from, "to": state.date_to}
+            if state.date_from and state.date_to
+            else {}
+        ),
     )
 
 
@@ -503,13 +850,39 @@ async def fetch_content_http_node(state: GraphState) -> dict[str, Any]:
     for item in state.http_queue:
         source = source_map.get(item.source_id)
         if not source:
-            if state.candidates_path or item.source_id == "google_news":
+            if state.candidates_path or item.source_id in {"google_news", "arxiv"}:
                 source = _fallback_source
             else:
                 continue
 
         samples_per_source.setdefault(item.source_id, 0)
         if state.debug and samples_per_source[item.source_id] >= max_samples:
+            continue
+
+        if item.source_id == "arxiv" and item.snippet:
+            doc = _document_from_search_metadata(
+                item=item,
+                source=source,
+                state=state,
+                seen_hashes=seen_hashes,
+            )
+            if doc:
+                documents.append(doc)
+                seen_hashes.add(doc.hash)
+                samples_per_source[item.source_id] += 1
+                if item.source_id in source_metrics:
+                    source_metrics[item.source_id] = _update_source_metrics(
+                        source_metrics[item.source_id],
+                        fetched_ok=1,
+                        text_ok=1,
+                        text_len=doc.text_len,
+                    )
+            elif item.source_id in source_metrics and item.status == ItemStatus.OK:
+                source_metrics[item.source_id] = _update_source_metrics(
+                    source_metrics[item.source_id],
+                    fetched_ok=1,
+                    dupes=1,
+                )
             continue
 
         await rate_limiter.wait(item.source_id, source.rate_limit_rps)
@@ -917,7 +1290,9 @@ async def classify_and_score_node(state: GraphState) -> dict[str, Any]:
             elif is_vigilancia or is_risk_batch:
                 if relevance_scorer is None:
                     relevance_scorer = RelevanceScorer()
-                vig_terms = _query_terms_list(state.terms)
+                vig_terms = list(getattr(doc, "query_terms", []) or _query_terms_list(state.terms))
+                if is_vigilancia and not getattr(doc, "matched_keywords", None) and vig_terms:
+                    doc.matched_keywords = vig_terms[:5]
                 if is_risk_batch:
                     analysis = process_document(doc.text, doc.title, query_type="riesgos")
                     doc.risk_type = analysis.get("category")

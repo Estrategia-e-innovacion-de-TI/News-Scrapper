@@ -233,6 +233,7 @@ class QueueItem(BaseModel):
     title: str | None = None
     published_at: str | None = None
     snippet: str | None = None
+    query_terms: list[str] = Field(default_factory=list)
     requires_playwright: bool = False
     status: ItemStatus = ItemStatus.PENDING
     error_type: ErrorType | None = None
