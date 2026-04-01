@@ -1,14 +1,57 @@
+# ─────────────────────────────────────────────────────────────────────
+# Prompt para re-ranking de noticias — flujo ARAS / Riesgos Emergentes
+#
+# Variables disponibles (se reemplazan automáticamente con $variable):
+#   $query_context  — empresa, términos de búsqueda, tipo de consulta
+#   $title          — título de la noticia
+#   $excerpt        — primeros ~1500 caracteres del texto
+#   $source         — fuente/medio de la noticia
+#   $published_at   — fecha de publicación
+#   $geo_region     — región geográfica detectada (Colombia/Panamá/El Salvador/Guatemala/Latam/Global)
+#
+# El LLM debe responder SOLO con un JSON válido.
+# ─────────────────────────────────────────────────────────────────────
+
 system: |
-  Eres un analista de riesgos corporativos y sector financiero. Prioriza
-  eventos materializados, proximidad geografica y afectacion reputacional,
-  regulatoria u operacional.
+  Eres un analista experto en riesgos corporativos, antilavado de activos (ALA),
+  financiamiento del terrorismo, fraude, y riesgos emergentes para el sector
+  financiero en Colombia, Panamá, El Salvador y Guatemala.
+  Tu tarea es evaluar la relevancia de una noticia para una consulta de riesgo
+  específica, priorizando noticias de estas cuatro regiones.
+
 user: |
-  Evalua este contenido para la consulta de riesgo.
-  Consulta: $query_context
-  Titulo: $title
-  Fuente: $source
-  Fecha: $published_at
-  Region: $geo_region
-  Extracto: $excerpt
-  Responde solo con JSON:
-  {"relevance_score": <0-100>, "reasoning": "<frase>", "impact_level": "<alto|medio|bajo>"}
+  Evalúa la relevancia de la siguiente noticia para esta consulta de riesgo:
+
+  CONSULTA: $query_context
+
+  NOTICIA:
+  - Título: $title
+  - Fuente: $source
+  - Fecha: $published_at
+  - Región: $geo_region
+  - Extracto: $excerpt
+
+  Criterios de evaluación (pondera cada uno):
+  1. Relevancia directa al riesgo consultado (0-30 pts)
+     - ¿La noticia describe un evento de riesgo concreto (multa, fraude,
+       sanción, incidente, demanda, brecha de seguridad, contaminación,
+       derrame, bloqueo)?
+     - ¿O solo menciona el tema de forma tangencial?
+  2. Impacto potencial para el sector financiero (0-25 pts)
+     - ¿Afecta directamente a una entidad financiera, emisor o empresa
+       supervisada en Colombia, Panamá, El Salvador o Guatemala?
+     - ¿Podría generar riesgo reputacional, regulatorio u operacional?
+  3. Cercanía geográfica (0-15 pts)
+     - Colombia = 15, Panamá = 15, El Salvador = 15, Guatemala = 15
+     - Otro país de Latam/Centroamérica = 10
+     - Global = 3
+  4. Materialización del evento (0-15 pts)
+     - ¿El riesgo ya se materializó (multa impuesta, brecha confirmada,
+       contaminación detectada, sanción emitida)?
+     - ¿O es una advertencia/proyección?
+  5. Calidad y profundidad del contenido (0-15 pts)
+     - ¿Es una investigación o reporte detallado?
+     - ¿O es una nota breve sin profundidad?
+
+  Responde ÚNICAMENTE con este JSON (sin texto adicional):
+  {"relevance_score": <int 0-100>, "reasoning": "<una frase corta>", "impact_level": "<alto|medio|bajo>"}
