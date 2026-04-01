@@ -94,6 +94,14 @@ export interface ClusterCardSummary {
   subtitle: string;
   category: string;
   summary: string;
+  executive_takeaway?: string;
+  why_it_matters?: string;
+  decision_prompt?: string;
+  evidence_line?: string;
+  signal_state?: string;
+  source_count?: number;
+  active_months?: number;
+  impact_targets?: string[];
   impact_score: number;
   maturity_score: number;
   momentum_score: number;
@@ -218,6 +226,10 @@ export interface TrendmapCluster {
   top_documents: TrendmapArticle[];
   representative_documents: TrendmapArticle[];
   source_mix: { source: string; count: number }[];
+  source_count?: number;
+  active_months?: number;
+  impact_targets?: string[];
+  evidence_line?: string;
   insight_evidence: InsightEvidence[];
   executive_takeaway: string;
   what_is_happening: string;

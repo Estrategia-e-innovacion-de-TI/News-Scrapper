@@ -83,6 +83,77 @@ _DISPLAY_TOKEN_MAP = {
     "fintech": "Fintech",
     "blockchain": "Blockchain",
     "pqc": "PQC",
+    "security": "seguridad",
+    "cyber": "ciber",
+    "cybersecurity": "ciberseguridad",
+    "threat": "amenaza",
+    "threats": "amenazas",
+    "flaw": "vulnerabilidad",
+    "flaws": "vulnerabilidades",
+    "vulnerability": "vulnerabilidad",
+    "vulnerabilities": "vulnerabilidades",
+    "attack": "ataque",
+    "attacks": "ataques",
+    "campaign": "campana",
+    "campaigns": "campanas",
+    "fraud": "fraude",
+    "compliance": "cumplimiento",
+    "governance": "gobierno",
+    "regulation": "regulacion",
+    "regulatory": "regulatorio",
+    "supply": "suministro",
+    "chain": "cadena",
+    "outage": "interrupcion",
+    "outages": "interrupciones",
+    "vehicle": "vehiculo",
+    "vehicles": "vehiculos",
+    "autonomous": "autonomo",
+    "autonomy": "autonomia",
+    "robotaxi": "robotaxi",
+    "robotaxis": "robotaxis",
+    "breach": "brecha",
+    "breaches": "brechas",
+    "jailbreak": "evasiones",
+    "deepfake": "deepfake",
+    "deepfakes": "deepfakes",
+}
+
+_DISPLAY_PHRASE_MAP = {
+    "supply chain": "cadena de suministro",
+    "operational resilience": "resiliencia operacional",
+    "business continuity": "continuidad del negocio",
+    "third party": "terceros",
+    "third parties": "terceros",
+    "vendor risk": "riesgo de terceros",
+    "financial crime": "crimen financiero",
+    "robotaxi services": "servicios de robotaxi",
+    "autonomous vehicles": "vehiculos autonomos",
+    "autonomous vehicle": "vehiculo autonomo",
+    "cyber attack": "ciberataque",
+    "cyber attacks": "ciberataques",
+    "ai risk": "riesgo de IA",
+    "model risk": "riesgo de modelo",
+    "prompt injection": "inyeccion de prompts",
+    "zero trust": "zero trust",
+}
+
+_TITLE_ACTION_TOKENS = {
+    "announce", "announces", "announced", "build", "builds", "debut", "debuts",
+    "expand", "expands", "expanded", "introduce", "introduces", "introduced",
+    "launch", "launches", "launched", "partner", "partners", "partnered",
+    "plan", "plans", "planned", "release", "releases", "released", "say",
+    "says", "said", "start", "starts", "started", "unveil", "unveils",
+    "unveiled", "use", "uses", "used",
+}
+
+_HYPE_STAGE_LABELS_ES = {
+    "weak_signal": "senal debil",
+    "innovation_trigger": "disparo de innovacion",
+    "rising_attention": "atencion creciente",
+    "peak_visibility": "pico de visibilidad",
+    "correction": "correccion",
+    "consolidation": "consolidacion",
+    "productive_adoption": "adopcion productiva",
 }
 
 _GARTNER_STAGES = (
@@ -270,7 +341,26 @@ def _clean_term(term: str) -> str | None:
 
 
 def _display_term(term: str) -> str:
-    return " ".join(_DISPLAY_TOKEN_MAP.get(token, token.title()) for token in term.split())
+    normalized = _normalize_text(term)
+    if normalized in _DISPLAY_PHRASE_MAP:
+        return _DISPLAY_PHRASE_MAP[normalized]
+    tokens = normalized.split()
+    return " ".join(_DISPLAY_TOKEN_MAP.get(token, token.title()) for token in tokens)
+
+
+def _display_terms(terms: list[str], limit: int = 4) -> list[str]:
+    values: list[str] = []
+    for term in terms:
+        display = _display_term(term)
+        if display and display not in values:
+            values.append(display)
+        if len(values) >= limit:
+            break
+    return values
+
+
+def _spanish_stage_label(stage: str) -> str:
+    return _HYPE_STAGE_LABELS_ES.get(stage, stage.replace("_", " "))
 
 
 def _generic_label_terms() -> set[str]:
@@ -341,6 +431,8 @@ def _fallback_terms_from_docs(docs: list[Any], limit: int = 6) -> list[str]:
                 continue
             for index in range(len(title_tokens) - size + 1):
                 phrase = " ".join(title_tokens[index:index + size])
+                if any(token in _TITLE_ACTION_TOKENS for token in phrase.split()):
+                    continue
                 cleaned = _clean_term(phrase)
                 if cleaned:
                     counter[cleaned] += weight
@@ -773,7 +865,7 @@ def _cluster_features(features: np.ndarray) -> tuple[np.ndarray, str]:
     if rows <= 3:
         return np.zeros(rows, dtype=int), "single_cluster"
 
-    if hdbscan is not None and rows >= 8:
+    if hdbscan is not None and rows >= 4:
         try:
             min_cluster_size, min_samples = _select_hdbscan_params(rows)
             clusterer = hdbscan.HDBSCAN(
@@ -783,9 +875,7 @@ def _cluster_features(features: np.ndarray) -> tuple[np.ndarray, str]:
                 cluster_selection_method="eom",
             )
             labels = np.asarray(clusterer.fit_predict(features), dtype=int)
-            non_noise = {int(label) for label in labels if label >= 0}
-            if non_noise and len(non_noise) <= max(2, rows - 2):
-                return labels, "hdbscan"
+            return labels, "hdbscan"
         except Exception:
             pass
 
@@ -961,6 +1051,8 @@ def _candidate_title_phrases(docs: list[Any], limit: int = 8) -> list[str]:
                 continue
             for index in range(len(tokens) - size + 1):
                 phrase = " ".join(tokens[index:index + size])
+                if any(token in _TITLE_ACTION_TOKENS for token in phrase.split()):
+                    continue
                 if phrase and phrase not in _configured_generic_terms():
                     counter[phrase] += weight * multiplier
     phrases = [phrase for phrase, _ in counter.most_common(limit * 2)]
@@ -1022,15 +1114,25 @@ def _heuristic_category(report_type: str, terms: list[str], docs: list[Any], pro
 
 
 def _cluster_label(docs: list[Any], report_type: str, terms: list[str], category: str) -> str:
+    descriptive_terms = _descriptive_cluster_terms(terms, category, limit=3)
+    if descriptive_terms:
+        focus = descriptive_terms[0]
+        if len(descriptive_terms) >= 2:
+            focus = f"{descriptive_terms[0]} y {descriptive_terms[1]}"
+        if category not in {"Innovacion general", "Otros temas", "Otros riesgos"}:
+            return f"{category}: {focus}"[:72]
+        return focus[:72]
+
     phrases = _candidate_title_phrases(docs, limit=8)
     for phrase in phrases:
         if _is_generic_label_candidate(phrase):
             continue
         display = _display_term(phrase)
         if display and _normalize_text(display) != _normalize_text(category):
+            if category not in {"Innovacion general", "Otros temas", "Otros riesgos"}:
+                return f"{category}: {display}"[:72]
             return display[:72]
 
-    descriptive_terms = _descriptive_cluster_terms(terms, category, limit=3)
     if len(descriptive_terms) >= 2:
         return " / ".join(descriptive_terms[:2])[:72]
     if descriptive_terms:
@@ -1038,12 +1140,74 @@ def _cluster_label(docs: list[Any], report_type: str, terms: list[str], category
             return f"{descriptive_terms[0]} - {category}"[:72]
         return descriptive_terms[0][:72]
     if terms:
-        fallback_terms = [_display_term(term) for term in terms[:2]]
+        fallback_terms = _display_terms(terms[:2], limit=2)
         return " / ".join(fallback_terms)[:72]
     if category not in {"Innovacion general", "Otros temas", "Otros riesgos"}:
         return category
     title = _safe_text(getattr(docs[0], "title", "")).strip()
     return title[:80] if title else "Cluster sin etiqueta"
+
+
+def _cluster_evidence_line(
+    *,
+    docs: list[Any],
+    source_counts: Counter[str],
+    active_months: int,
+    growth_ratio: float,
+    focus_terms: list[str],
+) -> str:
+    focus = ", ".join(focus_terms[:3]) if focus_terms else "senales semanticas coherentes"
+    return (
+        f"{len(docs)} documentos, {len(source_counts)} fuentes y {active_months} meses activos; "
+        f"crecimiento {round(growth_ratio * 100)}% con foco en {focus}."
+    )
+
+
+def _cluster_strategic_readout(
+    *,
+    report_type: str,
+    label: str,
+    category: str,
+    focus_terms: list[str],
+    impact_targets: list[str],
+    direction: str,
+    hype_stage: str,
+    weak_signal_flag: bool,
+    impact_score: float,
+    maturity_score: float,
+    momentum_score: float,
+    documents_count: int,
+    source_count: int,
+) -> str:
+    focus = ", ".join(focus_terms[:2]) if focus_terms else category.lower()
+    targets = ", ".join(impact_targets[:2]) if impact_targets else "capacidades transversales"
+    stage = _spanish_stage_label(hype_stage)
+    direction_label = _direction_label(direction)
+    if report_type == "risk_mapping":
+        if weak_signal_flag:
+            return (
+                f"{label} aparece como una senal temprana en {category.lower()}: aun no es dominante, "
+                f"pero ya conecta {focus} con posibles impactos sobre {targets}."
+            )
+        return (
+            f"{label} ya opera como frente de riesgo en {category.lower()}: la evidencia apunta a un "
+            f"patron {direction_label} en etapa de {stage}, con presion potencial sobre {targets}."
+        )
+    if weak_signal_flag:
+        return (
+            f"{label} emerge en {category.lower()} como una apuesta temprana: la senal aun es pequena, "
+            f"pero ya insinua cambios sobre {targets} a partir de {focus}."
+        )
+    if maturity_score >= 70:
+        return (
+            f"{label} ya dejo de ser solo observacion: combina impacto {round(impact_score)} y madurez "
+            f"{round(maturity_score)} con evidencia suficiente para mover decisiones sobre {targets}."
+        )
+    return (
+        f"{label} gana traccion en {category.lower()} con {documents_count} evidencias y {source_count} fuentes. "
+        f"El patron {direction_label} y su momentum {round(momentum_score)} sugieren definir posicion "
+        f"estrategica antes de que la ventana se cierre."
+    )
 
 
 def _top_documents(docs: list[Any], profiles: list[DocumentProfile], limit: int = 4) -> list[Any]:
@@ -1288,19 +1452,21 @@ def _cluster_summary(
     maturity_score: float,
     momentum_score: float,
     keywords: list[str],
+    source_count: int,
+    active_months: int,
 ) -> str:
     evidence = ", ".join(keywords[:3]) if keywords else "senales dispersas"
     taxonomy = taxonomy_matches[0]["name"] if taxonomy_matches else category
     if report_type == "risk_mapping":
         return (
-            f"{label} consolida {len(docs)} evidencias en {taxonomy}. "
-            f"Combina severidad/impacto {round(impact_score)} y persistencia {round(maturity_score)} "
-            f"con una trayectoria {_direction_label(direction)} apoyada por {evidence}."
+            f"El cluster consolida {len(docs)} evidencias sobre {taxonomy.lower()} con patron "
+            f"{_direction_label(direction)}. Combina severidad/impacto {round(impact_score)}, "
+            f"persistencia {round(maturity_score)} y {source_count} fuentes alrededor de {evidence}."
         )
     return (
-        f"{label} articula {len(docs)} documentos alrededor de {taxonomy}. "
-        f"El cluster muestra impacto {round(impact_score)}, madurez {round(maturity_score)} y momentum "
-        f"{round(momentum_score)} con evidencia concentrada en {evidence}."
+        f"El cluster concentra {len(docs)} evidencias sobre {taxonomy.lower()} en {active_months} meses "
+        f"activos. Muestra impacto {round(impact_score)}, madurez {round(maturity_score)} y momentum "
+        f"{round(momentum_score)} con foco en {evidence}."
     )
 
 
@@ -1334,57 +1500,61 @@ def _top_level_insight(cluster: dict[str, Any], report_type: str) -> str:
     maturity = round(cluster["maturity_score"])
     keyword_focus = ", ".join((cluster.get("top_keywords") or cluster.get("keywords") or [])[:2]) or cluster["category"]
     sources = len(cluster.get("source_mix") or [])
-    stage = str(cluster.get("hype_stage") or "").replace("_", " ")
+    stage = _spanish_stage_label(str(cluster.get("hype_stage") or ""))
     direction = _direction_label(str(cluster.get("direction") or "stable"))
     growth = round(float(cluster.get("growth_ratio") or 0.0) * 100)
+    evidence_line = cluster.get("evidence_line") or ""
+    impact_targets = ", ".join((cluster.get("impact_targets") or [])[:2]) or "capacidades transversales"
+    default_evidence = f"{cluster['item_count']} documentos y {sources} fuentes"
     if report_type == "risk_mapping":
         severity = round(cluster["risk_severity"])
         return (
-            f"{label} concentra {cluster['item_count']} documentos alrededor de {keyword_focus}, "
-            f"respaldados por {sources} fuentes. Combina severidad {severity}, persistencia {maturity} "
-            f"y momentum {momentum}, por lo que hoy se comporta como riesgo en {stage}."
+            f"{label}: la evidencia ya perfila un riesgo con severidad {severity}, persistencia {maturity} "
+            f"y momentum {momentum}. El patron {direction} en {stage} puede presionar {impact_targets}; "
+            f"la lectura se sostiene en {(evidence_line.lower() if evidence_line else default_evidence)}."
         )
     return (
-        f"{label} agrupa {cluster['item_count']} documentos sobre {keyword_focus} dentro de {cluster['category']}. "
-        f"Se mueve {direction} ({growth}%) y hoy esta en {stage}, con impacto {impact}, madurez {maturity} "
-        f"y momentum {momentum}."
+        f"{label}: la senal en {cluster['category']} ya tiene impacto {impact}, madurez {maturity} y momentum "
+        f"{momentum}. Se mueve {direction} ({growth}%) en etapa de {stage}, con implicaciones sobre "
+        f"{impact_targets} y evidencia concentrada en {keyword_focus}. {evidence_line}"
     )
 
 
 def _cluster_recommendation(cluster: dict[str, Any], report_type: str) -> str:
     label = cluster["label"]
     keyword_focus = ", ".join((cluster.get("top_keywords") or cluster.get("keywords") or [])[:2]) or cluster["category"]
-    stage = str(cluster.get("hype_stage") or "").replace("_", " ")
+    stage = _spanish_stage_label(str(cluster.get("hype_stage") or ""))
+    targets = ", ".join((cluster.get("impact_targets") or [])[:2]) or cluster["category"].lower()
     if report_type == "risk_mapping":
         severity = float(cluster.get("risk_severity") or 0.0)
         if cluster.get("weak_signal_flag"):
             return (
-                f"Monitorear {label} como senal temprana: seguir {keyword_focus} y definir gatillos para escalarlo "
-                f"si aumenta su severidad o gana persistencia."
+                f"Monitorear {label} como senal temprana: definir gatillos de escalamiento sobre {targets} "
+                f"y seguir si {keyword_focus} gana severidad o persistencia."
             )
         if severity >= 75 and cluster["momentum_score"] >= 55:
             return (
-                f"Tratar {label} como riesgo prioritario: asignar owner, escenario y controles sobre {keyword_focus}, "
-                f"incluyendo terceros expuestos y rutas de respuesta."
+                f"Tratar {label} como riesgo prioritario: asignar owner, escenario y controles sobre {targets}, "
+                f"incluyendo terceros expuestos, alertas y rutas de respuesta vinculadas a {keyword_focus}."
             )
         return (
-            f"Conectar {label} con controles y monitoreo operativo: revisar horizonte, materialidad y fuentes que lo "
-            f"estan moviendo en {stage}."
+            f"Conectar {label} con monitoreo operativo: revisar horizonte, materialidad y fuentes que lo "
+            f"estan moviendo en {stage}, y decidir si necesita controles adicionales sobre {targets}."
         )
 
     if cluster.get("weak_signal_flag") or cluster.get("hype_stage") in {"weak_signal", "innovation_trigger"}:
         return (
-            f"Evaluar {label} como exploracion acotada: definir hipotesis, caso de uso y criterio de descarte con base "
-            f"en las senales {keyword_focus}."
+            f"Evaluar {label} como exploracion acotada: definir hipotesis, caso de uso, owner y criterio de descarte "
+            f"antes de invertir mas en {targets}; la evidencia aun depende de {keyword_focus}."
         )
     if cluster.get("hype_stage") in {"rising_attention", "peak_visibility"}:
         return (
-            f"Aterrizar {label} en una apuesta concreta: asignar capacidad duena, piloto y metricas de adopcion; "
-            f"el cluster ya tiene masa critica alrededor de {keyword_focus}."
+            f"Definir una posicion estrategica para {label}: decidir si pasa a piloto, partnership o vigilancia "
+            f"prioritaria, con metricas de adopcion sobre {targets} y criterios claros frente a {keyword_focus}."
         )
     return (
         f"Pasar {label} a roadmap operativo: priorizar capacidades, dependencias y riesgo de ejecucion para capturar "
-        f"valor en {cluster['category']}."
+        f"valor en {targets}, aprovechando que ya transita por {stage}."
     )
 
 
@@ -1729,6 +1899,7 @@ def generate_report_analysis(
         cluster_y = round(float(np.mean([coordinates[index][1] for index in indices])), 3)
         top_docs = _top_documents(docs, local_profiles)
         source_counts = Counter(_safe_text(getattr(doc, "source_id", "")) for doc in docs)
+        source_count = len(source_counts)
         representative_documents = []
         for doc in top_docs:
             profile = profile_by_id[str(getattr(doc, "id", getattr(doc, "hash", "")))]
@@ -1784,9 +1955,11 @@ def generate_report_analysis(
             impact_score,
             maturity_score,
             momentum_score,
-            [_display_term(term) for term in terms],
+            _display_terms(terms, limit=4),
+            source_count,
+            temporal["active_months"],
         )
-        focus_terms = _descriptive_cluster_terms(terms, category, limit=3) or [_display_term(term) for term in terms[:3]]
+        focus_terms = _descriptive_cluster_terms(terms, category, limit=3) or _display_terms(terms[:3], limit=3)
         focus_text = ", ".join(focus_terms[:2]) if focus_terms else category
         dominant_taxonomy = taxonomy_matches[0]["name"] if taxonomy_matches else category
         impact_targets = (
@@ -1794,18 +1967,40 @@ def generate_report_analysis(
             if taxonomy_matches
             else ["capacidades transversales"]
         )
+        evidence_line = _cluster_evidence_line(
+            docs=docs,
+            source_counts=source_counts,
+            active_months=temporal["active_months"],
+            growth_ratio=growth_ratio,
+            focus_terms=focus_terms,
+        )
+        strategic_readout = _cluster_strategic_readout(
+            report_type=report_type,
+            label=label,
+            category=category,
+            focus_terms=focus_terms,
+            impact_targets=impact_targets,
+            direction=direction,
+            hype_stage=hype_stage,
+            weak_signal_flag=weak_signal_flag,
+            impact_score=impact_score,
+            maturity_score=maturity_score,
+            momentum_score=momentum_score,
+            documents_count=len(docs),
+            source_count=source_count,
+        )
         cluster_payload = {
             "cluster_id": cluster_id,
             "label": label,
-            "subtitle": f"{dominant_taxonomy} · {_cluster_signal_state(len(docs), novelty, growth_ratio)} · {focus_text}",
+            "subtitle": f"{dominant_taxonomy} | {_cluster_signal_state(len(docs), novelty, growth_ratio)} | {focus_text}",
             "category": category,
             "summary": summary,
             "rationale": (
                 f"Etiqueta construida con taxonomia dominante {dominant_taxonomy}, "
                 f"foco en {focus_text or 'N/D'} y documentos representativos de mayor score."
             ),
-            "keywords": [_display_term(term) for term in terms] or [label],
-            "top_keywords": [_display_term(term) for term in terms] or [label],
+            "keywords": _display_terms(terms, limit=6) or [label],
+            "top_keywords": _display_terms(terms, limit=6) or [label],
             "relevance": "alta" if avg_score >= 75 else "media" if avg_score >= 50 else "baja",
             "item_count": len(docs),
             "documents": len(docs),
@@ -1846,28 +2041,33 @@ def generate_report_analysis(
             "top_documents": representative_documents[:3],
             "representative_documents": representative_documents,
             "source_mix": [{"source": source, "count": count} for source, count in source_counts.most_common()],
+            "source_count": source_count,
+            "active_months": temporal["active_months"],
+            "impact_targets": impact_targets,
+            "evidence_line": evidence_line,
             "insight_evidence": [
-                {"type": "coverage", "detail": f"{len(docs)} documentos, {len(source_counts)} fuentes, {temporal['active_months']} meses activos"},
+                {"type": "coverage", "detail": f"{len(docs)} documentos, {source_count} fuentes, {temporal['active_months']} meses activos"},
                 {"type": "tempo", "detail": f"direccion {_direction_label(direction)}, crecimiento {round(growth_ratio * 100)}%, aceleracion {round(acceleration_ratio * 100)}%"},
                 {"type": "taxonomy", "detail": f"dominante {dominant_taxonomy}"},
                 {"type": "quality", "detail": f"coherencia {round(coherence * 100)} / calidad {round(quality_score)}"},
             ],
-            "executive_takeaway": _cluster_takeaway(label, report_type, category, weak_signal_flag, hype_stage, impact_score, maturity_score, momentum_score),
+            "executive_takeaway": strategic_readout,
             "what_is_happening": summary,
             "why_it_matters": (
                 f"Importa por su efecto potencial sobre {', '.join(impact_targets[:3])}, respaldado por {len(docs)} documentos, "
-                f"{len(source_counts)} fuentes y senales como {focus_text}."
+                f"{source_count} fuentes y senales como {focus_text}."
             ),
             "decision_prompt": _cluster_recommendation(
                 {
                     "label": label,
                     "category": category,
                     "item_count": len(docs),
-                    "top_keywords": [_display_term(term) for term in terms] or [label],
+                    "top_keywords": _display_terms(terms, limit=6) or [label],
                     "hype_stage": hype_stage,
                     "weak_signal_flag": weak_signal_flag,
                     "risk_severity": risk_severity if report_type == "risk_mapping" else 0.0,
                     "momentum_score": momentum_score,
+                    "impact_targets": impact_targets,
                 },
                 report_type,
             ),
@@ -2010,6 +2210,14 @@ def generate_report_analysis(
             "subtitle": cluster["subtitle"],
             "category": cluster["category"],
             "summary": cluster["summary"],
+            "executive_takeaway": cluster["executive_takeaway"],
+            "why_it_matters": cluster["why_it_matters"],
+            "decision_prompt": cluster["decision_prompt"],
+            "evidence_line": cluster["evidence_line"],
+            "signal_state": cluster["signal_state"],
+            "source_count": cluster["source_count"],
+            "active_months": cluster["active_months"],
+            "impact_targets": cluster["impact_targets"],
             "impact_score": cluster["impact_score"],
             "maturity_score": cluster["maturity_score"],
             "momentum_score": cluster["momentum_score"],

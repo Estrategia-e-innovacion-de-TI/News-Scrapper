@@ -53,9 +53,14 @@ type SortDir = 'asc' | 'desc';
           <div class="mt-4 grid gap-4 xl:grid-cols-[1.3fr_1fr]">
             <div class="space-y-4">
               <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-4">
-                <h5 class="text-sm font-semibold text-dark-text">Qué está pasando</h5>
+                <h5 class="text-sm font-semibold text-dark-text">Que esta pasando</h5>
                 <p class="mt-2 text-sm leading-6 text-dark-text/90">{{ cluster()!.what_is_happening }}</p>
                 <p class="mt-3 text-sm leading-6 text-dark-muted">{{ cluster()!.why_it_matters }}</p>
+                @if (cluster()!.evidence_line) {
+                  <p class="mt-3 rounded-lg border border-dark-border bg-dark-surface px-3 py-2 text-sm text-dark-muted">
+                    {{ cluster()!.evidence_line }}
+                  </p>
+                }
                 <p class="mt-3 rounded-lg border border-dark-border bg-dark-surface px-3 py-2 text-sm text-dark-text/90">
                   {{ cluster()!.decision_prompt }}
                 </p>
@@ -67,7 +72,7 @@ type SortDir = 'asc' | 'desc';
                 <div class="mt-3 flex flex-wrap gap-2">
                   @for (match of cluster()!.taxonomy_matches; track match.name) {
                     <span class="rounded-full border border-dark-border bg-dark-surface px-3 py-1 text-xs text-dark-muted">
-                      {{ match.name }} · {{ match.score * 100 | number:'1.0-0' }}
+                      {{ match.name }} | {{ match.score * 100 | number:'1.0-0' }}
                     </span>
                   }
                 </div>
@@ -78,6 +83,15 @@ type SortDir = 'asc' | 'desc';
                     </div>
                   }
                 </div>
+                @if ((cluster()!.impact_targets?.length ?? 0) > 0) {
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    @for (target of (cluster()!.impact_targets ?? []).slice(0, 4); track target) {
+                      <span class="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
+                        {{ target }}
+                      </span>
+                    }
+                  </div>
+                }
               </div>
             </div>
 
@@ -121,7 +135,7 @@ type SortDir = 'asc' | 'desc';
                         </a>
                         <span class="text-xs text-dark-muted">{{ doc.score }}</span>
                       </div>
-                      <p class="mt-1 text-xs text-dark-muted">{{ doc.source }} · {{ doc.date }}</p>
+                      <p class="mt-1 text-xs text-dark-muted">{{ doc.source }} | {{ doc.date }}</p>
                       @if (doc.representative_reason) {
                         <p class="mt-2 text-xs text-dark-text/80">{{ doc.representative_reason }}</p>
                       }
@@ -147,15 +161,15 @@ type SortDir = 'asc' | 'desc';
         </div>
 
         @if (sortedArticles().length === 0) {
-          <p class="text-dark-muted text-sm">No hay artículos para mostrar.</p>
+          <p class="text-dark-muted text-sm">No hay articulos para mostrar.</p>
         } @else {
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-dark-border">
-                  <th class="cursor-pointer px-3 py-2 text-left font-medium text-dark-muted hover:text-dark-text" (click)="toggleSort('title')">Título {{ sortIndicator('title') }}</th>
+                  <th class="cursor-pointer px-3 py-2 text-left font-medium text-dark-muted hover:text-dark-text" (click)="toggleSort('title')">Titulo {{ sortIndicator('title') }}</th>
                   <th class="cursor-pointer px-3 py-2 text-left font-medium text-dark-muted hover:text-dark-text" (click)="toggleSort('source')">Fuente {{ sortIndicator('source') }}</th>
-                  <th class="px-3 py-2 text-left font-medium text-dark-muted">Razón</th>
+                  <th class="px-3 py-2 text-left font-medium text-dark-muted">Razon</th>
                   <th class="cursor-pointer px-3 py-2 text-left font-medium text-dark-muted hover:text-dark-text" (click)="toggleSort('date')">Fecha {{ sortIndicator('date') }}</th>
                   <th class="cursor-pointer px-3 py-2 text-left font-medium text-dark-muted hover:text-dark-text" (click)="toggleSort('score')">Score {{ sortIndicator('score') }}</th>
                 </tr>
@@ -252,6 +266,6 @@ export class TrendmapDetailComponent {
 
   sortIndicator(field: SortField): string {
     if (this.sortField() !== field) return '';
-    return this.sortDir() === 'asc' ? '↑' : '↓';
+    return this.sortDir() === 'asc' ? '^' : 'v';
   }
 }

@@ -107,13 +107,25 @@ interface VolumePoint {
 
           <div class="mt-4 grid gap-4 xl:grid-cols-3">
             @for (card of clusterCards().slice(0, 6); track card.cluster_id) {
-              <article class="rounded-2xl border border-dark-border bg-dark-bg/60 p-4">
+              <article class="rounded-3xl border border-dark-border bg-dark-bg/60 p-5">
                 <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
-                      {{ card.category }}
-                    </p>
-                    <h5 class="mt-1 text-base font-semibold text-dark-text">{{ card.label }}</h5>
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span
+                        class="inline-flex items-center gap-2 rounded-full border border-dark-border bg-dark-surface px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-dark-muted"
+                      >
+                        <span
+                          class="h-2.5 w-2.5 rounded-full"
+                          [style.backgroundColor]="categoryColor(card.category)"
+                        ></span>
+                        {{ card.category }}
+                      </span>
+                      <span class="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-[10px] text-sky-200">
+                        {{ formatStage(card.hype_stage) }}
+                      </span>
+                    </div>
+                    <h5 class="mt-3 text-lg font-semibold leading-6 text-dark-text">{{ card.label }}</h5>
+                    <p class="mt-2 text-xs leading-5 text-dark-muted">{{ card.subtitle }}</p>
                   </div>
                   @if (card.weak_signal_flag) {
                     <span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300">
@@ -122,12 +134,41 @@ interface VolumePoint {
                   }
                 </div>
 
-                <p class="mt-2 text-sm leading-6 text-dark-muted">{{ card.summary }}</p>
+                <div class="mt-4 space-y-3">
+                  <div class="rounded-2xl border border-dark-border bg-dark-surface/70 p-3">
+                    <p class="text-[11px] uppercase tracking-[0.14em] text-dark-muted">Lectura estrategica</p>
+                    <p class="mt-2 text-sm leading-6 text-dark-text/90">
+                      {{ card.executive_takeaway || card.summary }}
+                    </p>
+                  </div>
 
-                <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+                  @if (card.why_it_matters) {
+                    <div class="rounded-2xl border border-dark-border bg-dark-surface/60 p-3">
+                      <p class="text-[11px] uppercase tracking-[0.14em] text-dark-muted">Por que importa</p>
+                      <p class="mt-2 text-sm leading-6 text-dark-muted">
+                        {{ card.why_it_matters }}
+                      </p>
+                    </div>
+                  }
+
+                  @if (card.decision_prompt) {
+                    <div class="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
+                      <p class="text-[11px] uppercase tracking-[0.14em] text-amber-200">Decision sugerida</p>
+                      <p class="mt-2 text-sm leading-6 text-dark-text/90">
+                        {{ card.decision_prompt }}
+                      </p>
+                    </div>
+                  }
+                </div>
+
+                <div class="mt-4 grid grid-cols-4 gap-2 text-xs">
                   <div class="rounded-lg bg-dark-surface px-2 py-2">
                     <p class="text-dark-muted">Impacto</p>
                     <p class="mt-1 font-medium text-dark-text">{{ card.impact_score }}</p>
+                  </div>
+                  <div class="rounded-lg bg-dark-surface px-2 py-2">
+                    <p class="text-dark-muted">Madurez</p>
+                    <p class="mt-1 font-medium text-dark-text">{{ card.maturity_score }}</p>
                   </div>
                   <div class="rounded-lg bg-dark-surface px-2 py-2">
                     <p class="text-dark-muted">Momentum</p>
@@ -138,6 +179,25 @@ interface VolumePoint {
                     <p class="mt-1 font-medium text-dark-text">{{ card.quality_score }}</p>
                   </div>
                 </div>
+
+                @if (card.evidence_line) {
+                  <div class="mt-4 rounded-2xl border border-dark-border bg-dark-surface/60 p-3">
+                    <p class="text-[11px] uppercase tracking-[0.14em] text-dark-muted">Evidencia</p>
+                    <p class="mt-2 text-sm leading-6 text-dark-muted">
+                      {{ card.evidence_line }}
+                    </p>
+                  </div>
+                }
+
+                @if ((card.impact_targets?.length ?? 0) > 0) {
+                  <div class="mt-4 flex flex-wrap gap-2">
+                    @for (target of (card.impact_targets ?? []).slice(0, 3); track target) {
+                      <span class="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] text-emerald-200">
+                        {{ target }}
+                      </span>
+                    }
+                  </div>
+                }
 
                 <div class="mt-4 flex flex-wrap gap-2">
                   @for (kw of card.top_keywords.slice(0, 4); track kw) {
@@ -280,6 +340,16 @@ export class TrendmapOverviewComponent implements AfterViewInit {
 
   weakSignals() {
     return this.data().weak_signals ?? [];
+  }
+
+  formatStage(stage: string): string {
+    return stage.replaceAll('_', ' ');
+  }
+
+  categoryColor(category: string): string {
+    const palette = ['#38bdf8', '#f59e0b', '#34d399', '#fb7185', '#818cf8', '#f97316'];
+    const hash = [...category].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return palette[hash % palette.length];
   }
 
   private taxonomyData(snapshot: TrendmapData): NamedScore[] {

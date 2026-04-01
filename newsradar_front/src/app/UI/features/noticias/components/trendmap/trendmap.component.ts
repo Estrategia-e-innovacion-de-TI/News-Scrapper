@@ -88,7 +88,7 @@ const TABS: Tab[] = [
                   <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-3">
                     <p class="text-sm font-medium text-dark-text">{{ card.label }}</p>
                     <p class="mt-1 text-xs text-dark-muted">
-                      Impacto {{ card.impact_score | number:'1.0-0' }} · Momentum
+                      Impacto {{ card.impact_score | number:'1.0-0' }} | Momentum
                       {{ card.momentum_score | number:'1.0-0' }}
                     </p>
                   </div>
@@ -136,7 +136,12 @@ const TABS: Tab[] = [
                   <app-trendmap-impact [clusters]="service.filteredClusters()" />
                 }
                 @case ('hype') {
-                  <app-hype-cycle [clusters]="service.filteredClusters()" />
+                  <app-hype-cycle
+                    [clusters]="service.filteredClusters()"
+                    [selectedStage]="service.filterHypeStage()"
+                    (stageSelected)="service.setFilterHypeStage($event)"
+                    (clusterSelected)="service.selectCluster($event)"
+                  />
                 }
                 @case ('detalle') {
                   <app-trendmap-detail

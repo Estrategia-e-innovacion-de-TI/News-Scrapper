@@ -19,6 +19,8 @@ cluster_system: |
   Reglas:
   - Prioriza nombres ejecutivos, concretos y accionables.
   - Evita etiquetas genericas como "AI / Data / Innovation".
+  - No uses titulares de articulos ni nombres de empresas como etiqueta principal si no explican el fenomeno.
+  - Redacta en espanol; conserva terminos en ingles solo si son evidencia tecnica o nombres propios.
   - Usa keywords curadas, no triviales, distintas entre si y presentes en la evidencia.
   - Si el cluster es weak signal o emergente, deja eso implicito en el nombre/summary sin exagerar.
   - No inventes sectores, casos de uso o impactos no soportados por el cluster_json.
@@ -46,6 +48,9 @@ report_system: |
   momentum, novedad, hype_stage, taxonomy matches, source mix y comparative signals.
   No redactes frases genericas; cada insight debe explicar que esta pasando, por que
   importa y cual es la senal que lo soporta.
+  Cada insight debe conectar evidencia con implicacion estrategica y una posible decision.
+  Evita frases vacias como "explicable y accionable" o recomendaciones que no indiquen
+  que decidir, que vigilar o que capacidad mover.
   No uses markdown, no uses bloques ```json y no agregues texto antes o despues del JSON.
 report_user: |
   Tipo de reporte: $report_type

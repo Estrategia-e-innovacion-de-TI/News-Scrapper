@@ -214,6 +214,10 @@ def build_trendmap_payload(documents: list[Document], window_months: int) -> dic
                 "top_documents": cluster["top_documents"],
                 "representative_documents": cluster["representative_documents"],
                 "source_mix": cluster["source_mix"],
+                "source_count": cluster.get("source_count"),
+                "active_months": cluster.get("active_months"),
+                "impact_targets": cluster.get("impact_targets"),
+                "evidence_line": cluster.get("evidence_line"),
                 "insight_evidence": cluster["insight_evidence"],
                 "executive_takeaway": cluster["executive_takeaway"],
                 "what_is_happening": cluster["what_is_happening"],
@@ -339,6 +343,10 @@ def build_riskmap_payload(documents: list[Document], window_months: int) -> dict
                 "what_is_happening": cluster["what_is_happening"],
                 "why_it_matters": cluster["why_it_matters"],
                 "decision_prompt": cluster["decision_prompt"],
+                "source_count": cluster.get("source_count"),
+                "active_months": cluster.get("active_months"),
+                "impact_targets": cluster.get("impact_targets"),
+                "evidence_line": cluster.get("evidence_line"),
             }
             for cluster in clusters
         ],
