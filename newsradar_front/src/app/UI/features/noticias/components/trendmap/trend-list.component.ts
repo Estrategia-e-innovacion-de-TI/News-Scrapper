@@ -10,7 +10,7 @@ const DIRECTION_LABELS: Record<Trend['direction'], string> = {
 };
 
 const STAGE_ORDER: HypeStage[] = [
-  'trigger',
+  'innovation_trigger',
   'peak_of_inflated_expectations',
   'trough_of_disillusionment',
   'slope_of_enlightenment',
@@ -18,7 +18,7 @@ const STAGE_ORDER: HypeStage[] = [
 ];
 
 const STAGE_LABELS: Record<HypeStage, string> = {
-  trigger: 'Innovation Trigger',
+  innovation_trigger: 'Innovation Trigger',
   peak_of_inflated_expectations: 'Peak of Inflated Expectations',
   trough_of_disillusionment: 'Trough of Disillusionment',
   slope_of_enlightenment: 'Slope of Enlightenment',

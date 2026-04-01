@@ -172,6 +172,7 @@ export interface TrendmapArticle {
   cluster_quality_score?: number;
   hype_stage?: LifecycleStage;
   unclustered?: boolean;
+  unclustered_reason?: string;
 }
 
 export interface TrendmapCluster {

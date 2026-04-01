@@ -63,6 +63,29 @@ const SORT_OPTIONS: SortOption[] = [
             </select>
           </label>
 
+          @if (visibleCategories().length > 0) {
+            <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+                Categorias visibles
+              </p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                @for (item of visibleCategories(); track item) {
+                  <button
+                    class="inline-flex items-center gap-2 rounded-full border border-dark-border bg-dark-surface px-3 py-1 text-xs text-dark-text transition hover:border-dark-muted"
+                    type="button"
+                    (click)="categoryChanged.emit(item === filterCategory() ? null : item)"
+                  >
+                    <span
+                      class="h-2.5 w-2.5 rounded-full"
+                      [style.backgroundColor]="categoryColor(item)"
+                    ></span>
+                    {{ item }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
           <label class="grid gap-1">
             <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
               Tipo de fuente
@@ -197,9 +220,15 @@ const SORT_OPTIONS: SortOption[] = [
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="text-xs uppercase tracking-[0.18em] text-dark-muted">
-                    {{ cluster.category }}
-                  </p>
+                  <div class="flex items-center gap-2">
+                    <span
+                      class="h-2.5 w-2.5 rounded-full"
+                      [style.backgroundColor]="categoryColor(cluster.category)"
+                    ></span>
+                    <p class="text-xs uppercase tracking-[0.18em] text-dark-muted">
+                      {{ cluster.category }}
+                    </p>
+                  </div>
                   <h5 class="mt-1 text-sm font-semibold leading-5 text-dark-text">
                     {{ cluster.label }}
                   </h5>
@@ -290,6 +319,11 @@ export class TrendmapSidebarComponent {
     () => this.filtersMetadata()?.categories ?? this.categories(),
   );
 
+  readonly visibleCategories = computed(() => {
+    const fromClusters = [...new Set(this.clusters().map((cluster) => cluster.category))];
+    return fromClusters.length > 0 ? fromClusters : this.categoriesList();
+  });
+
   readonly sourceTypes = computed(
     () => this.filtersMetadata()?.source_types ?? [],
   );
@@ -361,5 +395,11 @@ export class TrendmapSidebarComponent {
       return base + 'border-rose-500/40 bg-rose-500/10 text-rose-300';
     }
     return base + 'border-sky-500/40 bg-sky-500/10 text-sky-300';
+  }
+
+  categoryColor(category: string): string {
+    const palette = ['#38bdf8', '#f59e0b', '#34d399', '#fb7185', '#818cf8', '#f97316'];
+    const hash = [...category].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return palette[hash % palette.length];
   }
 }

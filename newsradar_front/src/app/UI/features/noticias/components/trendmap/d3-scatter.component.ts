@@ -94,6 +94,25 @@ export class D3ScatterComponent implements AfterViewInit {
       .range([HEIGHT - MARGIN.bottom, MARGIN.top]);
 
     const color = d3.scaleOrdinal(d3.schemeTableau10);
+    const tooltip = d3
+      .select('body')
+      .selectAll<HTMLDivElement, null>('div.trendmap-record-tooltip')
+      .data([null])
+      .join('div')
+      .attr('class', 'trendmap-record-tooltip')
+      .style('position', 'absolute')
+      .style('max-width', '360px')
+      .style('background', DARK_THEME.surface)
+      .style('border', `1px solid ${DARK_THEME.border}`)
+      .style('color', DARK_THEME.text)
+      .style('padding', '10px 12px')
+      .style('border-radius', '10px')
+      .style('font-size', '12px')
+      .style('line-height', '1.45')
+      .style('box-shadow', '0 12px 30px rgba(15, 23, 42, 0.35)')
+      .style('pointer-events', 'none')
+      .style('opacity', 0)
+      .style('z-index', '1200');
 
     // Build cluster map for quick lookup
     const clusterMap = new Map(clusters.map((c) => [c.cluster_id, c]));
@@ -155,6 +174,27 @@ export class D3ScatterComponent implements AfterViewInit {
       .attr('stroke', DARK_THEME.bg)
       .attr('stroke-width', 0.5)
       .attr('cursor', 'pointer')
+      .on('mouseenter', (event: MouseEvent, d: TrendmapArticle) => {
+        const safeTitle = this.escapeHtml(d.title);
+        const safeUrl = this.escapeHtml(d.url || 'sin URL');
+        tooltip
+          .style('opacity', 1)
+          .html(
+            `<div style="font-weight:600; margin-bottom:6px;">${safeTitle}</div>` +
+              `<div style="color:${DARK_THEME.textMuted}; word-break:break-word;">${safeUrl}</div>`,
+          );
+        tooltip
+          .style('left', `${event.pageX + 14}px`)
+          .style('top', `${event.pageY - 12}px`);
+      })
+      .on('mousemove', (event: MouseEvent) => {
+        tooltip
+          .style('left', `${event.pageX + 14}px`)
+          .style('top', `${event.pageY - 12}px`);
+      })
+      .on('mouseleave', () => {
+        tooltip.style('opacity', 0);
+      })
       .on('click', (_event: MouseEvent, d: TrendmapArticle) => {
         const cluster = clusterMap.get(d.cluster_id) ?? null;
         this.clusterSelected.emit(
@@ -191,5 +231,14 @@ export class D3ScatterComponent implements AfterViewInit {
       });
 
     svg.call(zoom);
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
   }
 }

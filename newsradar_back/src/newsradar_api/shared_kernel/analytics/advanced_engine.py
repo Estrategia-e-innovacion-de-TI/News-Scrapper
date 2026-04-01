@@ -60,6 +60,14 @@ _GENERIC_TERMS = {
     "week", "weeks", "month", "months", "today", "new",
 }
 
+_GENERIC_LABEL_TOKENS = {
+    "campaign", "campaigns", "initiative", "initiatives", "program", "programs",
+    "project", "projects", "platform", "platforms", "model", "models", "system",
+    "systems", "solution", "solutions", "trend", "trends", "signal", "signals",
+    "issue", "issues", "topic", "topics", "theme", "themes", "event", "events",
+    "response", "responses", "market", "markets", "data", "technology", "technologies",
+}
+
 _DISPLAY_TOKEN_MAP = {
     "ai": "AI",
     "ia": "IA",
@@ -94,6 +102,8 @@ _HYPE_STAGE_ORDER = (
     "consolidation",
     "productive_adoption",
 )
+
+_MIN_RELEVANCE_FOR_CLUSTERING = 40.0
 
 _DEFAULT_TAXONOMY = {
     "version": "analytics_taxonomy_fallback_v1",
@@ -261,6 +271,43 @@ def _clean_term(term: str) -> str | None:
 
 def _display_term(term: str) -> str:
     return " ".join(_DISPLAY_TOKEN_MAP.get(token, token.title()) for token in term.split())
+
+
+def _generic_label_terms() -> set[str]:
+    return _configured_generic_terms() | _GENERIC_LABEL_TOKENS
+
+
+def _is_generic_label_candidate(value: str) -> bool:
+    tokens = _tokenize(value)
+    if not tokens:
+        return True
+    generic_terms = _generic_label_terms()
+    if len(tokens) == 1 and tokens[0] in generic_terms:
+        return True
+    return all(token in generic_terms for token in tokens)
+
+
+def _descriptive_cluster_terms(terms: list[str], category: str, limit: int = 3) -> list[str]:
+    category_tokens = set(_tokenize(category))
+    generic_terms = _generic_label_terms()
+    selected: list[str] = []
+    for term in terms:
+        cleaned = _clean_term(term)
+        if not cleaned:
+            continue
+        tokens = cleaned.split()
+        if not tokens:
+            continue
+        if len(tokens) == 1 and tokens[0] in generic_terms:
+            continue
+        if category_tokens and set(tokens) <= category_tokens:
+            continue
+        display = _display_term(cleaned)
+        if display not in selected:
+            selected.append(display)
+        if len(selected) >= limit:
+            break
+    return selected
 
 
 def _meaningful_terms(terms: list[str], limit: int = 6) -> list[str]:
@@ -764,6 +811,98 @@ def _normalize_labels(labels: np.ndarray) -> np.ndarray:
     return np.asarray(normalized, dtype=int)
 
 
+def _eligible_cluster_indices(documents: list[Any]) -> list[int]:
+    return [
+        index
+        for index, doc in enumerate(documents)
+        if float(getattr(doc, "relevance_score", 0) or 0) >= _MIN_RELEVANCE_FOR_CLUSTERING
+    ]
+
+
+def _refine_labels_by_centroid_distance(
+    labels: np.ndarray,
+    features: np.ndarray,
+) -> tuple[np.ndarray, set[int]]:
+    active_labels = sorted(label for label in set(labels.tolist()) if label >= 0)
+    if not active_labels:
+        return labels, set()
+
+    dense = np.asarray(features, dtype=float)
+    norms = np.linalg.norm(dense, axis=1, keepdims=True)
+    norms[norms == 0.0] = 1.0
+    normalized = dense / norms
+
+    centroids: list[np.ndarray] = []
+    label_positions: dict[int, int] = {}
+    similarity_cutoffs: dict[int, float] = {}
+    for label in active_labels:
+        indices = [index for index, raw_label in enumerate(labels.tolist()) if raw_label == label]
+        if not indices:
+            continue
+        centroid = normalized[indices].mean(axis=0, keepdims=True)
+        centroid_norm = np.linalg.norm(centroid)
+        if centroid_norm == 0.0:
+            continue
+        centroid = centroid / centroid_norm
+        similarities = cosine_similarity(normalized[indices], centroid).ravel()
+        similarity_cutoffs[label] = max(
+            0.36,
+            min(0.78, float(np.mean(similarities) - max(0.08, float(np.std(similarities)) * 1.35))),
+        )
+        label_positions[label] = len(centroids)
+        centroids.append(centroid.ravel())
+
+    if not centroids:
+        return labels, set()
+
+    centroid_matrix = np.asarray(centroids, dtype=float)
+    similarities = cosine_similarity(normalized, centroid_matrix)
+    refined = labels.copy()
+    pruned_indices: set[int] = set()
+    for index, assigned_label in enumerate(labels.tolist()):
+        if assigned_label < 0 or assigned_label not in label_positions:
+            continue
+        row = similarities[index]
+        assigned_similarity = float(row[label_positions[assigned_label]])
+        sorted_scores = np.sort(row)
+        second_best = float(sorted_scores[-2]) if sorted_scores.size > 1 else 0.0
+        cutoff = similarity_cutoffs.get(assigned_label, 0.36)
+        if assigned_similarity < cutoff or (
+            assigned_similarity < 0.44 and (assigned_similarity - second_best) < 0.02
+        ):
+            refined[index] = -1
+            pruned_indices.add(index)
+
+    cluster_sizes = Counter(int(label) for label in refined.tolist() if label >= 0)
+    for label, size in cluster_sizes.items():
+        if size >= 2:
+            continue
+        for index, raw_label in enumerate(refined.tolist()):
+            if raw_label == label:
+                refined[index] = -1
+                pruned_indices.add(index)
+    return refined, pruned_indices
+
+
+def _assign_cluster_labels(
+    features: np.ndarray,
+    documents: list[Any],
+) -> tuple[np.ndarray, str, set[int]]:
+    labels = np.full(len(documents), -1, dtype=int)
+    eligible_indices = _eligible_cluster_indices(documents)
+    if not eligible_indices:
+        return labels, "relevance_gate", set()
+
+    eligible_features = np.asarray(features[eligible_indices], dtype=float)
+    raw_labels, cluster_method = _cluster_features(eligible_features)
+    eligible_labels = _normalize_labels(raw_labels)
+    for local_index, global_index in enumerate(eligible_indices):
+        labels[global_index] = int(eligible_labels[local_index])
+
+    refined_labels, centroid_pruned = _refine_labels_by_centroid_distance(labels, features)
+    return _normalize_labels(refined_labels), cluster_method, centroid_pruned
+
+
 def _dominant_category_from_docs(report_type: str, docs: list[Any]) -> str | None:
     explicit = Counter(
         value
@@ -840,18 +979,18 @@ def _cluster_terms(matrix: Any, indices: list[int], feature_names: np.ndarray, d
         if row[feature_index] <= 0:
             continue
         candidate = _clean_term(str(feature_names[feature_index]))
-        if candidate:
+        if candidate and not _is_generic_label_candidate(candidate):
             scores[candidate] += max(0.4, 3.2 - rank * 0.12)
 
     for rank, phrase in enumerate(_candidate_title_phrases(docs, limit=12)):
         cleaned = _clean_term(phrase)
-        if cleaned:
+        if cleaned and not _is_generic_label_candidate(cleaned):
             scores[cleaned] += max(0.6, 2.8 - rank * 0.14)
 
     for doc in docs:
         for keyword in getattr(doc, "matched_keywords", []) or []:
             cleaned = _clean_term(_safe_text(keyword))
-            if cleaned:
+            if cleaned and not _is_generic_label_candidate(cleaned):
                 scores[cleaned] += 2.1
 
     selected: list[str] = []
@@ -883,13 +1022,24 @@ def _heuristic_category(report_type: str, terms: list[str], docs: list[Any], pro
 
 
 def _cluster_label(docs: list[Any], report_type: str, terms: list[str], category: str) -> str:
-    phrases = _candidate_title_phrases(docs, limit=6)
-    if phrases:
-        phrase = _display_term(phrases[0])
-        if phrase.lower() != _normalize_text(category):
-            return phrase[:72]
+    phrases = _candidate_title_phrases(docs, limit=8)
+    for phrase in phrases:
+        if _is_generic_label_candidate(phrase):
+            continue
+        display = _display_term(phrase)
+        if display and _normalize_text(display) != _normalize_text(category):
+            return display[:72]
+
+    descriptive_terms = _descriptive_cluster_terms(terms, category, limit=3)
+    if len(descriptive_terms) >= 2:
+        return " / ".join(descriptive_terms[:2])[:72]
+    if descriptive_terms:
+        if category not in {"Innovacion general", "Otros temas", "Otros riesgos"}:
+            return f"{descriptive_terms[0]} - {category}"[:72]
+        return descriptive_terms[0][:72]
     if terms:
-        return " / ".join(_display_term(term) for term in terms[:2])[:72]
+        fallback_terms = [_display_term(term) for term in terms[:2]]
+        return " / ".join(fallback_terms)[:72]
     if category not in {"Innovacion general", "Otros temas", "Otros riesgos"}:
         return category
     title = _safe_text(getattr(docs[0], "title", "")).strip()
@@ -1182,10 +1332,60 @@ def _top_level_insight(cluster: dict[str, Any], report_type: str) -> str:
     impact = round(cluster["impact_score"])
     momentum = round(cluster["momentum_score"])
     maturity = round(cluster["maturity_score"])
+    keyword_focus = ", ".join((cluster.get("top_keywords") or cluster.get("keywords") or [])[:2]) or cluster["category"]
+    sources = len(cluster.get("source_mix") or [])
+    stage = str(cluster.get("hype_stage") or "").replace("_", " ")
+    direction = _direction_label(str(cluster.get("direction") or "stable"))
+    growth = round(float(cluster.get("growth_ratio") or 0.0) * 100)
     if report_type == "risk_mapping":
         severity = round(cluster["risk_severity"])
-        return f"{label} domina el snapshot por combinar severidad {severity}, materialidad {impact} y persistencia {maturity}, con momentum {momentum}."
-    return f"{label} destaca por impacto {impact}, madurez {maturity} y momentum {momentum}, lo que lo vuelve una tendencia explicable y accionable."
+        return (
+            f"{label} concentra {cluster['item_count']} documentos alrededor de {keyword_focus}, "
+            f"respaldados por {sources} fuentes. Combina severidad {severity}, persistencia {maturity} "
+            f"y momentum {momentum}, por lo que hoy se comporta como riesgo en {stage}."
+        )
+    return (
+        f"{label} agrupa {cluster['item_count']} documentos sobre {keyword_focus} dentro de {cluster['category']}. "
+        f"Se mueve {direction} ({growth}%) y hoy esta en {stage}, con impacto {impact}, madurez {maturity} "
+        f"y momentum {momentum}."
+    )
+
+
+def _cluster_recommendation(cluster: dict[str, Any], report_type: str) -> str:
+    label = cluster["label"]
+    keyword_focus = ", ".join((cluster.get("top_keywords") or cluster.get("keywords") or [])[:2]) or cluster["category"]
+    stage = str(cluster.get("hype_stage") or "").replace("_", " ")
+    if report_type == "risk_mapping":
+        severity = float(cluster.get("risk_severity") or 0.0)
+        if cluster.get("weak_signal_flag"):
+            return (
+                f"Monitorear {label} como senal temprana: seguir {keyword_focus} y definir gatillos para escalarlo "
+                f"si aumenta su severidad o gana persistencia."
+            )
+        if severity >= 75 and cluster["momentum_score"] >= 55:
+            return (
+                f"Tratar {label} como riesgo prioritario: asignar owner, escenario y controles sobre {keyword_focus}, "
+                f"incluyendo terceros expuestos y rutas de respuesta."
+            )
+        return (
+            f"Conectar {label} con controles y monitoreo operativo: revisar horizonte, materialidad y fuentes que lo "
+            f"estan moviendo en {stage}."
+        )
+
+    if cluster.get("weak_signal_flag") or cluster.get("hype_stage") in {"weak_signal", "innovation_trigger"}:
+        return (
+            f"Evaluar {label} como exploracion acotada: definir hipotesis, caso de uso y criterio de descarte con base "
+            f"en las senales {keyword_focus}."
+        )
+    if cluster.get("hype_stage") in {"rising_attention", "peak_visibility"}:
+        return (
+            f"Aterrizar {label} en una apuesta concreta: asignar capacidad duena, piloto y metricas de adopcion; "
+            f"el cluster ya tiene masa critica alrededor de {keyword_focus}."
+        )
+    return (
+        f"Pasar {label} a roadmap operativo: priorizar capacidades, dependencias y riesgo de ejecucion para capturar "
+        f"valor en {cluster['category']}."
+    )
 
 
 def _representative_reason(profile: DocumentProfile, category: str) -> str:
@@ -1324,8 +1524,14 @@ def generate_report_analysis(
         auxiliary_features,
         embedding_features,
     )
-    raw_labels, cluster_method = _cluster_features(clustering_features)
-    labels = _normalize_labels(raw_labels)
+    low_relevance_indices = {
+        index for index, doc in enumerate(documents)
+        if float(getattr(doc, "relevance_score", 0) or 0) < _MIN_RELEVANCE_FOR_CLUSTERING
+    }
+    labels, cluster_method, centroid_pruned_indices = _assign_cluster_labels(
+        clustering_features,
+        documents,
+    )
     coordinates, projection_method = _project_coordinates(clustering_features)
 
     unique_labels = sorted(label for label in set(labels.tolist()) if label >= 0)
@@ -1580,15 +1786,23 @@ def generate_report_analysis(
             momentum_score,
             [_display_term(term) for term in terms],
         )
+        focus_terms = _descriptive_cluster_terms(terms, category, limit=3) or [_display_term(term) for term in terms[:3]]
+        focus_text = ", ".join(focus_terms[:2]) if focus_terms else category
+        dominant_taxonomy = taxonomy_matches[0]["name"] if taxonomy_matches else category
+        impact_targets = (
+            (taxonomy_matches[0].get("sector_tags") or taxonomy_matches[0].get("capability_tags") or ["capacidades transversales"])
+            if taxonomy_matches
+            else ["capacidades transversales"]
+        )
         cluster_payload = {
             "cluster_id": cluster_id,
             "label": label,
-            "subtitle": f"{taxonomy_matches[0]['name'] if taxonomy_matches else category} · {_cluster_signal_state(len(docs), novelty, growth_ratio)}",
+            "subtitle": f"{dominant_taxonomy} · {_cluster_signal_state(len(docs), novelty, growth_ratio)} · {focus_text}",
             "category": category,
             "summary": summary,
             "rationale": (
-                f"Etiqueta construida con taxonomia dominante {taxonomy_matches[0]['name'] if taxonomy_matches else category}, "
-                f"keywords {', '.join(_display_term(term) for term in terms[:3]) or 'N/D'} y documentos representativos de mayor score."
+                f"Etiqueta construida con taxonomia dominante {dominant_taxonomy}, "
+                f"foco en {focus_text or 'N/D'} y documentos representativos de mayor score."
             ),
             "keywords": [_display_term(term) for term in terms] or [label],
             "top_keywords": [_display_term(term) for term in terms] or [label],
@@ -1635,20 +1849,27 @@ def generate_report_analysis(
             "insight_evidence": [
                 {"type": "coverage", "detail": f"{len(docs)} documentos, {len(source_counts)} fuentes, {temporal['active_months']} meses activos"},
                 {"type": "tempo", "detail": f"direccion {_direction_label(direction)}, crecimiento {round(growth_ratio * 100)}%, aceleracion {round(acceleration_ratio * 100)}%"},
-                {"type": "taxonomy", "detail": f"dominante {taxonomy_matches[0]['name'] if taxonomy_matches else category}"},
+                {"type": "taxonomy", "detail": f"dominante {dominant_taxonomy}"},
                 {"type": "quality", "detail": f"coherencia {round(coherence * 100)} / calidad {round(quality_score)}"},
             ],
             "executive_takeaway": _cluster_takeaway(label, report_type, category, weak_signal_flag, hype_stage, impact_score, maturity_score, momentum_score),
             "what_is_happening": summary,
             "why_it_matters": (
-                f"Impacta {', '.join((taxonomy_matches[0].get('sector_tags') or taxonomy_matches[0].get('capability_tags') or ['capacidades transversales'])[:3])}"
-                if taxonomy_matches
-                else "impacta capacidades transversales"
+                f"Importa por su efecto potencial sobre {', '.join(impact_targets[:3])}, respaldado por {len(docs)} documentos, "
+                f"{len(source_counts)} fuentes y senales como {focus_text}."
             ),
-            "decision_prompt": (
-                "Escalar monitoreo y traducirlo a casos de uso, inversiones y dependencias."
-                if report_type == "trend_mapping"
-                else "Validar controles, escenarios y dependencias operativas asociadas."
+            "decision_prompt": _cluster_recommendation(
+                {
+                    "label": label,
+                    "category": category,
+                    "item_count": len(docs),
+                    "top_keywords": [_display_term(term) for term in terms] or [label],
+                    "hype_stage": hype_stage,
+                    "weak_signal_flag": weak_signal_flag,
+                    "risk_severity": risk_severity if report_type == "risk_mapping" else 0.0,
+                    "momentum_score": momentum_score,
+                },
+                report_type,
             ),
             "dominant_risk": category if report_type == "risk_mapping" else None,
         }
@@ -1667,6 +1888,13 @@ def generate_report_analysis(
                 "keywords": list(getattr(doc, "matched_keywords", []) or [])[:5],
                 "unclustered": True,
                 "duplicate_flag": duplicate_counts[profile.duplicate_signature] > 1,
+                "unclustered_reason": (
+                    "relevancia_baja"
+                    if index in low_relevance_indices
+                    else "distancia_centroide"
+                    if index in centroid_pruned_indices
+                    else "noise_cluster"
+                ),
             }
         )
         document_points.append(payload)
@@ -1716,15 +1944,13 @@ def generate_report_analysis(
         f"Se analizaron {len(documents)} documentos en {window_months} meses bajo {methodology_version}. "
         f"El snapshot concentra {len(clusters)} clusters utiles, {clustered_count} documentos agrupados y {unclustered_count} sin cluster. "
         f"Los temas/riesgos mas relevantes son {', '.join(dominant_labels[:3]) or 'dispersos'}, con calidad media {quality_avg}/100, "
-        f"cobertura taxonomica {round(taxonomy_coverage * 100)}% y silhouette {silhouette}."
+        f"cobertura taxonomica {round(taxonomy_coverage * 100)}% y silhouette {silhouette}. "
+        f"La clusterizacion excluye relevancia < {_MIN_RELEVANCE_FOR_CLUSTERING:.0f} y envia a sin cluster los registros alejados de centroides."
     )
 
     recommendations = []
     for cluster in clusters[:3]:
-        if report_type == "risk_mapping":
-            recommendations.append(f"Elevar seguimiento sobre {cluster['label']} y conectar su severidad con escenarios, terceros y planes de respuesta.")
-        else:
-            recommendations.append(f"Traducir {cluster['label']} a decisiones de capacidad, pilotos o apuestas de portafolio segun su momento {cluster['hype_stage']}.")
+        recommendations.append(_cluster_recommendation(cluster, report_type))
     if weak_signal_clusters:
         recommendations.append("Separar weak signals de clusters maduros para evitar que la novedad pierda visibilidad frente al volumen.")
     if unclustered_share >= 25:
@@ -1868,6 +2094,10 @@ def generate_report_analysis(
                 "auxiliary_features": auxiliary_feature_names,
             },
             "clustering": {"cluster_method": cluster_method, "projection_method": projection_method, "noise_label": "sin_cluster"},
+            "clustering_constraints": {
+                "min_relevance_for_clustering": _MIN_RELEVANCE_FOR_CLUSTERING,
+                "centroid_distance_validation": "enabled",
+            },
             "scoring": {
                 "impact": "heuristica interpretable multi-factor",
                 "maturity": "recurrencia + adopcion/persistencia + coherencia + autoridad",
@@ -1888,8 +2118,11 @@ def generate_report_analysis(
             "embedding_attempted": embedding_meta["embedding_attempted"],
             "embedding_error": embedding_meta["embedding_error"],
             "noise_label": "sin_cluster",
+            "min_relevance_for_clustering": _MIN_RELEVANCE_FOR_CLUSTERING,
             "clustered_documents": clustered_count,
             "unclustered_documents": unclustered_count,
+            "unclustered_low_relevance_documents": len(low_relevance_indices),
+            "unclustered_centroid_distance_documents": len(centroid_pruned_indices),
             "cluster_input_dim": int(clustering_features.shape[1]) if clustering_features.ndim == 2 else 0,
             "auxiliary_feature_count": len(auxiliary_feature_names),
             "taxonomy_version": _taxonomy_config().get("version"),

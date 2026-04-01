@@ -183,8 +183,8 @@ def test_embeddings_are_preferred_for_clustering(monkeypatch) -> None:
     assert analysis["parameters"]["embedding_provider"] == "bedrock"
     assert analysis["parameters"]["embedding_attempted"] is True
     assert analysis["parameters"]["cluster_method"] == "hdbscan"
-    assert analysis["summary"]["clustered_documents"] == 3
-    assert analysis["summary"]["unclustered_documents"] == 1
+    assert analysis["summary"]["clustered_documents"] == 2
+    assert analysis["summary"]["unclustered_documents"] == 2
 
 
 def test_cluster_labels_filter_noise_and_infer_category(monkeypatch) -> None:
