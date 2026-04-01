@@ -1,0 +1,361 @@
+version: analytics_taxonomy_v1
+
+generic_terms:
+  - news
+  - report
+  - reports
+  - latest
+  - breaking
+  - update
+  - updates
+  - global
+  - world
+  - market
+  - markets
+  - sector
+  - industry
+  - company
+  - companies
+  - technology
+  - technologies
+  - tech
+  - business
+  - services
+  - article
+  - articles
+  - analysis
+  - insight
+  - insights
+  - source
+  - sources
+  - today
+  - month
+  - months
+  - week
+  - weeks
+  - year
+  - years
+
+adoption_terms:
+  - deployment
+  - deployed
+  - rollout
+  - launch
+  - launched
+  - implementation
+  - implemented
+  - production
+  - operating
+  - operational
+  - adopted
+  - adoption
+  - scaling
+  - scale-up
+  - integration
+  - integrated
+  - commercialization
+  - monetization
+  - productized
+  - productization
+
+exploration_terms:
+  - pilot
+  - pilots
+  - prototype
+  - prototyping
+  - proof of concept
+  - poc
+  - experiment
+  - experimentation
+  - benchmark
+  - research
+  - study
+  - paper
+  - preprint
+  - early-stage
+  - lab
+  - sandbox
+
+strong_source_weights:
+  news: 0.48
+  rss: 0.52
+  paper: 0.82
+  patent: 0.85
+  pdf: 0.75
+  institutional_report: 0.86
+
+strong_source_ids:
+  wef: 0.95
+  worldbank: 0.93
+  world_bank: 0.93
+  allianz: 0.92
+  marsh: 0.92
+  zurich: 0.9
+  aon: 0.88
+  baker_tilly: 0.82
+  techcrunch: 0.62
+  mit_technology_review: 0.75
+  wired: 0.68
+  cyberscoop: 0.7
+  the_hacker_news: 0.78
+  arxiv: 0.8
+  github: 0.72
+  epo: 0.84
+
+trend_categories:
+  - name: Inteligencia Artificial
+    keywords:
+      - ai
+      - ia
+      - llm
+      - generative ai
+      - generativa
+      - agentic
+      - agente
+      - agentes
+      - copilot
+      - copilots
+      - multimodal
+      - model
+      - modelos fundacionales
+      - foundation model
+      - synthetic data
+    sector_tags: [operaciones, riesgo, servicio, canales]
+    capability_tags: [automatizacion, decisioning, productividad, experiencia]
+  - name: Ciberseguridad
+    keywords:
+      - cyber
+      - ciber
+      - ransomware
+      - phishing
+      - breach
+      - vulnerability
+      - malware
+      - botnet
+      - exploit
+      - zero trust
+      - credential theft
+      - prompt injection
+      - supply chain attack
+    sector_tags: [datos, continuidad, fraude, resiliencia]
+    capability_tags: [deteccion, respuesta, identidad, proteccion]
+  - name: Blockchain / Cripto
+    keywords:
+      - blockchain
+      - tokenization
+      - tokenizacion
+      - crypto
+      - stablecoin
+      - defi
+      - onchain
+      - digital asset
+      - cbdc
+      - smart contract
+    sector_tags: [pagos, tesoreria, mercados, custodia]
+    capability_tags: [tokenizacion, settlement, trazabilidad]
+  - name: Cloud / Data
+    keywords:
+      - cloud
+      - datos
+      - data platform
+      - lakehouse
+      - warehouse
+      - observability
+      - data center
+      - infrastructure
+      - gpu
+      - platform engineering
+      - data governance
+    sector_tags: [arquitectura, eficiencia, escalabilidad]
+    capability_tags: [infraestructura, datos, gobierno, costos]
+  - name: Fintech / Banca Digital
+    keywords:
+      - banking
+      - banca
+      - payment
+      - payments
+      - wallet
+      - lending
+      - credit
+      - open finance
+      - digital bank
+      - core banking
+      - fraud
+    sector_tags: [clientes, pagos, credito, fondeo]
+    capability_tags: [originacion, servicio, fraude, onboarding]
+  - name: Regulacion
+    keywords:
+      - regulation
+      - regulatory
+      - regulacion
+      - compliance
+      - normativa
+      - ai act
+      - governance
+      - supervision
+      - policy
+      - law
+    sector_tags: [cumplimiento, reporte, riesgo legal]
+    capability_tags: [gobierno, control, trazabilidad]
+  - name: Computacion Cuantica
+    keywords:
+      - quantum
+      - cuantica
+      - qubit
+      - qpu
+      - post-quantum
+      - pqc
+      - quantum-safe
+    sector_tags: [criptografia, investigacion]
+    capability_tags: [seguridad, experimentacion]
+  - name: Robotica / Automatizacion
+    keywords:
+      - robot
+      - robotics
+      - automation
+      - automatizacion
+      - drone
+      - autonomous
+      - industrial automation
+      - cobot
+    sector_tags: [operaciones, logistica, manufactura]
+    capability_tags: [automatizacion, operaciones]
+  - name: Innovacion General
+    keywords:
+      - modernization
+      - modernizacion
+      - transformation
+      - enterprise architecture
+      - api integration
+      - microservices
+      - workflow
+      - developer productivity
+    sector_tags: [transformacion, arquitectura]
+    capability_tags: [modernizacion, integracion]
+
+risk_categories:
+  - name: ciberseguridad
+    keywords:
+      - cyber
+      - ciber
+      - ransomware
+      - phishing
+      - malware
+      - breach
+      - exploit
+      - vulnerability
+      - credential theft
+      - supply chain attack
+      - zero trust
+      - skimmer
+      - malware
+    impact_areas: [datos, continuidad, fraude]
+  - name: desinformacion / malinformacion
+    keywords:
+      - disinformation
+      - misinformation
+      - malinformation
+      - deepfake
+      - synthetic identity
+      - fraud
+      - manipulation
+      - social engineering
+      - election interference
+    impact_areas: [reputacion, fraude, confianza]
+  - name: clima / naturaleza
+    keywords:
+      - climate
+      - clima
+      - biodiversity
+      - naturaleza
+      - disaster
+      - flood
+      - wildfire
+      - drought
+      - emissions
+      - water stress
+    impact_areas: [infraestructura, continuidad, cartera]
+  - name: geopolitica / geoeconomia
+    keywords:
+      - geopolitics
+      - geopolitical
+      - geoeconomic
+      - sanctions
+      - tariffs
+      - trade war
+      - conflict
+      - supply chain
+      - export control
+    impact_areas: [cadena de suministro, costos, liquidez]
+  - name: riesgo de IA
+    keywords:
+      - ai risk
+      - model risk
+      - jailbreak
+      - prompt injection
+      - autonomous system
+      - bias
+      - hallucination
+      - model governance
+      - unsafe agent
+    impact_areas: [modelo, cumplimiento, fraude]
+  - name: regulacion / cumplimiento
+    keywords:
+      - regulation
+      - regulatory
+      - compliance
+      - aml
+      - sanction
+      - ai act
+      - supervisory
+      - reporting rule
+    impact_areas: [cumplimiento, costo operativo, legal]
+  - name: terceros / cadena de suministro
+    keywords:
+      - third party
+      - vendor risk
+      - dependency
+      - supply chain
+      - concentration
+      - outsourc
+      - service provider
+    impact_areas: [continuidad, dependencia, resiliencia]
+  - name: fraude / crimen financiero
+    keywords:
+      - fraud
+      - laundering
+      - scam
+      - mule
+      - illicit finance
+      - bribery
+      - cyber-enabled fraud
+      - payment fraud
+    impact_areas: [perdida financiera, sancion, reputacion]
+  - name: reputacional
+    keywords:
+      - reputation
+      - reputational
+      - trust erosion
+      - backlash
+      - scrutiny
+      - public pressure
+    impact_areas: [marca, clientes, supervision]
+  - name: resiliencia operacional
+    keywords:
+      - outage
+      - downtime
+      - operational resilience
+      - disruption
+      - business continuity
+      - incident response
+      - service interruption
+    impact_areas: [continuidad, clientes, regulacion]
+  - name: riesgos sistemicos emergentes
+    keywords:
+      - systemic risk
+      - contagion
+      - cascading failure
+      - structural vulnerability
+      - interconnected
+      - instability
+    impact_areas: [sistema, liquidez, capital]

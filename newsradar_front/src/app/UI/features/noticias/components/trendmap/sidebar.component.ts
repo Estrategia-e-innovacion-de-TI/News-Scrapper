@@ -1,86 +1,310 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, input, output } from '@angular/core';
-import { TrendmapCluster } from '../../../../../domain/noticias/models';
+import { Component, computed, input, output } from '@angular/core';
+import {
+  FiltersMetadata,
+  LifecycleStage,
+  QualityChecks,
+  TrendmapCluster,
+} from '../../../../../domain/noticias/models';
+
+type ClusterSort = 'impact' | 'momentum' | 'novelty' | 'size' | 'quality' | 'maturity';
+
+interface SortOption {
+  value: ClusterSort;
+  label: string;
+}
+
+const SORT_OPTIONS: SortOption[] = [
+  { value: 'impact', label: 'Impacto' },
+  { value: 'momentum', label: 'Momentum' },
+  { value: 'novelty', label: 'Novedad' },
+  { value: 'size', label: 'Tamano cluster' },
+  { value: 'quality', label: 'Calidad analitica' },
+  { value: 'maturity', label: 'Madurez' },
+];
 
 @Component({
   selector: 'app-trendmap-sidebar',
   standalone: true,
+  imports: [DecimalPipe],
   template: `
     <aside class="w-80 shrink-0 space-y-4">
-      <!-- Category filter -->
-      <div class="bg-dark-surface border border-dark-border rounded-lg p-3">
-        <label for="sidebar-category" class="text-xs text-dark-muted block mb-1">
-          Filtrar por categoría
-        </label>
-        <select
-          id="sidebar-category"
-          class="w-full bg-dark-bg border border-dark-border text-dark-text text-sm rounded px-2 py-1.5"
-          [value]="filterCategory() ?? ''"
-          (change)="onCategoryChange($event)"
-        >
-          <option value="">Todas</option>
-          @for (cat of categories(); track cat) {
-            <option [value]="cat">{{ cat }}</option>
-          }
-        </select>
-      </div>
-
-      <!-- Cluster cards -->
-      <div class="space-y-2 max-h-[calc(100vh-240px)] overflow-y-auto pr-1">
-        @for (cluster of clusters(); track cluster.cluster_id) {
+      <section class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h4 class="text-sm font-semibold text-dark-text">Filtros</h4>
+            <p class="mt-1 text-xs leading-5 text-dark-muted">
+              Ajusta lectura ejecutiva y priorizacion del mapa.
+            </p>
+          </div>
           <button
-            class="w-full text-left bg-dark-surface border rounded-lg p-3 transition-all cursor-pointer"
-            [class]="cardClass(cluster)"
-            (click)="onClusterClick(cluster)"
+            class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-[11px] text-dark-muted transition hover:text-dark-text"
+            type="button"
+            (click)="clearRequested.emit()"
           >
-            <div class="flex justify-between items-start mb-1">
-              <h5 class="text-sm font-semibold text-dark-text leading-tight flex-1 mr-2">
-                {{ cluster.label }}
-              </h5>
-              <span [class]="relevanceBadge(cluster.relevance)">
-                {{ cluster.relevance }}
-              </span>
-            </div>
-
-            <div class="flex flex-wrap gap-1 mb-2">
-              @for (kw of cluster.keywords.slice(0, 4); track kw) {
-                <span class="text-[10px] bg-dark-bg text-dark-muted px-1.5 py-0.5 rounded">
-                  {{ kw }}
-                </span>
-              }
-            </div>
-
-            <div class="flex gap-3 text-xs text-dark-muted">
-              <span>{{ cluster.item_count }} artículos</span>
-              <span>Impacto: {{ cluster.impact_score | number:'1.0-0' }}</span>
-            </div>
+            Limpiar
           </button>
-        }
+        </div>
 
-        @if (clusters().length === 0) {
-          <p class="text-dark-muted text-sm text-center py-4">
-            No hay clusters para esta categoría.
-          </p>
-        }
-      </div>
+        <div class="mt-4 grid gap-3">
+          <label class="grid gap-1">
+            <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+              Categoria
+            </span>
+            <select
+              class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+              [value]="filterCategory() ?? ''"
+              (change)="onCategoryChange($event)"
+            >
+              <option value="">Todas</option>
+              @for (item of categoriesList(); track item) {
+                <option [value]="item">{{ item }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="grid gap-1">
+            <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+              Tipo de fuente
+            </span>
+            <select
+              class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+              [value]="filterSourceType() ?? ''"
+              (change)="onSourceTypeChange($event)"
+            >
+              <option value="">Todas</option>
+              @for (item of sourceTypes(); track item) {
+                <option [value]="item">{{ item }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="grid gap-1">
+            <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+              Madurez
+            </span>
+            <select
+              class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+              [value]="filterMaturityStage() ?? ''"
+              (change)="onMaturityStageChange($event)"
+            >
+              <option value="">Todas</option>
+              @for (item of maturityStages(); track item) {
+                <option [value]="item">{{ formatStage(item) }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="grid gap-1">
+            <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+              Hype stage
+            </span>
+            <select
+              class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+              [value]="filterHypeStage() ?? ''"
+              (change)="onHypeStageChange($event)"
+            >
+              <option value="">Todas</option>
+              @for (item of hypeStages(); track item) {
+                <option [value]="item">{{ formatStage(item) }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="grid gap-1">
+            <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+              Orden
+            </span>
+            <select
+              class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+              [value]="sortBy()"
+              (change)="onSortChange($event)"
+            >
+              @for (item of sortOptions; track item.value) {
+                <option [value]="item.value">{{ item.label }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        <label
+          class="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-dark-border bg-dark-bg/70 px-3 py-2"
+        >
+          <input
+            class="mt-1 accent-amber-500"
+            type="checkbox"
+            [checked]="weakSignalsOnly()"
+            (change)="onWeakSignalsChange($event)"
+          />
+          <span>
+            <span class="block text-sm text-dark-text">Solo weak signals</span>
+            <span class="block text-xs leading-5 text-dark-muted">
+              Prioriza clusters pequenos con alta novedad y senales tempranas.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      @if (qualityChecks()) {
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+          <h4 class="text-sm font-semibold text-dark-text">Quality Checks</h4>
+          <div class="mt-3 grid grid-cols-2 gap-3">
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Coherencia</p>
+              <p class="mt-2 text-lg font-semibold text-dark-text">
+                {{ qualityChecks()!.cluster_coherence_avg | number:'1.0-0' }}
+              </p>
+            </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Calidad</p>
+              <p class="mt-2 text-lg font-semibold text-dark-text">
+                {{ qualityChecks()!.cluster_quality_avg | number:'1.0-0' }}
+              </p>
+            </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Cobertura tax.</p>
+              <p class="mt-2 text-lg font-semibold text-dark-text">
+                {{ qualityChecks()!.taxonomy_coverage | number:'1.0-0' }}%
+              </p>
+            </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">No cluster</p>
+              <p class="mt-2 text-lg font-semibold text-dark-text">
+                {{ qualityChecks()!.unclustered_ratio | number:'1.0-0' }}%
+              </p>
+            </div>
+          </div>
+        </section>
+      }
+
+      <section class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h4 class="text-sm font-semibold text-dark-text">Clusters</h4>
+            <p class="mt-1 text-xs text-dark-muted">
+              {{ clusters().length }} clusters visibles con el filtro actual.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-4 space-y-2 max-h-[calc(100vh-26rem)] overflow-y-auto pr-1">
+          @for (cluster of clusters(); track cluster.cluster_id) {
+            <button
+              class="w-full rounded-2xl border p-3 text-left transition cursor-pointer"
+              [class]="cardClass(cluster)"
+              type="button"
+              (click)="onClusterClick(cluster)"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-xs uppercase tracking-[0.18em] text-dark-muted">
+                    {{ cluster.category }}
+                  </p>
+                  <h5 class="mt-1 text-sm font-semibold leading-5 text-dark-text">
+                    {{ cluster.label }}
+                  </h5>
+                  <p class="mt-1 text-xs leading-5 text-dark-muted">
+                    {{ cluster.subtitle }}
+                  </p>
+                </div>
+                <span [class]="signalBadge(cluster)">
+                  {{ formatStage(cluster.hype_stage) }}
+                </span>
+              </div>
+
+              <div class="mt-3 flex flex-wrap gap-2">
+                @for (kw of cluster.top_keywords.slice(0, 4); track kw) {
+                  <span class="rounded-full border border-dark-border bg-dark-bg px-2 py-1 text-[11px] text-dark-muted">
+                    {{ kw }}
+                  </span>
+                }
+              </div>
+
+              <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
+                <div class="rounded-lg bg-dark-bg/70 px-2 py-2">
+                  <p class="text-dark-muted">Impacto</p>
+                  <p class="mt-1 font-medium text-dark-text">
+                    {{ cluster.impact_score | number:'1.0-0' }}
+                  </p>
+                </div>
+                <div class="rounded-lg bg-dark-bg/70 px-2 py-2">
+                  <p class="text-dark-muted">Momentum</p>
+                  <p class="mt-1 font-medium text-dark-text">
+                    {{ cluster.momentum_score | number:'1.0-0' }}
+                  </p>
+                </div>
+                <div class="rounded-lg bg-dark-bg/70 px-2 py-2">
+                  <p class="text-dark-muted">Calidad</p>
+                  <p class="mt-1 font-medium text-dark-text">
+                    {{ cluster.cluster_quality.score | number:'1.0-0' }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="mt-3 flex items-center justify-between gap-3 text-xs text-dark-muted">
+                <span>{{ cluster.item_count }} docs</span>
+                @if (cluster.weak_signal_flag) {
+                  <span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-300">
+                    weak signal
+                  </span>
+                }
+              </div>
+            </button>
+          }
+
+          @if (clusters().length === 0) {
+            <p class="rounded-xl border border-dark-border bg-dark-bg/60 px-3 py-4 text-center text-sm text-dark-muted">
+              No hay clusters para la combinacion de filtros seleccionada.
+            </p>
+          }
+        </div>
+      </section>
     </aside>
   `,
-  imports: [DecimalPipe],
 })
 export class TrendmapSidebarComponent {
   readonly clusters = input<TrendmapCluster[]>([]);
   readonly categories = input<string[]>([]);
+  readonly filtersMetadata = input<FiltersMetadata | null>(null);
   readonly selectedCluster = input<TrendmapCluster | null>(null);
   readonly filterCategory = input<string | null>(null);
+  readonly filterSourceType = input<string | null>(null);
+  readonly filterMaturityStage = input<string | null>(null);
+  readonly filterHypeStage = input<LifecycleStage | null>(null);
+  readonly weakSignalsOnly = input(false);
+  readonly sortBy = input<ClusterSort>('impact');
+  readonly qualityChecks = input<QualityChecks | null>(null);
 
   readonly clusterSelected = output<TrendmapCluster | null>();
   readonly categoryChanged = output<string | null>();
+  readonly sourceTypeChanged = output<string | null>();
+  readonly maturityStageChanged = output<string | null>();
+  readonly hypeStageChanged = output<LifecycleStage | null>();
+  readonly weakSignalsChanged = output<boolean>();
+  readonly sortChanged = output<ClusterSort>();
+  readonly clearRequested = output<void>();
+
+  readonly sortOptions = SORT_OPTIONS;
+
+  readonly categoriesList = computed(
+    () => this.filtersMetadata()?.categories ?? this.categories(),
+  );
+
+  readonly sourceTypes = computed(
+    () => this.filtersMetadata()?.source_types ?? [],
+  );
+
+  readonly maturityStages = computed(
+    () => this.filtersMetadata()?.maturity_stages ?? [],
+  );
+
+  readonly hypeStages = computed(
+    () => this.filtersMetadata()?.hype_stages ?? [],
+  );
 
   onClusterClick(cluster: TrendmapCluster): void {
     const current = this.selectedCluster();
-    this.clusterSelected.emit(
-      current?.cluster_id === cluster.cluster_id ? null : cluster,
-    );
+    this.clusterSelected.emit(current?.cluster_id === cluster.cluster_id ? null : cluster);
   }
 
   onCategoryChange(event: Event): void {
@@ -88,23 +312,54 @@ export class TrendmapSidebarComponent {
     this.categoryChanged.emit(value || null);
   }
 
+  onSourceTypeChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.sourceTypeChanged.emit(value || null);
+  }
+
+  onMaturityStageChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.maturityStageChanged.emit(value || null);
+  }
+
+  onHypeStageChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as LifecycleStage | '';
+    this.hypeStageChanged.emit(value || null);
+  }
+
+  onWeakSignalsChange(event: Event): void {
+    this.weakSignalsChanged.emit((event.target as HTMLInputElement).checked);
+  }
+
+  onSortChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as ClusterSort;
+    this.sortChanged.emit(value);
+  }
+
+  formatStage(stage: string): string {
+    return stage.replaceAll('_', ' ');
+  }
+
   cardClass(cluster: TrendmapCluster): string {
     const isSelected = this.selectedCluster()?.cluster_id === cluster.cluster_id;
     if (isSelected) {
-      return 'border-dark-accent bg-dark-bg';
+      return 'border-amber-500/70 bg-dark-bg';
     }
-    return 'border-dark-border hover:border-dark-muted';
+    return 'border-dark-border bg-dark-bg/40 hover:border-dark-muted hover:bg-dark-bg/70';
   }
 
-  relevanceBadge(relevance: 'alta' | 'media' | 'baja'): string {
-    const base = 'text-[10px] font-medium px-2 py-0.5 rounded-full ';
-    switch (relevance) {
-      case 'alta':
-        return base + 'bg-red-900/40 text-red-400';
-      case 'media':
-        return base + 'bg-yellow-900/40 text-yellow-400';
-      case 'baja':
-        return base + 'bg-green-900/40 text-green-400';
+  signalBadge(cluster: TrendmapCluster): string {
+    const base =
+      'inline-flex rounded-full border px-2 py-1 text-[10px] font-medium leading-none ';
+    if (cluster.weak_signal_flag) {
+      return base + 'border-amber-500/50 bg-amber-500/10 text-amber-300';
     }
+    if (cluster.hype_stage === 'productive_adoption') {
+      return base + 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300';
+    }
+    if (cluster.hype_stage === 'correction') {
+      return base + 'border-rose-500/40 bg-rose-500/10 text-rose-300';
+    }
+    return base + 'border-sky-500/40 bg-sky-500/10 text-sky-300';
   }
 }

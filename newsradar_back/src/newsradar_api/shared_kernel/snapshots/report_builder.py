@@ -60,6 +60,109 @@ def _base_document_payload(doc: Document) -> dict[str, Any]:
     }
 
 
+def _normalized_keyword_set(cluster: dict[str, Any]) -> set[str]:
+    values = cluster.get("keywords") or cluster.get("top_keywords") or []
+    result: set[str] = set()
+    for value in values:
+        text = str(value).strip().lower()
+        if text:
+            result.add(text)
+    return result
+
+
+def _category_value(cluster: dict[str, Any]) -> str:
+    return str(cluster.get("dominant_risk") or cluster.get("category") or "").strip().lower()
+
+
+def _cluster_similarity(current: dict[str, Any], previous: dict[str, Any]) -> float:
+    current_keywords = _normalized_keyword_set(current)
+    previous_keywords = _normalized_keyword_set(previous)
+    keyword_overlap = (
+        len(current_keywords & previous_keywords) / len(current_keywords | previous_keywords)
+        if current_keywords and previous_keywords
+        else 0.0
+    )
+    label_current = str(current.get("label") or "").strip().lower()
+    label_previous = str(previous.get("label") or "").strip().lower()
+    label_score = 1.0 if label_current and label_current == label_previous else 0.0
+    category_score = 1.0 if _category_value(current) and _category_value(current) == _category_value(previous) else 0.0
+    return 0.55 * keyword_overlap + 0.25 * label_score + 0.20 * category_score
+
+
+def _attach_comparative_signals(payload: dict[str, Any], previous_payload: dict[str, Any] | None) -> None:
+    if not previous_payload:
+        payload["comparative_signals"] = {
+            "previous_snapshot_available": False,
+            "summary": "No hay snapshot previo comparable.",
+            "clusters": [],
+        }
+        return
+
+    previous_clusters = list(previous_payload.get("clusters") or [])
+    cluster_comparisons: list[dict[str, Any]] = []
+    new_count = accelerating_count = cooling_count = 0
+
+    for cluster in payload.get("clusters", []):
+        best_match = None
+        best_score = 0.0
+        for candidate in previous_clusters:
+            similarity = _cluster_similarity(cluster, candidate)
+            if similarity > best_score:
+                best_match = candidate
+                best_score = similarity
+
+        if best_match is None or best_score < 0.45:
+            status = "new"
+            new_count += 1
+            comparison = {
+                "cluster_id": cluster["cluster_id"],
+                "matched_previous_cluster": None,
+                "status": status,
+                "delta_documents": cluster.get("item_count") or cluster.get("documents") or 0,
+                "delta_impact": cluster.get("impact_score") or 0,
+                "delta_momentum": cluster.get("momentum_score") or 0,
+                "similarity": round(best_score, 3),
+            }
+        else:
+            current_docs = float(cluster.get("item_count") or cluster.get("documents") or 0)
+            previous_docs = float(best_match.get("item_count") or best_match.get("documents") or 0)
+            current_impact = float(cluster.get("impact_score") or cluster.get("avg_score") or 0)
+            previous_impact = float(best_match.get("impact_score") or best_match.get("avg_score") or 0)
+            current_momentum = float(cluster.get("momentum_score") or 0)
+            previous_momentum = float(best_match.get("momentum_score") or 0)
+            delta_documents = round(current_docs - previous_docs, 1)
+            delta_impact = round(current_impact - previous_impact, 1)
+            delta_momentum = round(current_momentum - previous_momentum, 1)
+            if delta_momentum >= 8 or delta_documents >= 2:
+                status = "accelerating"
+                accelerating_count += 1
+            elif delta_momentum <= -8:
+                status = "cooling"
+                cooling_count += 1
+            else:
+                status = "stable"
+            comparison = {
+                "cluster_id": cluster["cluster_id"],
+                "matched_previous_cluster": best_match.get("cluster_id"),
+                "status": status,
+                "delta_documents": delta_documents,
+                "delta_impact": delta_impact,
+                "delta_momentum": delta_momentum,
+                "similarity": round(best_score, 3),
+            }
+        cluster["comparative_signal"] = comparison
+        cluster_comparisons.append(comparison)
+
+    payload["comparative_signals"] = {
+        "previous_snapshot_available": True,
+        "summary": (
+            f"{new_count} clusters nuevos, {accelerating_count} acelerando y {cooling_count} enfriandose "
+            f"frente al snapshot previo."
+        ),
+        "clusters": cluster_comparisons,
+    }
+
+
 def build_trendmap_payload(documents: list[Document], window_months: int) -> dict[str, Any]:
     analysis = generate_report_analysis(documents, "trend_mapping", window_months)
     generated_at = analysis["generated_at"]
@@ -69,7 +172,8 @@ def build_trendmap_payload(documents: list[Document], window_months: int) -> dic
         "report_type": "trend_mapping",
         "generated_at": generated_at,
         "window_months": window_months,
-        "version": 2,
+        "version": 3,
+        "methodology_version": analysis["parameters"]["methodology_version"],
         "meta": analysis["meta"],
         "summary": {
             **analysis["summary"],
@@ -85,24 +189,56 @@ def build_trendmap_payload(documents: list[Document], window_months: int) -> dic
                 "relevance": cluster["relevance"],
                 "item_count": cluster["item_count"],
                 "impact_score": cluster["impact_score"],
+                "maturity_score": cluster["maturity_score"],
                 "horizon_score": cluster["horizon_score"],
                 "maturity_stage": cluster["maturity_stage"],
+                "hype_stage": cluster["hype_stage"],
                 "direction": cluster["direction"],
                 "growth_ratio": cluster["growth_ratio"],
+                "acceleration_ratio": cluster["acceleration_ratio"],
+                "momentum_score": cluster["momentum_score"],
+                "novelty_score": cluster["novelty_score"],
+                "uncertainty_score": cluster["uncertainty_score"],
+                "weak_signal_flag": cluster["weak_signal_flag"],
+                "subtitle": cluster["subtitle"],
+                "rationale": cluster["rationale"],
+                "taxonomy_matches": cluster["taxonomy_matches"],
+                "cluster_quality": cluster["cluster_quality"],
+                "maturity_score_breakdown": cluster["maturity_score_breakdown"],
+                "impact_score_breakdown": cluster["impact_score_breakdown"],
+                "momentum_score_breakdown": cluster["momentum_score_breakdown"],
+                "novelty_score_breakdown": cluster["novelty_score_breakdown"],
+                "uncertainty_score_breakdown": cluster["uncertainty_score_breakdown"],
                 "hull_polygon": cluster["hull_polygon"],
                 "articles": cluster["articles"],
                 "top_documents": cluster["top_documents"],
+                "representative_documents": cluster["representative_documents"],
                 "source_mix": cluster["source_mix"],
+                "insight_evidence": cluster["insight_evidence"],
                 "executive_takeaway": cluster["executive_takeaway"],
+                "what_is_happening": cluster["what_is_happening"],
+                "why_it_matters": cluster["why_it_matters"],
+                "decision_prompt": cluster["decision_prompt"],
                 "coords": cluster["coords"],
             }
             for cluster in clusters
         ],
         "super_clusters": analysis["super_clusters"],
         "articles": analysis["documents"],
+        "documents": analysis["documents"],
         "trends": analysis["timeline"],
         "charts": {
             "embedding_scatter": analysis["documents"],
+            "cluster_scatter": [
+                {
+                    "label": cluster["label"],
+                    "category": cluster["category"],
+                    "x": cluster["impact_score"],
+                    "y": cluster["maturity_score"],
+                    "size": cluster["item_count"],
+                }
+                for cluster in clusters
+            ],
             "cluster_sizes": [
                 {"label": cluster["label"], "count": cluster["item_count"]}
                 for cluster in clusters
@@ -112,8 +248,10 @@ def build_trendmap_payload(documents: list[Document], window_months: int) -> dic
             "hype_cycle": [
                 {
                     "label": cluster["label"],
-                    "x": round(cluster["horizon_score"] * 100, 2),
+                    "stage": cluster["hype_stage"],
+                    "x": round(cluster["maturity_score"], 2),
                     "y": cluster["impact_score"],
+                    "momentum": cluster["momentum_score"],
                 }
                 for cluster in clusters
             ],
@@ -123,6 +261,13 @@ def build_trendmap_payload(documents: list[Document], window_months: int) -> dic
         "recommendations": analysis["recommendations"],
         "risk_signals": analysis["risk_signals"],
         "top_documents": analysis["top_documents"],
+        "cluster_cards": analysis["cluster_cards"],
+        "trend_cards": analysis["trend_cards"],
+        "taxonomy_breakdown": analysis["taxonomy_breakdown"],
+        "quality_checks": analysis["quality_checks"],
+        "filters_metadata": analysis["filters_metadata"],
+        "weak_signals": analysis["weak_signals"],
+        "methodology": analysis["methodology"],
         "sources_used": [item["source"] for item in analysis["source_mix"]],
         "parameters": analysis["parameters"],
     }
@@ -138,7 +283,9 @@ def build_riskmap_payload(documents: list[Document], window_months: int) -> dict
         "report_type": "risk_mapping",
         "generated_at": generated_at,
         "window_months": window_months,
-        "version": 2,
+        "version": 3,
+        "methodology_version": analysis["parameters"]["methodology_version"],
+        "meta": analysis["meta"],
         "summary": {
             **analysis["summary"],
             "executive_summary": analysis["executive_summary"],
@@ -147,21 +294,58 @@ def build_riskmap_payload(documents: list[Document], window_months: int) -> dict
             {
                 "cluster_id": cluster["cluster_id"],
                 "label": cluster["label"],
+                "category": cluster["category"],
                 "dominant_risk": cluster["dominant_risk"] or cluster["category"],
+                "keywords": cluster["keywords"],
+                "relevance": cluster["relevance"],
                 "documents": cluster["documents"],
+                "item_count": cluster["item_count"],
+                "effective_documents": cluster.get("effective_documents"),
                 "avg_score": cluster["avg_score"],
+                "impact_score": cluster["impact_score"],
+                "maturity_score": cluster["maturity_score"],
                 "coords": cluster["coords"],
+                "hull_polygon": cluster["hull_polygon"],
+                "articles": cluster["articles"],
                 "top_keywords": cluster["top_keywords"],
                 "direction": cluster["direction"],
                 "growth_ratio": cluster["growth_ratio"],
+                "acceleration_ratio": cluster["acceleration_ratio"],
                 "horizon_score": cluster["horizon_score"],
+                "momentum_score": cluster["momentum_score"],
+                "novelty_score": cluster["novelty_score"],
+                "uncertainty_score": cluster["uncertainty_score"],
+                "persistence_score": cluster["persistence_score"],
+                "risk_severity": cluster["risk_severity"],
+                "risk_severity_breakdown": cluster["risk_severity_breakdown"],
+                "maturity_stage": cluster["maturity_stage"],
+                "hype_stage": cluster["hype_stage"],
+                "weak_signal_flag": cluster["weak_signal_flag"],
+                "subtitle": cluster["subtitle"],
+                "rationale": cluster["rationale"],
+                "taxonomy_matches": cluster["taxonomy_matches"],
+                "cluster_quality": cluster["cluster_quality"],
+                "maturity_score_breakdown": cluster["maturity_score_breakdown"],
+                "impact_score_breakdown": cluster["impact_score_breakdown"],
+                "momentum_score_breakdown": cluster["momentum_score_breakdown"],
+                "novelty_score_breakdown": cluster["novelty_score_breakdown"],
+                "uncertainty_score_breakdown": cluster["uncertainty_score_breakdown"],
                 "source_mix": cluster["source_mix"],
                 "summary": cluster["summary"],
                 "top_documents": cluster["top_documents"],
+                "representative_documents": cluster["representative_documents"],
+                "insight_evidence": cluster["insight_evidence"],
                 "executive_takeaway": cluster["executive_takeaway"],
+                "what_is_happening": cluster["what_is_happening"],
+                "why_it_matters": cluster["why_it_matters"],
+                "decision_prompt": cluster["decision_prompt"],
             }
             for cluster in clusters
         ],
+        "super_clusters": analysis["super_clusters"],
+        "documents": analysis["documents"],
+        "articles": analysis["documents"],
+        "timeline": analysis["timeline"],
         "charts": {
             "timeline": analysis["timeline"],
             "source_mix": analysis["source_mix"],
@@ -172,8 +356,20 @@ def build_riskmap_payload(documents: list[Document], window_months: int) -> dict
             "hype_cycle": [
                 {
                     "label": cluster["label"],
-                    "x": round(cluster["horizon_score"] * 100, 2),
-                    "y": cluster["avg_score"],
+                    "stage": cluster["hype_stage"],
+                    "x": round(cluster["maturity_score"], 2),
+                    "y": cluster["impact_score"],
+                    "momentum": cluster["momentum_score"],
+                }
+                for cluster in clusters
+            ],
+            "risk_scatter": [
+                {
+                    "label": cluster["label"],
+                    "category": cluster["dominant_risk"],
+                    "x": cluster["risk_severity"],
+                    "y": cluster["momentum_score"],
+                    "size": cluster["documents"],
                 }
                 for cluster in clusters
             ],
@@ -181,9 +377,18 @@ def build_riskmap_payload(documents: list[Document], window_months: int) -> dict
             "monthly_volume": analysis["monthly_volume"],
         },
         "top_documents": analysis["top_documents"],
+        "cluster_cards": analysis["cluster_cards"],
+        "trend_cards": analysis["trend_cards"],
+        "taxonomy_breakdown": analysis["taxonomy_breakdown"],
+        "quality_checks": analysis["quality_checks"],
+        "filters_metadata": analysis["filters_metadata"],
+        "weak_signals": analysis["weak_signals"],
+        "methodology": analysis["methodology"],
         "sources_used": [item["source"] for item in analysis["source_mix"]],
         "parameters": analysis["parameters"],
         "insights": analysis["insights"],
+        "recommendations": analysis["recommendations"],
+        "risk_signals": analysis["risk_signals"],
     }
     return SnapshotLLMEnricher("risk_mapping").enrich_payload(payload)
 
@@ -239,6 +444,21 @@ async def _latest_existing_snapshot(
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
+async def _latest_previous_snapshot(
+    session: AsyncSession,
+    report_type: str,
+    business_flow: str,
+) -> ReportSnapshot | None:
+    stmt = (
+        select(ReportSnapshot)
+        .where(ReportSnapshot.report_type == report_type)
+        .where(ReportSnapshot.business_flow == business_flow)
+        .order_by(ReportSnapshot.generated_at.desc())
+        .limit(1)
+    )
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
 async def persist_snapshot(
     session: AsyncSession,
     report_type: str,
@@ -260,6 +480,8 @@ async def persist_snapshot(
         if existing is not None:
             return existing
 
+    previous_snapshot = await _latest_previous_snapshot(session, report_type, business_flow)
+    _attach_comparative_signals(payload, previous_snapshot.data_json if previous_snapshot else None)
     generated_at = datetime.now(timezone.utc)
     version = await _next_snapshot_version(session, report_type, business_flow)
     parameters = payload.get("parameters") or {"window_months": window_months}

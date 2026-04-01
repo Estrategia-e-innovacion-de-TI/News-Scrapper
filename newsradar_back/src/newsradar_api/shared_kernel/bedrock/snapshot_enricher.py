@@ -369,6 +369,8 @@ class SnapshotLLMEnricher:
             clusters_json=json.dumps(clusters[:8], ensure_ascii=False),
             top_documents_json=json.dumps(top_documents[:5], ensure_ascii=False),
             source_mix_json=json.dumps(source_mix, ensure_ascii=False),
+            comparative_signals_json=json.dumps(payload.get("comparative_signals") or {}, ensure_ascii=False),
+            methodology_json=json.dumps(payload.get("methodology") or {}, ensure_ascii=False),
         )
         trace["report_calls"] += 1
 

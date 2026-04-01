@@ -10,6 +10,18 @@ export type {
 } from './vigilancia.model';
 export type {
   HypeStage,
+  LifecycleStage,
+  ScoreBreakdown,
+  ScoreBreakdownComponent,
+  TaxonomyMatch,
+  ClusterQuality,
+  InsightEvidence,
+  ComparativeClusterSignal,
+  ComparativeSignals,
+  QualityChecks,
+  FiltersMetadata,
+  ClusterCardSummary,
+  TrendCardSummary,
   Cluster,
   Trend,
   TrendmapData,
@@ -19,5 +31,7 @@ export type {
   SuperCluster,
   TrendEntry,
   RiskSignal,
+  MethodologyBlock,
 } from './trendmap.model';
+export type { RiskmapData, RiskmapCluster } from './riskmap.model';
 export { DARK_THEME } from './trendmap.model';

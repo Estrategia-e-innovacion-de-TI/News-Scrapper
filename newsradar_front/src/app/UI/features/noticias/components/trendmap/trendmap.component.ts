@@ -1,4 +1,5 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { TrendmapSignalService } from '../../../../../infrastructure/noticias/services/trendmap.service';
 import { TrendmapOverviewComponent } from './overview.component';
 import { D3ScatterComponent } from './d3-scatter.component';
@@ -28,6 +29,7 @@ const TABS: Tab[] = [
   selector: 'app-trendmap',
   standalone: true,
   imports: [
+    DecimalPipe,
     TrendmapOverviewComponent,
     D3ScatterComponent,
     TrendmapImpactComponent,
@@ -39,7 +41,62 @@ const TABS: Tab[] = [
   template: `
     <div class="min-h-screen bg-dark-bg text-dark-text">
       <div class="p-6">
-        <h2 class="text-xl font-semibold mb-6">Trend Mapping</h2>
+        <div class="mb-6 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+          <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 class="text-2xl font-semibold">Trend Mapping</h2>
+                <p class="mt-2 max-w-3xl text-sm leading-6 text-dark-muted">
+                  Snapshot-driven, con scoring interpretable, clusterización híbrida y detalle
+                  explicable por cluster.
+                </p>
+              </div>
+              @if (service.data()?.methodology_version) {
+                <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
+                  {{ service.data()?.methodology_version }}
+                </span>
+              }
+            </div>
+
+            @if (service.data()?.summary?.executive_summary) {
+              <p class="mt-4 text-sm leading-6 text-dark-text/90">
+                {{ service.data()?.summary?.executive_summary }}
+              </p>
+            }
+
+            @if (service.data()?.comparative_signals?.summary) {
+              <div class="mt-4 rounded-xl border border-dark-border bg-dark-bg/70 px-4 py-3 text-sm text-dark-muted">
+                {{ service.data()?.comparative_signals?.summary }}
+              </div>
+            }
+          </section>
+
+          <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+            <h3 class="text-xs font-semibold uppercase tracking-[0.18em] text-dark-muted">
+              Filtros activos
+            </h3>
+            <div class="mt-3 flex flex-wrap gap-2">
+              @for (tag of service.activeFilterSummary(); track tag) {
+                <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
+                  {{ tag }}
+                </span>
+              }
+            </div>
+            @if (service.highlightCards().length > 0) {
+              <div class="mt-4 space-y-2">
+                @for (card of service.highlightCards().slice(0, 3); track card.cluster_id) {
+                  <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-3">
+                    <p class="text-sm font-medium text-dark-text">{{ card.label }}</p>
+                    <p class="mt-1 text-xs text-dark-muted">
+                      Impacto {{ card.impact_score | number:'1.0-0' }} · Momentum
+                      {{ card.momentum_score | number:'1.0-0' }}
+                    </p>
+                  </div>
+                }
+              </div>
+            }
+          </section>
+        </div>
 
         @if (service.loading()) {
           <p class="text-dark-muted text-sm">Cargando datos de tendencias...</p>
@@ -83,11 +140,16 @@ const TABS: Tab[] = [
                 }
                 @case ('detalle') {
                   <app-trendmap-detail
+                    [cluster]="service.selectedCluster()"
                     [articles]="selectedOrFilteredArticles()"
                   />
                 }
                 @case ('metodologia') {
-                  <app-trendmap-methodology />
+                  <app-trendmap-methodology
+                    [methodology]="service.data()?.methodology ?? null"
+                    [qualityChecks]="service.data()?.quality_checks ?? null"
+                    [filtersMetadata]="service.data()?.filters_metadata ?? null"
+                  />
                 }
               }
             </div>
@@ -97,10 +159,23 @@ const TABS: Tab[] = [
               <app-trendmap-sidebar
                 [clusters]="service.filteredClusters()"
                 [categories]="service.categories()"
+                [filtersMetadata]="service.data()?.filters_metadata ?? null"
                 [selectedCluster]="service.selectedCluster()"
                 [filterCategory]="service.filterCategory()"
+                [filterSourceType]="service.filterSourceType()"
+                [filterMaturityStage]="service.filterMaturityStage()"
+                [filterHypeStage]="service.filterHypeStage()"
+                [weakSignalsOnly]="service.weakSignalsOnly()"
+                [sortBy]="service.sortBy()"
+                [qualityChecks]="service.data()?.quality_checks ?? null"
                 (clusterSelected)="service.selectCluster($event)"
                 (categoryChanged)="service.setFilterCategory($event)"
+                (sourceTypeChanged)="service.setFilterSourceType($event)"
+                (maturityStageChanged)="service.setFilterMaturityStage($event)"
+                (hypeStageChanged)="service.setFilterHypeStage($event)"
+                (weakSignalsChanged)="service.setWeakSignalsOnly($event)"
+                (sortChanged)="service.setSortBy($event)"
+                (clearRequested)="service.clearFilters()"
               />
             }
           </div>
@@ -117,7 +192,7 @@ export class TrendmapComponent implements OnInit {
 
   readonly showSidebar = computed(() => {
     const tab = this.activeTab();
-    return tab === 'mapa' || tab === 'detalle';
+    return tab !== 'metodologia';
   });
 
   readonly selectedOrFilteredArticles = computed(() => {

@@ -1,0 +1,471 @@
+<div class="min-h-screen bg-dark-bg text-dark-text">
+  <div class="space-y-6 p-6">
+    <div class="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+      <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-semibold">Risk Mapping</h2>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-dark-muted">
+              Snapshot-driven, comparable con Trend Mapping y centrado en severidad,
+              persistencia, momentum y explicabilidad documental.
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            @if (snapshot()?.methodology_version) {
+              <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
+                {{ snapshot()?.methodology_version }}
+              </span>
+            }
+            <button
+              class="rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200 disabled:opacity-50"
+              [disabled]="running()"
+              type="button"
+              (click)="runRiskmap()"
+            >
+              @if (running()) { Ejecutando... } @else { Regenerar snapshot }
+            </button>
+          </div>
+        </div>
+        @if (snapshot()?.summary?.executive_summary) {
+          <p class="mt-4 text-sm leading-6 text-dark-text/90">
+            {{ snapshot()?.summary?.executive_summary }}
+          </p>
+        }
+        @if (snapshot()?.comparative_signals?.summary) {
+          <div class="mt-4 rounded-2xl border border-dark-border bg-dark-bg/70 px-4 py-3 text-sm text-dark-muted">
+            {{ snapshot()?.comparative_signals?.summary }}
+          </div>
+        }
+      </section>
+
+      <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+        <h3 class="text-xs font-semibold uppercase tracking-[0.18em] text-dark-muted">
+          Filtros activos
+        </h3>
+        <div class="mt-3 flex flex-wrap gap-2">
+          @for (tag of activeFilterSummary(); track tag) {
+            <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
+              {{ tag }}
+            </span>
+          }
+        </div>
+        @if (highlightClusters().length > 0) {
+          <div class="mt-4 space-y-2">
+            @for (cluster of highlightClusters().slice(0, 3); track cluster.cluster_id) {
+              <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-3">
+                <p class="text-sm font-medium text-dark-text">{{ cluster.label }}</p>
+                <p class="mt-1 text-xs text-dark-muted">
+                  Severidad {{ cluster.risk_severity | number:'1.0-0' }} · Momentum
+                  {{ cluster.momentum_score | number:'1.0-0' }}
+                </p>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    </div>
+
+    @if (loading()) {
+      <p class="text-sm text-dark-muted">Cargando snapshot de riesgos...</p>
+    } @else if (error()) {
+      <p class="text-sm text-red-400" role="alert">{{ error() }}</p>
+    } @else if (!snapshot()) {
+      <div class="rounded-2xl border border-dark-border bg-dark-surface p-6 text-sm text-dark-muted">
+        No hay snapshot de Risk Mapping disponible.
+      </div>
+    } @else {
+      <div class="grid gap-6 xl:grid-cols-[320px_1fr]">
+        <aside class="space-y-4">
+          <section class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h4 class="text-sm font-semibold text-dark-text">Filtros</h4>
+                <p class="mt-1 text-xs text-dark-muted">Categoria, fuente, stage y orden.</p>
+              </div>
+              <button
+                class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-[11px] text-dark-muted"
+                type="button"
+                (click)="clearFilters()"
+              >
+                Limpiar
+              </button>
+            </div>
+
+            <div class="mt-4 grid gap-3">
+              <label class="grid gap-1">
+                <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Categoria</span>
+                <select
+                  class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+                  [value]="filterCategory() ?? ''"
+                  (change)="setFilterCategory(onSelectValue($event))"
+                >
+                  <option value="">Todas</option>
+                  @for (item of categories(); track item) {
+                    <option [value]="item">{{ item }}</option>
+                  }
+                </select>
+              </label>
+
+              <label class="grid gap-1">
+                <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Tipo fuente</span>
+                <select
+                  class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+                  [value]="filterSourceType() ?? ''"
+                  (change)="setFilterSourceType(onSelectValue($event))"
+                >
+                  <option value="">Todas</option>
+                  @for (item of sourceTypes(); track item) {
+                    <option [value]="item">{{ item }}</option>
+                  }
+                </select>
+              </label>
+
+              <label class="grid gap-1">
+                <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Hype stage</span>
+                <select
+                  class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+                  [value]="filterHypeStage() ?? ''"
+                  (change)="setFilterHypeStage(onStageValue($event))"
+                >
+                  <option value="">Todos</option>
+                  @for (item of hypeStages(); track item) {
+                    <option [value]="item">{{ stageLabel(item) }}</option>
+                  }
+                </select>
+              </label>
+
+              <label class="grid gap-1">
+                <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Orden</span>
+                <select
+                  class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+                  [value]="sortBy()"
+                  (change)="setSortBy(onSortValue($event))"
+                >
+                  @for (item of sortOptions; track item.value) {
+                    <option [value]="item.value">{{ item.label }}</option>
+                  }
+                </select>
+              </label>
+            </div>
+
+            <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-dark-border bg-dark-bg/70 px-3 py-2">
+              <input
+                class="mt-1 accent-amber-500"
+                type="checkbox"
+                [checked]="weakSignalsOnly()"
+                (change)="setWeakSignalsOnly(onCheckboxValue($event))"
+              />
+              <span>
+                <span class="block text-sm text-dark-text">Solo weak signals</span>
+                <span class="block text-xs text-dark-muted">Riesgos pequenos con alta novedad.</span>
+              </span>
+            </label>
+          </section>
+
+          <section class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+            <h4 class="text-sm font-semibold text-dark-text">Quality Checks</h4>
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Coherencia</p>
+                <p class="mt-2 text-lg font-semibold text-dark-text">
+                  {{ snapshot()!.quality_checks?.cluster_coherence_avg ?? 0 }}
+                </p>
+              </div>
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Calidad</p>
+                <p class="mt-2 text-lg font-semibold text-dark-text">
+                  {{ snapshot()!.quality_checks?.cluster_quality_avg ?? 0 }}
+                </p>
+              </div>
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Taxonomia</p>
+                <p class="mt-2 text-lg font-semibold text-dark-text">
+                  {{ snapshot()!.quality_checks?.taxonomy_coverage ?? 0 }}%
+                </p>
+              </div>
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Weak</p>
+                <p class="mt-2 text-lg font-semibold text-dark-text">
+                  {{ snapshot()!.quality_checks?.weak_signal_clusters ?? 0 }}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+            <h4 class="text-sm font-semibold text-dark-text">Clusters de riesgo</h4>
+            <p class="mt-1 text-xs text-dark-muted">{{ filteredClusters().length }} visibles.</p>
+            <div class="mt-4 space-y-2 max-h-[calc(100vh-28rem)] overflow-y-auto pr-1">
+              @for (cluster of filteredClusters(); track cluster.cluster_id) {
+                <button
+                  class="w-full rounded-2xl border p-3 text-left transition cursor-pointer"
+                  [class]="clusterCardClass(cluster)"
+                  type="button"
+                  (click)="selectCluster(cluster)"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+                        {{ cluster.dominant_risk }}
+                      </p>
+                      <h5 class="mt-1 text-sm font-semibold text-dark-text">{{ cluster.label }}</h5>
+                      <p class="mt-1 text-xs text-dark-muted">{{ cluster.subtitle }}</p>
+                    </div>
+                    <span [class]="stageBadge(cluster.hype_stage)">{{ stageLabel(cluster.hype_stage) }}</span>
+                  </div>
+                  <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
+                    <div class="rounded-lg bg-dark-bg/70 px-2 py-2">
+                      <p class="text-dark-muted">Severidad</p>
+                      <p class="mt-1 font-medium text-dark-text">{{ cluster.risk_severity | number:'1.0-0' }}</p>
+                    </div>
+                    <div class="rounded-lg bg-dark-bg/70 px-2 py-2">
+                      <p class="text-dark-muted">Momentum</p>
+                      <p class="mt-1 font-medium text-dark-text">{{ cluster.momentum_score | number:'1.0-0' }}</p>
+                    </div>
+                    <div class="rounded-lg bg-dark-bg/70 px-2 py-2">
+                      <p class="text-dark-muted">Persistencia</p>
+                      <p class="mt-1 font-medium text-dark-text">{{ cluster.persistence_score | number:'1.0-0' }}</p>
+                    </div>
+                  </div>
+                </button>
+              }
+            </div>
+          </section>
+        </aside>
+
+        <div class="space-y-6">
+          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+            @for (card of kpis(); track card.label) {
+              <div class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">{{ card.label }}</p>
+                <p class="mt-2 text-2xl font-semibold text-dark-text">{{ card.value }}</p>
+              </div>
+            }
+          </div>
+
+          <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+            <h4 class="text-sm font-semibold text-dark-text">Severidad vs momentum</h4>
+            <svg viewBox="0 0 620 360" class="mt-4 h-auto w-full">
+              <rect width="620" height="360" [attr.fill]="theme.bg" rx="14" />
+              @for (tick of axisTicks; track tick) {
+                <line [attr.x1]="scatterX(tick)" [attr.x2]="scatterX(tick)" y1="36" y2="308" [attr.stroke]="theme.border" stroke-dasharray="4 6" />
+                <line x1="56" x2="584" [attr.y1]="scatterY(tick)" [attr.y2]="scatterY(tick)" [attr.stroke]="theme.border" stroke-dasharray="4 6" />
+                <text [attr.x]="scatterX(tick)" y="326" text-anchor="middle" [attr.fill]="theme.textMuted" font-size="10">{{ tick }}</text>
+                <text x="44" [attr.y]="scatterY(tick) + 4" text-anchor="end" [attr.fill]="theme.textMuted" font-size="10">{{ tick }}</text>
+              }
+              <line x1="56" y1="308" x2="584" y2="308" [attr.stroke]="theme.border" />
+              <line x1="56" y1="36" x2="56" y2="308" [attr.stroke]="theme.border" />
+              <text x="320" y="344" text-anchor="middle" [attr.fill]="theme.textMuted" font-size="11">Severidad potencial</text>
+              <text x="18" y="182" text-anchor="middle" [attr.fill]="theme.textMuted" font-size="11" transform="rotate(-90 18 182)">Momentum</text>
+              @for (point of scatterPoints(); track point.cluster.cluster_id) {
+                <g class="cursor-pointer" (click)="selectCluster(point.cluster)">
+                  <circle
+                    [attr.cx]="point.x"
+                    [attr.cy]="point.y"
+                    [attr.r]="point.r"
+                    [attr.fill]="point.color"
+                    [attr.opacity]="bubbleOpacity(point.cluster)"
+                    [attr.stroke]="selectedCluster()?.cluster_id === point.cluster.cluster_id ? '#f8fafc' : '#0f172a'"
+                    [attr.stroke-width]="selectedCluster()?.cluster_id === point.cluster.cluster_id ? 2 : 1.2"
+                  >
+                    <title>{{ point.cluster.label }}&#10;Severidad: {{ point.cluster.risk_severity | number:'1.0-0' }}&#10;Momentum: {{ point.cluster.momentum_score | number:'1.0-0' }}&#10;Persistencia: {{ point.cluster.persistence_score | number:'1.0-0' }}</title>
+                  </circle>
+                  @if (point.r >= 12) {
+                    <text [attr.x]="point.x" [attr.y]="point.y - point.r - 8" text-anchor="middle" [attr.fill]="theme.text" font-size="8">
+                      {{ shortLabel(point.cluster.label, 18) }}
+                    </text>
+                  }
+                </g>
+              }
+            </svg>
+          </section>
+
+          <div class="grid gap-6 xl:grid-cols-2">
+            <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+              <h4 class="text-sm font-semibold text-dark-text">Taxonomia y temporalidad</h4>
+              <div class="mt-4 space-y-4">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.18em] text-dark-muted">Taxonomia dominante</p>
+                  <div class="mt-3 space-y-2">
+                    @for (item of taxonomyBreakdown().slice(0, 6); track item.name) {
+                      <div>
+                        <div class="flex items-center justify-between gap-3 text-xs text-dark-muted">
+                          <span>{{ item.name }}</span>
+                          <span>{{ item.score | number:'1.0-2' }}</span>
+                        </div>
+                        <div class="mt-1 h-2 rounded-full bg-dark-border">
+                          <div class="h-full rounded-full bg-amber-500" [style.width.%]="ratio(item.score, taxonomyMax())"></div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+                <div>
+                  <p class="text-xs uppercase tracking-[0.18em] text-dark-muted">Volumen mensual</p>
+                  <div class="mt-3 space-y-2">
+                    @for (item of monthlyVolume().slice(-6); track item.bucket) {
+                      <div>
+                        <div class="flex items-center justify-between gap-3 text-xs text-dark-muted">
+                          <span>{{ item.bucket }}</span>
+                          <span>{{ item.count }}</span>
+                        </div>
+                        <div class="mt-1 h-2 rounded-full bg-dark-border">
+                          <div class="h-full rounded-full bg-emerald-400" [style.width.%]="ratio(item.count, monthlyVolumeMax())"></div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+              <h4 class="text-sm font-semibold text-dark-text">Source mix e insights</h4>
+              <div class="mt-4 space-y-4">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.18em] text-dark-muted">Source mix</p>
+                  <div class="mt-3 space-y-2">
+                    @for (item of sourceMix().slice(0, 6); track item.source) {
+                      <div>
+                        <div class="flex items-center justify-between gap-3 text-xs text-dark-muted">
+                          <span>{{ item.source }}</span>
+                          <span>{{ item.count }}</span>
+                        </div>
+                        <div class="mt-1 h-2 rounded-full bg-dark-border">
+                          <div class="h-full rounded-full bg-sky-400" [style.width.%]="ratio(item.count, sourceMixMax())"></div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+                <div class="space-y-3">
+                  @for (signal of topSignals().slice(0, 4); track signal.type + signal.description) {
+                    <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-3">
+                      <div class="flex items-center justify-between gap-3">
+                        <span class="text-sm font-medium text-dark-text">{{ signal.type }}</span>
+                        <span [class]="severityBadge(signal.severity)">{{ signal.severity }}</span>
+                      </div>
+                      <p class="mt-2 text-sm text-dark-muted">{{ signal.description }}</p>
+                    </div>
+                  }
+                </div>
+              </div>
+            </section>
+          </div>
+
+          @if (selectedCluster()) {
+            <div class="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+              <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p class="text-xs uppercase tracking-[0.18em] text-dark-muted">{{ selectedCluster()!.dominant_risk }}</p>
+                    <h4 class="mt-2 text-xl font-semibold text-dark-text">{{ selectedCluster()!.label }}</h4>
+                    <p class="mt-2 text-sm text-dark-muted">{{ selectedCluster()!.subtitle }}</p>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <span [class]="stageBadge(selectedCluster()!.hype_stage)">{{ stageLabel(selectedCluster()!.hype_stage) }}</span>
+                    <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
+                      {{ selectedCluster()!.maturity_stage.replaceAll('_', ' ') }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="mt-4 grid gap-4 lg:grid-cols-4">
+                  <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3"><p class="text-xs uppercase tracking-wide text-dark-muted">Severidad</p><p class="mt-2 text-2xl font-semibold text-dark-text">{{ selectedCluster()!.risk_severity | number:'1.0-0' }}</p></div>
+                  <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3"><p class="text-xs uppercase tracking-wide text-dark-muted">Impacto</p><p class="mt-2 text-2xl font-semibold text-dark-text">{{ selectedCluster()!.impact_score | number:'1.0-0' }}</p></div>
+                  <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3"><p class="text-xs uppercase tracking-wide text-dark-muted">Persistencia</p><p class="mt-2 text-2xl font-semibold text-dark-text">{{ selectedCluster()!.persistence_score | number:'1.0-0' }}</p></div>
+                  <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3"><p class="text-xs uppercase tracking-wide text-dark-muted">Momentum</p><p class="mt-2 text-2xl font-semibold text-dark-text">{{ selectedCluster()!.momentum_score | number:'1.0-0' }}</p></div>
+                </div>
+
+                <div class="mt-4 space-y-4">
+                  <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-4">
+                    <h5 class="text-sm font-semibold text-dark-text">Que esta pasando</h5>
+                    <p class="mt-2 text-sm leading-6 text-dark-text/90">{{ selectedCluster()!.what_is_happening }}</p>
+                    <p class="mt-3 text-sm leading-6 text-dark-muted">{{ selectedCluster()!.why_it_matters }}</p>
+                    <p class="mt-3 rounded-lg border border-dark-border bg-dark-surface px-3 py-2 text-sm text-dark-text/90">
+                      {{ selectedCluster()!.decision_prompt }}
+                    </p>
+                  </div>
+
+                  <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-4">
+                    <h5 class="text-sm font-semibold text-dark-text">Evidencia y scoring</h5>
+                    <p class="mt-2 text-sm leading-6 text-dark-muted">{{ selectedCluster()!.rationale }}</p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      @for (match of selectedCluster()!.taxonomy_matches.slice(0, 5); track match.name) {
+                        <span class="rounded-full border border-dark-border bg-dark-surface px-3 py-1 text-xs text-dark-muted">
+                          {{ match.name }} · {{ match.score * 100 | number:'1.0-0' }}
+                        </span>
+                      }
+                    </div>
+                    <div class="mt-3 space-y-3">
+                      @for (item of selectedScoreRows(); track item.label) {
+                        <div class="rounded-lg border border-dark-border bg-dark-surface/70 p-3">
+                          <div class="flex items-center justify-between gap-3">
+                            <p class="text-sm font-medium text-dark-text">{{ item.label }}</p>
+                            <span class="text-xs text-dark-muted">{{ item.score | number:'1.0-0' }}</span>
+                          </div>
+                          <p class="mt-1 text-xs leading-5 text-dark-muted">{{ item.formula }}</p>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+                <h4 class="text-sm font-semibold text-dark-text">Documentos representativos</h4>
+                <div class="mt-4 space-y-3">
+                  @for (doc of selectedCluster()!.representative_documents.slice(0, 5); track doc.id) {
+                    <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-3">
+                      <div class="flex items-start justify-between gap-3">
+                        <a [href]="doc.url" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-dark-text hover:text-dark-accent">
+                          {{ doc.title }}
+                        </a>
+                        <span class="text-xs text-dark-muted">{{ doc.score | number:'1.0-0' }}</span>
+                      </div>
+                      <p class="mt-1 text-xs text-dark-muted">{{ doc.source }} · {{ doc.date }}</p>
+                      @if (doc.representative_reason) {
+                        <p class="mt-2 text-xs text-dark-text/85">{{ doc.representative_reason }}</p>
+                      }
+                    </div>
+                  }
+                </div>
+              </section>
+            </div>
+          }
+
+          <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+            <h4 class="text-sm font-semibold text-dark-text">Documentos ({{ selectedOrFilteredDocuments().length }})</h4>
+            <div class="mt-4 overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-dark-border">
+                    <th class="px-3 py-2 text-left font-medium text-dark-muted">Documento</th>
+                    <th class="px-3 py-2 text-left font-medium text-dark-muted">Fuente</th>
+                    <th class="px-3 py-2 text-left font-medium text-dark-muted">Cluster</th>
+                    <th class="px-3 py-2 text-left font-medium text-dark-muted">Fecha</th>
+                    <th class="px-3 py-2 text-left font-medium text-dark-muted">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (doc of selectedOrFilteredDocuments(); track doc.id) {
+                    <tr class="border-b border-dark-border/50 align-top hover:bg-dark-bg/50">
+                      <td class="px-3 py-3 text-dark-text">
+                        <a [href]="doc.url" target="_blank" rel="noopener noreferrer" class="hover:text-dark-accent">{{ doc.title }}</a>
+                        <p class="mt-1 text-xs text-dark-muted">{{ doc.summary }}</p>
+                      </td>
+                      <td class="px-3 py-3 text-dark-muted">{{ doc.source }}</td>
+                      <td class="px-3 py-3 text-dark-muted">{{ doc.cluster_label ?? doc.cluster_id }}</td>
+                      <td class="px-3 py-3 whitespace-nowrap text-dark-muted">{{ doc.date }}</td>
+                      <td class="px-3 py-3 text-dark-muted">{{ doc.score | number:'1.0-0' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    }
+  </div>
+</div>

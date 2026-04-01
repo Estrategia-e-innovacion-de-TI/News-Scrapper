@@ -15,95 +15,210 @@ interface KpiCard {
   value: number | string;
 }
 
+interface NamedScore {
+  name: string;
+  score: number;
+}
+
+interface VolumePoint {
+  bucket: string;
+  count: number;
+}
+
 @Component({
   selector: 'app-trendmap-overview',
   standalone: true,
   template: `
     <div class="space-y-6">
-      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         @for (kpi of kpis(); track kpi.label) {
-          <div class="bg-dark-surface border border-dark-border rounded-lg p-4">
-            <p class="text-dark-muted text-xs uppercase tracking-wide">{{ kpi.label }}</p>
-            <p class="text-2xl font-bold text-dark-text mt-1">{{ kpi.value }}</p>
+          <div class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+            <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">{{ kpi.label }}</p>
+            <p class="mt-2 text-2xl font-semibold text-dark-text">{{ kpi.value }}</p>
           </div>
         }
       </div>
 
-      @if (data().summary?.executive_summary) {
-        <section class="bg-dark-surface border border-dark-border rounded-lg p-5">
-          <h4 class="text-sm font-semibold text-dark-text mb-3">Resumen Ejecutivo</h4>
-          <p class="text-sm leading-6 text-dark-text/90">
-            {{ data().summary?.executive_summary }}
+      <div class="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <h4 class="text-sm font-semibold text-dark-text">Lectura ejecutiva</h4>
+          <p class="mt-3 text-sm leading-6 text-dark-text/90">
+            {{ data().summary.executive_summary || 'Sin resumen ejecutivo disponible.' }}
           </p>
+
           @if (headlineTags().length > 0) {
             <div class="mt-4 flex flex-wrap gap-2">
               @for (tag of headlineTags(); track tag) {
-                <span class="text-xs bg-dark-bg border border-dark-border text-dark-muted px-2 py-1 rounded-full">
+                <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
                   {{ tag }}
                 </span>
               }
             </div>
           }
+
+          @if (data().comparative_signals?.summary) {
+            <div class="mt-4 rounded-2xl border border-dark-border bg-dark-bg/70 px-4 py-3 text-sm leading-6 text-dark-muted">
+              {{ data().comparative_signals?.summary }}
+            </div>
+          }
+        </section>
+
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <h4 class="text-sm font-semibold text-dark-text">Cobertura metodologica</h4>
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Coherencia</p>
+              <p class="mt-2 text-xl font-semibold text-dark-text">
+                {{ data().quality_checks?.cluster_coherence_avg ?? 0 }}
+              </p>
+            </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Calidad promedio</p>
+              <p class="mt-2 text-xl font-semibold text-dark-text">
+                {{ data().quality_checks?.cluster_quality_avg ?? 0 }}
+              </p>
+            </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Taxonomia</p>
+              <p class="mt-2 text-xl font-semibold text-dark-text">
+                {{ data().quality_checks?.taxonomy_coverage ?? 0 }}%
+              </p>
+            </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Weak signals</p>
+              <p class="mt-2 text-xl font-semibold text-dark-text">
+                {{ data().quality_checks?.weak_signal_clusters ?? 0 }}
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      @if (clusterCards().length > 0) {
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h4 class="text-sm font-semibold text-dark-text">Cluster cards</h4>
+              <p class="mt-1 text-xs text-dark-muted">
+                Narrativa priorizada por impacto y momentum.
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-4 grid gap-4 xl:grid-cols-3">
+            @for (card of clusterCards().slice(0, 6); track card.cluster_id) {
+              <article class="rounded-2xl border border-dark-border bg-dark-bg/60 p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+                      {{ card.category }}
+                    </p>
+                    <h5 class="mt-1 text-base font-semibold text-dark-text">{{ card.label }}</h5>
+                  </div>
+                  @if (card.weak_signal_flag) {
+                    <span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300">
+                      weak signal
+                    </span>
+                  }
+                </div>
+
+                <p class="mt-2 text-sm leading-6 text-dark-muted">{{ card.summary }}</p>
+
+                <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+                  <div class="rounded-lg bg-dark-surface px-2 py-2">
+                    <p class="text-dark-muted">Impacto</p>
+                    <p class="mt-1 font-medium text-dark-text">{{ card.impact_score }}</p>
+                  </div>
+                  <div class="rounded-lg bg-dark-surface px-2 py-2">
+                    <p class="text-dark-muted">Momentum</p>
+                    <p class="mt-1 font-medium text-dark-text">{{ card.momentum_score }}</p>
+                  </div>
+                  <div class="rounded-lg bg-dark-surface px-2 py-2">
+                    <p class="text-dark-muted">Calidad</p>
+                    <p class="mt-1 font-medium text-dark-text">{{ card.quality_score }}</p>
+                  </div>
+                </div>
+
+                <div class="mt-4 flex flex-wrap gap-2">
+                  @for (kw of card.top_keywords.slice(0, 4); track kw) {
+                    <span class="rounded-full border border-dark-border bg-dark-surface px-2 py-1 text-[11px] text-dark-muted">
+                      {{ kw }}
+                    </span>
+                  }
+                </div>
+              </article>
+            }
+          </div>
         </section>
       }
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-dark-surface border border-dark-border rounded-lg p-4">
-          <h4 class="text-sm font-semibold text-dark-text mb-3">Distribución por Categoría</h4>
-          <svg #categoryChart></svg>
-        </div>
-        <div class="bg-dark-surface border border-dark-border rounded-lg p-4">
-          <h4 class="text-sm font-semibold text-dark-text mb-3">Timeline de Tendencias</h4>
-          <svg #timelineChart></svg>
-        </div>
+      <div class="grid gap-6 xl:grid-cols-2">
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <h4 class="text-sm font-semibold text-dark-text">Taxonomia dominante</h4>
+          <p class="mt-1 text-xs text-dark-muted">
+            Peso agregado de matches taxonomicos sobre clusters detectados.
+          </p>
+          <svg #taxonomyChart></svg>
+        </section>
+
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <h4 class="text-sm font-semibold text-dark-text">Volumen mensual</h4>
+          <p class="mt-1 text-xs text-dark-muted">
+            Evolucion del corpus analizado dentro de la ventana del snapshot.
+          </p>
+          <svg #monthlyChart></svg>
+        </section>
       </div>
 
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <section class="bg-dark-surface border border-dark-border rounded-lg p-4">
-          <h4 class="text-sm font-semibold text-dark-text mb-3">Insights</h4>
+      <div class="grid gap-6 xl:grid-cols-3">
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <h4 class="text-sm font-semibold text-dark-text">Insights</h4>
           @if (data().insights.length === 0) {
-            <p class="text-sm text-dark-muted">No hay insights disponibles.</p>
+            <p class="mt-3 text-sm text-dark-muted">No hay insights disponibles.</p>
           } @else {
-            <ul class="space-y-2">
+            <div class="mt-4 space-y-3">
               @for (item of data().insights; track item) {
-                <li class="text-sm text-dark-text/90 leading-6 border-l-2 border-dark-accent pl-3">
+                <div class="rounded-xl border border-dark-border bg-dark-bg/60 px-3 py-3 text-sm leading-6 text-dark-text/90">
                   {{ item }}
-                </li>
+                </div>
               }
-            </ul>
+            </div>
           }
         </section>
 
-        <section class="bg-dark-surface border border-dark-border rounded-lg p-4">
-          <h4 class="text-sm font-semibold text-dark-text mb-3">Recomendaciones</h4>
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <h4 class="text-sm font-semibold text-dark-text">Recomendaciones</h4>
           @if (data().recommendations.length === 0) {
-            <p class="text-sm text-dark-muted">No hay recomendaciones disponibles.</p>
+            <p class="mt-3 text-sm text-dark-muted">No hay recomendaciones disponibles.</p>
           } @else {
-            <ul class="space-y-2">
+            <div class="mt-4 space-y-3">
               @for (item of data().recommendations; track item) {
-                <li class="text-sm text-dark-text/90 leading-6 border-l-2 border-emerald-500 pl-3">
+                <div class="rounded-xl border border-dark-border bg-dark-bg/60 px-3 py-3 text-sm leading-6 text-dark-text/90">
                   {{ item }}
-                </li>
+                </div>
               }
-            </ul>
+            </div>
           }
         </section>
 
-        <section class="bg-dark-surface border border-dark-border rounded-lg p-4">
-          <h4 class="text-sm font-semibold text-dark-text mb-3">Señales</h4>
-          @if (data().risk_signals.length === 0) {
-            <p class="text-sm text-dark-muted">No se detectaron señales destacadas.</p>
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <h4 class="text-sm font-semibold text-dark-text">Weak signals</h4>
+          @if (weakSignals().length === 0) {
+            <p class="mt-3 text-sm text-dark-muted">No se detectaron weak signals destacados.</p>
           } @else {
-            <div class="space-y-3">
-              @for (signal of data().risk_signals; track signal.type + signal.description) {
-                <div class="border border-dark-border rounded-lg p-3 bg-dark-bg/50">
-                  <div class="flex items-center justify-between gap-3 mb-1">
-                    <span class="text-sm font-medium text-dark-text">{{ signal.type }}</span>
-                    <span [class]="severityBadge(signal.severity)">
-                      {{ signal.severity }}
+            <div class="mt-4 space-y-3">
+              @for (item of weakSignals().slice(0, 4); track item.cluster_id) {
+                <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-3">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <p class="text-sm font-medium text-dark-text">{{ item.label }}</p>
+                      <p class="mt-1 text-xs text-dark-muted">{{ item.subtitle }}</p>
+                    </div>
+                    <span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300">
+                      {{ item.hype_stage.replaceAll('_', ' ') }}
                     </span>
                   </div>
-                  <p class="text-sm text-dark-text/85 leading-5">{{ signal.description }}</p>
+                  <p class="mt-2 text-xs leading-5 text-dark-muted">{{ item.summary }}</p>
                 </div>
               }
             </div>
@@ -115,8 +230,8 @@ interface KpiCard {
 })
 export class TrendmapOverviewComponent implements AfterViewInit {
   readonly data = input.required<TrendmapData>();
-  readonly categoryChartRef = viewChild.required<ElementRef<SVGSVGElement>>('categoryChart');
-  readonly timelineChartRef = viewChild.required<ElementRef<SVGSVGElement>>('timelineChart');
+  readonly taxonomyChartRef = viewChild.required<ElementRef<SVGSVGElement>>('taxonomyChart');
+  readonly monthlyChartRef = viewChild.required<ElementRef<SVGSVGElement>>('monthlyChart');
 
   private initialized = false;
 
@@ -124,182 +239,110 @@ export class TrendmapOverviewComponent implements AfterViewInit {
     effect(() => {
       const snapshot = this.data();
       if (this.initialized && snapshot) {
-        this.renderCategoryChart(snapshot);
-        this.renderTimelineChart(snapshot);
+        this.renderTaxonomyChart(this.taxonomyData(snapshot));
+        this.renderMonthlyChart(this.monthlyVolume(snapshot));
       }
     });
   }
 
-  kpis = () => {
-    const snapshot = this.data();
-    if (!snapshot) return [];
-    const cards: KpiCard[] = [
-      { label: 'Noticias', value: snapshot.meta.total_articles },
-      { label: 'Papers', value: snapshot.meta.total_papers },
-      { label: 'Filtrados', value: snapshot.meta.total_filtered },
-      { label: 'Clusters', value: snapshot.meta.total_clusters },
-      { label: 'Agrupados', value: snapshot.summary?.clustered_documents ?? 'N/D' },
-      { label: 'Sin Cluster', value: snapshot.summary?.unclustered_documents ?? 'N/D' },
-      { label: 'Categorías', value: snapshot.meta.total_categories },
-      { label: 'Silhouette', value: snapshot.meta.silhouette_score.toFixed(3) },
-    ];
-    return cards;
-  };
-
-  headlineTags = () => {
-    const snapshot = this.data();
-    if (!snapshot?.summary) return [];
-    return [
-      ...(snapshot.summary.dominant_topics ?? []),
-      ...(snapshot.summary.emerging_topics ?? []),
-      ...(snapshot.summary.consolidating_topics ?? []),
-    ].slice(0, 6);
-  };
-
   ngAfterViewInit(): void {
     this.initialized = true;
     const snapshot = this.data();
-    if (snapshot) {
-      this.renderCategoryChart(snapshot);
-      this.renderTimelineChart(snapshot);
+    this.renderTaxonomyChart(this.taxonomyData(snapshot));
+    this.renderMonthlyChart(this.monthlyVolume(snapshot));
+  }
+
+  kpis(): KpiCard[] {
+    const snapshot = this.data();
+    return [
+      { label: 'Documentos', value: snapshot.summary.total_documents ?? snapshot.meta.total_filtered },
+      { label: 'Clusters', value: snapshot.meta.total_clusters },
+      { label: 'Sin cluster', value: snapshot.summary.unclustered_documents ?? 0 },
+      { label: 'Fuentes', value: snapshot.filters_metadata?.sources.length ?? 0 },
+      { label: 'Taxonomia', value: `${snapshot.quality_checks?.taxonomy_coverage ?? 0}%` },
+      { label: 'Weak signals', value: snapshot.quality_checks?.weak_signal_clusters ?? 0 },
+    ];
+  }
+
+  headlineTags(): string[] {
+    const summary = this.data().summary;
+    return [
+      ...(summary.dominant_topics ?? []),
+      ...(summary.emerging_topics ?? []),
+      ...(summary.consolidating_topics ?? []),
+      ...(summary.weak_signal_topics ?? []),
+    ].slice(0, 8);
+  }
+
+  clusterCards() {
+    return this.data().cluster_cards ?? [];
+  }
+
+  weakSignals() {
+    return this.data().weak_signals ?? [];
+  }
+
+  private taxonomyData(snapshot: TrendmapData): NamedScore[] {
+    return (snapshot.taxonomy_breakdown ?? []).slice(0, 8);
+  }
+
+  private monthlyVolume(snapshot: TrendmapData): VolumePoint[] {
+    return (
+      (snapshot.charts?.['monthly_volume'] as VolumePoint[] | undefined) ??
+      []
+    );
+  }
+
+  private renderTaxonomyChart(data: NamedScore[]): void {
+    const svg = d3.select(this.taxonomyChartRef().nativeElement);
+    svg.selectAll('*').remove();
+
+    const width = 520;
+    const rowHeight = 38;
+    const height = Math.max(220, data.length * rowHeight + 40);
+    const margin = { top: 10, right: 24, bottom: 24, left: 170 };
+
+    svg.attr('width', width).attr('height', height);
+
+    if (data.length === 0) {
+      svg
+        .append('text')
+        .attr('x', width / 2)
+        .attr('y', height / 2)
+        .attr('text-anchor', 'middle')
+        .attr('fill', DARK_THEME.textMuted)
+        .text('Sin datos taxonomicos');
+      return;
     }
-  }
-
-  private renderCategoryChart(data: TrendmapData): void {
-    const svg = d3.select(this.categoryChartRef().nativeElement);
-    svg.selectAll('*').remove();
-
-    const width = 500;
-    const height = 300;
-    const margin = { top: 10, right: 20, bottom: 60, left: 50 };
-
-    svg.attr('width', width).attr('height', height);
-
-    const catCounts = d3.rollup(
-      data.clusters,
-      (items) => d3.sum(items, (cluster) => cluster.item_count),
-      (cluster) => cluster.category,
-    );
-    const entries = Array.from(catCounts, ([cat, count]) => ({ cat, count })).sort(
-      (a, b) => b.count - a.count,
-    );
-
-    if (entries.length === 0) return;
 
     const x = d3
-      .scaleBand()
-      .domain(entries.map((entry) => entry.cat))
-      .range([margin.left, width - margin.right])
-      .padding(0.3);
+      .scaleLinear()
+      .domain([0, d3.max(data, (d) => d.score) ?? 1])
+      .nice()
+      .range([margin.left, width - margin.right]);
 
     const y = d3
-      .scaleLinear()
-      .domain([0, d3.max(entries, (entry) => entry.count) ?? 0])
-      .nice()
-      .range([height - margin.bottom, margin.top]);
-
-    const color = d3.scaleOrdinal(d3.schemeTableau10);
+      .scaleBand()
+      .domain(data.map((d) => d.name))
+      .range([margin.top, height - margin.bottom])
+      .padding(0.25);
 
     svg
+      .append('g')
       .selectAll('rect')
-      .data(entries)
+      .data(data)
       .join('rect')
-      .attr('x', (entry) => x(entry.cat)!)
-      .attr('y', (entry) => y(entry.count))
-      .attr('width', x.bandwidth())
-      .attr('height', (entry) => y(0) - y(entry.count))
-      .attr('fill', (entry) => color(entry.cat))
-      .attr('rx', 3);
+      .attr('x', margin.left)
+      .attr('y', (d) => y(d.name) ?? 0)
+      .attr('width', (d) => x(d.score) - margin.left)
+      .attr('height', y.bandwidth())
+      .attr('fill', DARK_THEME.accent)
+      .attr('rx', 8);
 
     svg
       .append('g')
       .attr('transform', `translate(0,${height - margin.bottom})`)
-      .call(d3.axisBottom(x))
-      .selectAll('text')
-      .attr('fill', DARK_THEME.textMuted)
-      .attr('font-size', '10px')
-      .attr('transform', 'rotate(-30)')
-      .attr('text-anchor', 'end');
-
-    svg.selectAll('.domain, .tick line').attr('stroke', DARK_THEME.border);
-
-    svg
-      .append('g')
-      .attr('transform', `translate(${margin.left},0)`)
-      .call(d3.axisLeft(y).ticks(5))
-      .selectAll('text')
-      .attr('fill', DARK_THEME.textMuted);
-
-    svg.selectAll('.domain, .tick line').attr('stroke', DARK_THEME.border);
-  }
-
-  private renderTimelineChart(data: TrendmapData): void {
-    const svg = d3.select(this.timelineChartRef().nativeElement);
-    svg.selectAll('*').remove();
-
-    const width = 500;
-    const height = 300;
-    const margin = { top: 10, right: 20, bottom: 40, left: 50 };
-
-    svg.attr('width', width).attr('height', height);
-
-    const trends = data.trends;
-    if (!trends || trends.length === 0) return;
-
-    const dateCounts = d3.rollup(
-      trends,
-      (items) => d3.sum(items, (trend) => trend.count),
-      (trend) => trend.date,
-    );
-    const entries = Array.from(dateCounts, ([date, count]) => ({ date, count })).sort(
-      (a, b) => a.date.localeCompare(b.date),
-    );
-
-    if (entries.length === 0) return;
-
-    const x = d3
-      .scaleBand()
-      .domain(entries.map((entry) => entry.date))
-      .range([margin.left, width - margin.right])
-      .padding(0.2);
-
-    const y = d3
-      .scaleLinear()
-      .domain([0, d3.max(entries, (entry) => entry.count) ?? 0])
-      .nice()
-      .range([height - margin.bottom, margin.top]);
-
-    const line = d3
-      .line<{ date: string; count: number }>()
-      .x((entry) => x(entry.date)! + x.bandwidth() / 2)
-      .y((entry) => y(entry.count))
-      .curve(d3.curveMonotoneX);
-
-    svg
-      .append('path')
-      .datum(entries)
-      .attr('d', line)
-      .attr('fill', 'none')
-      .attr('stroke', DARK_THEME.accent)
-      .attr('stroke-width', 2);
-
-    svg
-      .selectAll('circle')
-      .data(entries)
-      .join('circle')
-      .attr('cx', (entry) => x(entry.date)! + x.bandwidth() / 2)
-      .attr('cy', (entry) => y(entry.count))
-      .attr('r', 3)
-      .attr('fill', DARK_THEME.accent);
-
-    svg
-      .append('g')
-      .attr('transform', `translate(0,${height - margin.bottom})`)
-      .call(
-        d3
-          .axisBottom(x)
-          .tickValues(x.domain().filter((_, index) => index % Math.ceil(entries.length / 6) === 0)),
-      )
+      .call(d3.axisBottom(x).ticks(4))
       .selectAll('text')
       .attr('fill', DARK_THEME.textMuted)
       .attr('font-size', '10px');
@@ -309,21 +352,104 @@ export class TrendmapOverviewComponent implements AfterViewInit {
     svg
       .append('g')
       .attr('transform', `translate(${margin.left},0)`)
-      .call(d3.axisLeft(y).ticks(5))
+      .call(d3.axisLeft(y))
       .selectAll('text')
-      .attr('fill', DARK_THEME.textMuted);
+      .attr('fill', DARK_THEME.text)
+      .attr('font-size', '11px');
+
+    svg
+      .append('g')
+      .selectAll('text.value')
+      .data(data)
+      .join('text')
+      .attr('x', (d) => x(d.score) + 8)
+      .attr('y', (d) => (y(d.name) ?? 0) + y.bandwidth() / 2)
+      .attr('dominant-baseline', 'central')
+      .attr('fill', DARK_THEME.textMuted)
+      .attr('font-size', '11px')
+      .text((d) => d.score.toFixed(2));
   }
 
-  severityBadge(severity: 'H' | 'M' | 'L'): string {
-    const base = 'text-[10px] font-medium px-2 py-0.5 rounded-full ';
-    switch (severity) {
-      case 'H':
-        return base + 'bg-red-900/40 text-red-400';
-      case 'M':
-        return base + 'bg-yellow-900/40 text-yellow-400';
-      case 'L':
-      default:
-        return base + 'bg-sky-900/40 text-sky-400';
+  private renderMonthlyChart(data: VolumePoint[]): void {
+    const svg = d3.select(this.monthlyChartRef().nativeElement);
+    svg.selectAll('*').remove();
+
+    const width = 520;
+    const height = 280;
+    const margin = { top: 12, right: 18, bottom: 42, left: 44 };
+
+    svg.attr('width', width).attr('height', height);
+
+    if (data.length === 0) {
+      svg
+        .append('text')
+        .attr('x', width / 2)
+        .attr('y', height / 2)
+        .attr('text-anchor', 'middle')
+        .attr('fill', DARK_THEME.textMuted)
+        .text('Sin volumen mensual');
+      return;
     }
+
+    const x = d3
+      .scalePoint()
+      .domain(data.map((d) => d.bucket))
+      .range([margin.left, width - margin.right]);
+
+    const y = d3
+      .scaleLinear()
+      .domain([0, d3.max(data, (d) => d.count) ?? 0])
+      .nice()
+      .range([height - margin.bottom, margin.top]);
+
+    const line = d3
+      .line<VolumePoint>()
+      .x((d) => x(d.bucket) ?? margin.left)
+      .y((d) => y(d.count))
+      .curve(d3.curveMonotoneX);
+
+    svg
+      .append('path')
+      .datum(data)
+      .attr('fill', 'none')
+      .attr('stroke', DARK_THEME.accent)
+      .attr('stroke-width', 2.5)
+      .attr('d', line);
+
+    svg
+      .append('g')
+      .selectAll('circle')
+      .data(data)
+      .join('circle')
+      .attr('cx', (d) => x(d.bucket) ?? margin.left)
+      .attr('cy', (d) => y(d.count))
+      .attr('r', 4)
+      .attr('fill', DARK_THEME.accent);
+
+    svg
+      .append('g')
+      .attr('transform', `translate(0,${height - margin.bottom})`)
+      .call(
+        d3
+          .axisBottom(x)
+          .tickValues(
+            x
+              .domain()
+              .filter((_, index) => index % Math.max(1, Math.ceil(data.length / 6)) === 0),
+          ),
+      )
+      .selectAll('text')
+      .attr('fill', DARK_THEME.textMuted)
+      .attr('font-size', '10px');
+
+    svg
+      .append('g')
+      .attr('transform', `translate(${margin.left},0)`)
+      .call(d3.axisLeft(y).ticks(5))
+      .selectAll('text')
+      .attr('fill', DARK_THEME.textMuted)
+      .attr('font-size', '10px');
+
+    svg.selectAll('.domain, .tick line').attr('stroke', DARK_THEME.border);
   }
 }

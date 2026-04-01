@@ -1,88 +1,231 @@
-import { Component } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { Component, computed, input } from '@angular/core';
+import {
+  FiltersMetadata,
+  MethodologyBlock,
+  QualityChecks,
+} from '../../../../../domain/noticias/models';
 
 @Component({
   selector: 'app-trendmap-methodology',
   standalone: true,
+  imports: [DecimalPipe],
   template: `
-    <div class="bg-dark-surface border border-dark-border rounded-lg p-6 space-y-6 max-w-3xl">
-      <h4 class="text-lg font-semibold text-dark-text">Metodología del Trendmap</h4>
-
-      <p class="text-dark-muted text-sm leading-relaxed">
-        El mapa de tendencias se genera mediante un pipeline automatizado que combina
-        técnicas de procesamiento de lenguaje natural, reducción de dimensionalidad y
-        clustering no supervisado para identificar y visualizar patrones temáticos en
-        noticias y papers académicos.
-      </p>
-
-      <!-- Step 1: Embeddings -->
-      <section class="border-l-2 border-dark-accent pl-4">
-        <h5 class="text-sm font-semibold text-dark-text mb-1">1. Embeddings Semánticos</h5>
-        <p class="text-dark-muted text-sm leading-relaxed">
-          Cada artículo se convierte en un vector numérico de alta dimensión usando
-          Amazon Bedrock Titan Embed v2. Estos embeddings capturan el significado
-          semántico del texto, permitiendo medir similitud entre documentos.
-          Cuando Bedrock no está disponible, se usa TF-IDF como fallback.
-        </p>
+    <div class="max-w-5xl space-y-6">
+      <section class="rounded-2xl border border-dark-border bg-dark-surface p-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h4 class="text-lg font-semibold text-dark-text">Metodologia analitica</h4>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-dark-muted">
+              El backend construye el snapshot con representacion documental hibrida,
+              clusterizacion explicable y scoring multi-factor. El frontend solo visualiza
+              payloads preparados.
+            </p>
+          </div>
+          <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
+            {{ methodology()?.methodology_version ?? qualityChecks()?.methodology_version ?? 'analytics_methodology_v3' }}
+          </span>
+        </div>
       </section>
 
-      <!-- Step 2: UMAP -->
-      <section class="border-l-2 border-dark-accent pl-4">
-        <h5 class="text-sm font-semibold text-dark-text mb-1">2. Reducción Dimensional (UMAP)</h5>
-        <p class="text-dark-muted text-sm leading-relaxed">
-          Los embeddings de alta dimensión se proyectan a 2 dimensiones usando UMAP
-          (Uniform Manifold Approximation and Projection) con métrica coseno.
-          Se aplica PCA previo para reducir ruido. El resultado son las coordenadas
-          (x, y) que posicionan cada artículo en el mapa, preservando las relaciones
-          de vecindad del espacio original.
-        </p>
-      </section>
+      <div class="grid gap-6 xl:grid-cols-3">
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <h5 class="text-sm font-semibold text-dark-text">Representacion</h5>
+          <p class="mt-3 text-sm leading-6 text-dark-muted">
+            {{ representationDescription() }}
+          </p>
+          @if (representationEntries().length > 0) {
+            <div class="mt-4 space-y-2">
+              @for (entry of representationEntries(); track entry.label) {
+                <div class="rounded-xl border border-dark-border bg-dark-bg/70 px-3 py-2">
+                  <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+                    {{ entry.label }}
+                  </p>
+                  <p class="mt-1 text-sm text-dark-text">{{ entry.value }}</p>
+                </div>
+              }
+            </div>
+          }
+        </section>
 
-      <!-- Step 3: HDBSCAN -->
-      <section class="border-l-2 border-dark-accent pl-4">
-        <h5 class="text-sm font-semibold text-dark-text mb-1">3. Clustering (HDBSCAN)</h5>
-        <p class="text-dark-muted text-sm leading-relaxed">
-          Los artículos se agrupan automáticamente usando HDBSCAN (Hierarchical
-          Density-Based Spatial Clustering of Applications with Noise), un algoritmo
-          que detecta clusters de densidad variable sin requerir un número predefinido
-          de grupos. Los artículos que no pertenecen a ningún cluster se marcan como ruido.
-        </p>
-      </section>
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <h5 class="text-sm font-semibold text-dark-text">Clusterizacion</h5>
+          <p class="mt-3 text-sm leading-6 text-dark-muted">
+            Se combinan espacio lexical/semantico, reduccion para coordenadas 2D y un
+            algoritmo de clusterizacion con manejo de noise. Los clusters pequenos y de
+            alta novedad se marcan como weak signals.
+          </p>
+          @if (clusteringEntries().length > 0) {
+            <div class="mt-4 space-y-2">
+              @for (entry of clusteringEntries(); track entry.label) {
+                <div class="rounded-xl border border-dark-border bg-dark-bg/70 px-3 py-2">
+                  <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+                    {{ entry.label }}
+                  </p>
+                  <p class="mt-1 text-sm text-dark-text">{{ entry.value }}</p>
+                </div>
+              }
+            </div>
+          }
+        </section>
 
-      <!-- Step 4: LLM Labeling -->
-      <section class="border-l-2 border-dark-accent pl-4">
-        <h5 class="text-sm font-semibold text-dark-text mb-1">4. Etiquetado con LLM</h5>
-        <p class="text-dark-muted text-sm leading-relaxed">
-          Cada cluster se etiqueta usando Claude Haiku (Amazon Bedrock), que genera
-          un nombre descriptivo, categoría, resumen, keywords y nivel de relevancia
-          en español. Esto permite interpretar cada grupo temático de forma intuitiva.
-        </p>
-      </section>
-
-      <!-- Step 5: Metrics -->
-      <section class="border-l-2 border-dark-accent pl-4">
-        <h5 class="text-sm font-semibold text-dark-text mb-1">5. Métricas y Visualización</h5>
-        <p class="text-dark-muted text-sm leading-relaxed">
-          Para cada cluster se calculan: polígono convex hull (envolvente visual),
-          impact score (0-100), horizon score (0-1 mapeado a etapas Gartner del
-          Hype Cycle). Los super-clusters agrupan clusters por categoría para una
-          vista de alto nivel.
-        </p>
-      </section>
-
-      <!-- Legend -->
-      <div class="bg-dark-bg border border-dark-border rounded-lg p-4 mt-4">
-        <h5 class="text-xs font-semibold text-dark-muted uppercase tracking-wide mb-2">
-          Etapas del Hype Cycle (Gartner)
-        </h5>
-        <ol class="text-dark-muted text-sm space-y-1 list-decimal list-inside">
-          <li>Innovation Trigger — Tecnología emergente, primeras pruebas de concepto</li>
-          <li>Peak of Inflated Expectations — Expectativas exageradas, alta cobertura mediática</li>
-          <li>Trough of Disillusionment — Desilusión, fracasos iniciales, interés decae</li>
-          <li>Slope of Enlightenment — Maduración, casos de uso reales emergen</li>
-          <li>Plateau of Productivity — Adopción generalizada, beneficios demostrados</li>
-        </ol>
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <h5 class="text-sm font-semibold text-dark-text">Calidad y cobertura</h5>
+          @if (qualityChecks()) {
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Coherencia</p>
+                <p class="mt-2 text-xl font-semibold text-dark-text">
+                  {{ qualityChecks()!.cluster_coherence_avg | number:'1.0-0' }}
+                </p>
+              </div>
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Cobertura tax.</p>
+                <p class="mt-2 text-xl font-semibold text-dark-text">
+                  {{ qualityChecks()!.taxonomy_coverage | number:'1.0-0' }}%
+                </p>
+              </div>
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Keywords utiles</p>
+                <p class="mt-2 text-xl font-semibold text-dark-text">
+                  {{ qualityChecks()!.keyword_usefulness_ratio | number:'1.0-0' }}%
+                </p>
+              </div>
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Weak signals</p>
+                <p class="mt-2 text-xl font-semibold text-dark-text">
+                  {{ qualityChecks()!.weak_signal_clusters }}
+                </p>
+              </div>
+            </div>
+          } @else {
+            <p class="mt-3 text-sm leading-6 text-dark-muted">
+              El snapshot incluye cluster coherence, calidad promedio, ratio de no cluster,
+              coverage taxonomico y ratio de keywords utiles para monitorear degradacion.
+            </p>
+          }
+        </section>
       </div>
+
+      <section class="rounded-2xl border border-dark-border bg-dark-surface p-6">
+        <h5 class="text-sm font-semibold text-dark-text">Formulas interpretables</h5>
+        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+          @for (formula of formulas; track formula.label) {
+            <div class="rounded-2xl border border-dark-border bg-dark-bg/60 p-4">
+              <p class="text-sm font-semibold text-dark-text">{{ formula.label }}</p>
+              <p class="mt-2 text-sm leading-6 text-dark-muted">{{ formula.description }}</p>
+              <p class="mt-3 rounded-xl border border-dark-border bg-dark-surface px-3 py-2 text-xs text-dark-text/90">
+                {{ formula.value }}
+              </p>
+            </div>
+          }
+        </div>
+      </section>
+
+      @if (filtersMetadata()) {
+        <section class="rounded-2xl border border-dark-border bg-dark-surface p-6">
+          <h5 class="text-sm font-semibold text-dark-text">Espacio de filtros expuesto</h5>
+          <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-4">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Categorias</p>
+              <p class="mt-2 text-sm leading-6 text-dark-text">
+                {{ filtersMetadata()!.categories.join(', ') || 'N/D' }}
+              </p>
+            </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-4">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Source types</p>
+              <p class="mt-2 text-sm leading-6 text-dark-text">
+                {{ filtersMetadata()!.source_types.join(', ') || 'N/D' }}
+              </p>
+            </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-4">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Maturity stages</p>
+              <p class="mt-2 text-sm leading-6 text-dark-text">
+                {{ joinStages(filtersMetadata()!.maturity_stages) }}
+              </p>
+            </div>
+            <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-4">
+              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Hype stages</p>
+              <p class="mt-2 text-sm leading-6 text-dark-text">
+                {{ joinStages(filtersMetadata()!.hype_stages) }}
+              </p>
+            </div>
+          </div>
+        </section>
+      }
     </div>
   `,
 })
-export class TrendmapMethodologyComponent {}
+export class TrendmapMethodologyComponent {
+  readonly methodology = input<MethodologyBlock | null>(null);
+  readonly qualityChecks = input<QualityChecks | null>(null);
+  readonly filtersMetadata = input<FiltersMetadata | null>(null);
+
+  readonly formulas = [
+    {
+      label: 'Impacto trend',
+      description:
+        'Combina relevancia, autoridad de fuentes, diversidad, escala del cluster, foco taxonomico y transversalidad.',
+      value:
+        '0.28 relevancia + 0.16 autoridad + 0.14 diversidad + 0.14 escala + 0.14 foco taxonomico + 0.14 transversalidad',
+    },
+    {
+      label: 'Madurez trend',
+      description:
+        'Evita heuristicas arbitrarias: pondera recurrencia temporal, adopcion explicita, tamano, coherencia, autoridad y baja novedad.',
+      value:
+        '0.28 recurrencia + 0.20 adopcion + 0.16 escala + 0.14 coherencia + 0.12 autoridad + 0.10 baja novedad',
+    },
+    {
+      label: 'Momentum',
+      description:
+        'Mide intensidad reciente a partir de crecimiento, aceleracion, share reciente y visibilidad observada en el cluster.',
+      value: '0.40 crecimiento + 0.25 aceleracion + 0.20 recencia + 0.15 visibilidad',
+    },
+    {
+      label: 'Novedad e incertidumbre',
+      description:
+        'La novedad favorece recencia y baja recurrencia; la incertidumbre sube con exploracion, baja coherencia, baja autoridad y duplicidad.',
+      value:
+        'Novedad: 0.45 recencia + 0.30 baja recurrencia + 0.15 exploracion + 0.10 escala pequena. Incertidumbre: 0.30 exploracion + 0.25 baja coherencia + 0.20 baja autoridad + 0.15 duplicidad + 0.10 bajo foco taxonomico',
+    },
+    {
+      label: 'Severidad y persistencia de riesgo',
+      description:
+        'Risk Mapping usa formulas paralelas para severidad potencial y persistencia, de modo que el mapa sea comparable pero orientado a materialidad.',
+      value:
+        'Severidad: 0.26 relevancia + 0.24 materialidad + 0.18 autoridad + 0.16 diversidad + 0.16 foco taxonomico. Persistencia: 0.40 recurrencia + 0.20 escala + 0.15 autoridad + 0.15 coherencia + 0.10 diversidad',
+    },
+  ];
+
+  readonly representationEntries = computed(() => {
+    const representation = this.methodology()?.representation ?? {};
+    return Object.entries(representation).map(([key, value]) => ({
+      label: key.replaceAll('_', ' '),
+      value: Array.isArray(value) ? value.join(', ') : String(value),
+    }));
+  });
+
+  readonly clusteringEntries = computed(() => {
+    const clustering = this.methodology()?.clustering ?? {};
+    return Object.entries(clustering).map(([key, value]) => ({
+      label: key.replaceAll('_', ' '),
+      value: String(value),
+    }));
+  });
+
+  representationDescription(): string {
+    const representation = this.methodology()?.representation;
+    if (!representation) {
+      return 'Cada documento se representa con titulo, excerpt, texto normalizado, keywords, taxonomia y metadata de fuente. El feature space puede combinar TF-IDF, embeddings y senales auxiliares.';
+    }
+    return (
+      String(representation['document_text'] ?? '') ||
+      'Cada documento se representa con texto enriquecido y metadata contextual.'
+    );
+  }
+
+  joinStages(values: string[]): string {
+    return values.map((value) => value.replaceAll('_', ' ')).join(', ');
+  }
+}

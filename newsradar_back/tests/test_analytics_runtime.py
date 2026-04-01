@@ -61,16 +61,19 @@ def test_snapshot_builders_emit_advanced_analytics_payloads() -> None:
     trend_payload = build_trendmap_payload(tech_docs, window_months=6)
     risk_payload = build_riskmap_payload(risk_docs, window_months=6)
 
-    assert trend_payload["version"] == 2
+    assert trend_payload["version"] == 3
     assert trend_payload["parameters"]["vectorizer"] == "tfidf_ngram_v1"
     assert trend_payload["charts"]["embedding_scatter"]
     assert trend_payload["clusters"]
     assert "executive_summary" in trend_payload["summary"]
+    assert trend_payload["quality_checks"]["methodology_version"] == "analytics_methodology_v3"
+    assert "cluster_cards" in trend_payload
 
-    assert risk_payload["version"] == 2
+    assert risk_payload["version"] == 3
     assert risk_payload["parameters"]["cluster_method"] in {"kmeans", "hdbscan", "single_cluster"}
     assert risk_payload["charts"]["hype_cycle"]
     assert risk_payload["summary"]["dominant_risks"]
+    assert "filters_metadata" in risk_payload
 
 
 def test_smcp_ingestion_falls_back_to_local_runtime(monkeypatch) -> None:

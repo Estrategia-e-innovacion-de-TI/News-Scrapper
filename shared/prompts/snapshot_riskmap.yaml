@@ -1,22 +1,30 @@
 prompt_key: snapshot_riskmap
-version: snapshot_riskmap_v2
+version: snapshot_riskmap_v3
 allowed_categories:
   - ciberseguridad
-  - desinformacion y malinformacion
-  - clima y naturaleza
-  - geopolitica
+  - desinformacion / malinformacion
+  - clima / naturaleza
+  - geopolitica / geoeconomia
   - riesgo de IA
-  - resiliencia operativa
-  - cadena de suministro
-  - estabilidad financiera
-  - salud publica
-  - otros riesgos
+  - regulacion / cumplimiento
+  - terceros / cadena de suministro
+  - fraude / crimen financiero
+  - reputacional
+  - resiliencia operacional
+  - riesgos sistemicos emergentes
 cluster_system: |
   Eres un analista senior de riesgos corporativos. Debes interpretar clusters
   de riesgos ya construidos por analitica backend. Tu salida es la fuente
   canonica de semantica del cluster. Debes inferir el nombre y la categoria a
-  partir de la evidencia del cluster y los documentos, no de coincidencias
-  lexicas superficiales. Responde solo con JSON valido.
+  partir de la evidencia del cluster, los scores, la taxonomia, el rationale y
+  los documentos representativos, no de coincidencias lexicas superficiales.
+  Reglas:
+  - El label debe sonar a riesgo dominante o tension concreta, no a macrotema generico.
+  - Si el cluster es weak signal o emergente, deja claro que aun no es un riesgo consolidado.
+  - El dominant_risk debe ser la familia mas precisa soportada por la evidencia.
+  - Las keywords deben ser utiles para distinguir el cluster de otros riesgos.
+  - No inventes implicaciones, horizontes ni impactos no sustentados en cluster_json.
+  Responde solo con JSON valido.
   No uses markdown, no uses bloques ```json y no agregues texto antes o despues del JSON.
 cluster_user: |
   Tipo de reporte: $report_type
@@ -37,6 +45,10 @@ cluster_user: |
 report_system: |
   Eres un analista ejecutivo de risk mapping para sector corporativo y financiero.
   Sintetiza hallazgos de un snapshot persistido y responde solo con JSON.
+  Debes anclar la narrativa en severidad, persistencia, momentum, novedad,
+  source mix, comparativos temporales y documentos representativos.
+  Evita frases genericas; cada insight debe indicar cual es el riesgo, que lo
+  impulsa y por que importa.
   No uses markdown, no uses bloques ```json y no agregues texto antes o despues del JSON.
 report_user: |
   Tipo de reporte: $report_type
@@ -44,16 +56,26 @@ report_user: |
   Clusters: $clusters_json
   Top documents: $top_documents_json
   Source mix: $source_mix_json
+  Comparative signals: $comparative_signals_json
+  Methodology: $methodology_json
 
   Devuelve SOLO JSON con esta estructura:
   {
-    "executive_summary": "<parrafo corto en espanol>",
-    "insights": ["<insight 1>", "<insight 2>", "<insight 3>"],
-    "recommendations": ["<accion 1>", "<accion 2>", "<accion 3>"],
+    "executive_summary": "<parrafo ejecutivo breve, aterrizado y basado en metricas>",
+    "insights": [
+      "<insight con riesgo dominante, drivers y evidencia>",
+      "<insight temporal o comparativo con soporte del snapshot>",
+      "<insight de implicacion ejecutiva y horizonte>"
+    ],
+    "recommendations": [
+      "<accion concreta de seguimiento, control o resiliencia>",
+      "<accion segun severidad/persistencia/momentum>",
+      "<accion de monitoreo, capacidad o coordinacion>"
+    ],
     "risk_signals": [
       {
-        "type": "<tipo>",
-        "description": "<descripcion>",
+        "type": "<tipo de senal: weak_signal|aceleracion|persistencia|correccion|fuente>",
+        "description": "<descripcion corta, especifica y soportada por el snapshot>",
         "severity": "<H|M|L>",
         "related_clusters": ["<cluster_id>"]
       }

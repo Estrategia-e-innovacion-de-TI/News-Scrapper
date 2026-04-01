@@ -1,24 +1,46 @@
 import {
+  AfterViewInit,
   Component,
   ElementRef,
-  input,
   effect,
+  input,
   viewChild,
-  AfterViewInit,
 } from '@angular/core';
-import { TrendmapCluster, DARK_THEME } from '../../../../../domain/noticias/models';
 import * as d3 from 'd3';
 
-const WIDTH = 800;
-const HEIGHT = 500;
-const MARGIN = { top: 30, right: 30, bottom: 50, left: 60 };
+import {
+  DARK_THEME,
+  LifecycleStage,
+  TrendmapCluster,
+} from '../../../../../domain/noticias/models';
+
+const WIDTH = 820;
+const HEIGHT = 520;
+const MARGIN = { top: 28, right: 28, bottom: 56, left: 64 };
+
+const STAGE_COLORS: Record<LifecycleStage, string> = {
+  weak_signal: '#f59e0b',
+  innovation_trigger: '#38bdf8',
+  rising_attention: '#60a5fa',
+  peak_visibility: '#f97316',
+  correction: '#fb7185',
+  consolidation: '#34d399',
+  productive_adoption: '#10b981',
+};
 
 @Component({
   selector: 'app-trendmap-impact',
   standalone: true,
   template: `
-    <div class="bg-dark-surface border border-dark-border rounded-lg p-4">
-      <h4 class="text-sm font-semibold text-dark-text mb-2">Impacto vs Madurez</h4>
+    <div class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h4 class="text-sm font-semibold text-dark-text">Impacto vs madurez</h4>
+          <p class="mt-1 text-xs leading-5 text-dark-muted">
+            Burbujas por cluster con tamano segun volumen y color segun hype stage.
+          </p>
+        </div>
+      </div>
       <svg #chart [attr.width]="width" [attr.height]="height"></svg>
     </div>
   `,
@@ -34,9 +56,8 @@ export class TrendmapImpactComponent implements AfterViewInit {
 
   constructor() {
     effect(() => {
-      const data = this.clusters();
       if (this.initialized) {
-        this.render(data);
+        this.render(this.clusters());
       }
     });
   }
@@ -50,136 +71,195 @@ export class TrendmapImpactComponent implements AfterViewInit {
     const svg = d3.select(this.chartRef().nativeElement);
     svg.selectAll('*').remove();
 
-    if (clusters.length === 0) return;
+    if (clusters.length === 0) {
+      return;
+    }
 
-    // Background
+    const x = d3.scaleLinear().domain([0, 100]).range([MARGIN.left, WIDTH - MARGIN.right]);
+    const y = d3.scaleLinear().domain([0, 100]).range([HEIGHT - MARGIN.bottom, MARGIN.top]);
+    const r = d3
+      .scaleSqrt()
+      .domain([0, d3.max(clusters, (cluster) => cluster.item_count) ?? 1])
+      .range([8, 36]);
+
+    const innerWidth = WIDTH - MARGIN.left - MARGIN.right;
+    const innerHeight = HEIGHT - MARGIN.top - MARGIN.bottom;
+    const quadrantX = x(60);
+    const quadrantY = y(60);
+
     svg
       .append('rect')
       .attr('width', WIDTH)
       .attr('height', HEIGHT)
       .attr('fill', DARK_THEME.bg)
-      .attr('rx', 8);
+      .attr('rx', 12);
 
-    const innerW = WIDTH - MARGIN.left - MARGIN.right;
-    const innerH = HEIGHT - MARGIN.top - MARGIN.bottom;
+    svg
+      .append('rect')
+      .attr('x', MARGIN.left)
+      .attr('y', MARGIN.top)
+      .attr('width', quadrantX - MARGIN.left)
+      .attr('height', quadrantY - MARGIN.top)
+      .attr('fill', '#132033');
 
-    const x = d3
-      .scaleLinear()
-      .domain([0, d3.max(clusters, (d) => d.impact_score) ?? 100])
-      .nice()
-      .range([MARGIN.left, MARGIN.left + innerW]);
+    svg
+      .append('rect')
+      .attr('x', quadrantX)
+      .attr('y', MARGIN.top)
+      .attr('width', MARGIN.left + innerWidth - quadrantX)
+      .attr('height', quadrantY - MARGIN.top)
+      .attr('fill', '#1a2b3a');
 
-    const y = d3
-      .scaleLinear()
-      .domain([0, 1])
-      .range([MARGIN.top + innerH, MARGIN.top]);
+    svg
+      .append('rect')
+      .attr('x', MARGIN.left)
+      .attr('y', quadrantY)
+      .attr('width', quadrantX - MARGIN.left)
+      .attr('height', MARGIN.top + innerHeight - quadrantY)
+      .attr('fill', '#101e2e');
 
-    const r = d3
-      .scaleSqrt()
-      .domain([0, d3.max(clusters, (d) => d.item_count) ?? 1])
-      .range([6, 40]);
+    svg
+      .append('rect')
+      .attr('x', quadrantX)
+      .attr('y', quadrantY)
+      .attr('width', MARGIN.left + innerWidth - quadrantX)
+      .attr('height', MARGIN.top + innerHeight - quadrantY)
+      .attr('fill', '#18272f');
 
-    const color = d3.scaleOrdinal(d3.schemeTableau10);
+    svg
+      .append('g')
+      .selectAll('line.grid-x')
+      .data([20, 40, 60, 80])
+      .join('line')
+      .attr('x1', (value) => x(value))
+      .attr('x2', (value) => x(value))
+      .attr('y1', MARGIN.top)
+      .attr('y2', HEIGHT - MARGIN.bottom)
+      .attr('stroke', DARK_THEME.border)
+      .attr('stroke-dasharray', '4,6')
+      .attr('stroke-opacity', 0.6);
 
-    // X axis
+    svg
+      .append('g')
+      .selectAll('line.grid-y')
+      .data([20, 40, 60, 80])
+      .join('line')
+      .attr('x1', MARGIN.left)
+      .attr('x2', WIDTH - MARGIN.right)
+      .attr('y1', (value) => y(value))
+      .attr('y2', (value) => y(value))
+      .attr('stroke', DARK_THEME.border)
+      .attr('stroke-dasharray', '4,6')
+      .attr('stroke-opacity', 0.6);
+
     const xAxis = svg
       .append('g')
-      .attr('transform', `translate(0,${MARGIN.top + innerH})`)
-      .call(d3.axisBottom(x).ticks(6));
+      .attr('transform', `translate(0,${HEIGHT - MARGIN.bottom})`)
+      .call(d3.axisBottom(x).ticks(5));
 
     xAxis.selectAll('text').attr('fill', DARK_THEME.textMuted);
     xAxis.selectAll('.domain, .tick line').attr('stroke', DARK_THEME.border);
 
-    svg
-      .append('text')
-      .attr('x', MARGIN.left + innerW / 2)
-      .attr('y', HEIGHT - 8)
-      .attr('text-anchor', 'middle')
-      .attr('fill', DARK_THEME.textMuted)
-      .attr('font-size', '11px')
-      .text('Impact Score');
-
-    // Y axis
     const yAxis = svg
       .append('g')
       .attr('transform', `translate(${MARGIN.left},0)`)
-      .call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('.1f')));
+      .call(d3.axisLeft(y).ticks(5));
 
     yAxis.selectAll('text').attr('fill', DARK_THEME.textMuted);
     yAxis.selectAll('.domain, .tick line').attr('stroke', DARK_THEME.border);
 
     svg
       .append('text')
-      .attr('transform', 'rotate(-90)')
-      .attr('x', -(MARGIN.top + innerH / 2))
-      .attr('y', 14)
+      .attr('x', WIDTH / 2)
+      .attr('y', HEIGHT - 12)
       .attr('text-anchor', 'middle')
       .attr('fill', DARK_THEME.textMuted)
       .attr('font-size', '11px')
-      .text('Madurez (horizon_score)');
+      .text('Impacto potencial');
 
-    // Tooltip
-    const tooltip = d3
-      .select('body')
-      .append('div')
-      .style('position', 'absolute')
-      .style('background', DARK_THEME.surface)
-      .style('border', `1px solid ${DARK_THEME.border}`)
-      .style('color', DARK_THEME.text)
-      .style('padding', '8px 12px')
-      .style('border-radius', '6px')
-      .style('font-size', '12px')
-      .style('pointer-events', 'none')
-      .style('opacity', 0)
-      .style('z-index', '1000');
-
-    // Bubbles
     svg
-      .selectAll('circle.bubble')
+      .append('text')
+      .attr('transform', 'rotate(-90)')
+      .attr('x', -HEIGHT / 2)
+      .attr('y', 18)
+      .attr('text-anchor', 'middle')
+      .attr('fill', DARK_THEME.textMuted)
+      .attr('font-size', '11px')
+      .text('Madurez / recurrencia');
+
+    this.addQuadrantLabel(svg, MARGIN.left + 18, MARGIN.top + 22, 'Explorar', 'alto potencial, baja madurez');
+    this.addQuadrantLabel(svg, quadrantX + 18, MARGIN.top + 22, 'Escalar', 'alto potencial, alta madurez');
+    this.addQuadrantLabel(svg, MARGIN.left + 18, quadrantY + 22, 'Observar', 'baja madurez y bajo impacto');
+    this.addQuadrantLabel(svg, quadrantX + 18, quadrantY + 22, 'Operar', 'maduro pero con foco tactico');
+
+    const bubbles = svg
+      .append('g')
+      .selectAll('g.cluster')
       .data(clusters)
-      .join('circle')
-      .attr('class', 'bubble')
-      .attr('cx', (d) => x(d.impact_score))
-      .attr('cy', (d) => y(d.horizon_score))
-      .attr('r', (d) => r(d.item_count))
-      .attr('fill', (d) => color(d.category))
-      .attr('fill-opacity', 0.6)
-      .attr('stroke', (d) => color(d.category))
-      .attr('stroke-width', 1.5)
-      .on('mouseenter', (event: MouseEvent, d: TrendmapCluster) => {
-        tooltip
-          .style('opacity', 1)
-          .html(
-            `<strong>${d.label}</strong><br/>` +
-            `Categoría: ${d.category}<br/>` +
-            `Impacto: ${d.impact_score.toFixed(1)}<br/>` +
-            `Madurez: ${d.horizon_score.toFixed(2)}<br/>` +
-            `Artículos: ${d.item_count}<br/>` +
-            `Keywords: ${d.keywords.slice(0, 4).join(', ')}`,
-          );
-      })
-      .on('mousemove', (event: MouseEvent) => {
-        tooltip
-          .style('left', event.pageX + 12 + 'px')
-          .style('top', event.pageY - 10 + 'px');
-      })
-      .on('mouseleave', () => {
-        tooltip.style('opacity', 0);
-      });
+      .join('g')
+      .attr('class', 'cluster');
 
-    // Labels for larger bubbles
-    svg
-      .selectAll('text.bubble-label')
-      .data(clusters.filter((d) => r(d.item_count) > 15))
-      .join('text')
-      .attr('class', 'bubble-label')
-      .attr('x', (d) => x(d.impact_score))
-      .attr('y', (d) => y(d.horizon_score))
+    bubbles
+      .append('circle')
+      .attr('cx', (cluster) => x(cluster.impact_score))
+      .attr('cy', (cluster) => y(cluster.maturity_score))
+      .attr('r', (cluster) => r(cluster.item_count))
+      .attr('fill', (cluster) => STAGE_COLORS[cluster.hype_stage])
+      .attr('fill-opacity', 0.75)
+      .attr('stroke', '#e2e8f0')
+      .attr('stroke-opacity', 0.15)
+      .attr('stroke-width', 1.2);
+
+    bubbles
+      .append('title')
+      .text(
+        (cluster) =>
+          `${cluster.label}
+Impacto: ${cluster.impact_score.toFixed(1)}
+Madurez: ${cluster.maturity_score.toFixed(1)}
+Momentum: ${cluster.momentum_score.toFixed(1)}
+Novedad: ${cluster.novelty_score.toFixed(1)}
+Docs: ${cluster.item_count}
+Stage: ${cluster.hype_stage.replaceAll('_', ' ')}`,
+      );
+
+    bubbles
+      .filter((cluster) => r(cluster.item_count) >= 14)
+      .append('text')
+      .attr('x', (cluster) => x(cluster.impact_score))
+      .attr('y', (cluster) => y(cluster.maturity_score))
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
-      .attr('font-size', '9px')
       .attr('fill', DARK_THEME.text)
+      .attr('font-size', '9px')
       .attr('pointer-events', 'none')
-      .text((d) => d.label.length > 12 ? d.label.slice(0, 12) + '…' : d.label);
+      .text((cluster) =>
+        cluster.label.length > 16 ? `${cluster.label.slice(0, 16)}...` : cluster.label,
+      );
+  }
+
+  private addQuadrantLabel(
+    svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+    xValue: number,
+    yValue: number,
+    title: string,
+    subtitle: string,
+  ): void {
+    svg
+      .append('text')
+      .attr('x', xValue)
+      .attr('y', yValue)
+      .attr('fill', DARK_THEME.text)
+      .attr('font-size', '12px')
+      .attr('font-weight', '600')
+      .text(title);
+
+    svg
+      .append('text')
+      .attr('x', xValue)
+      .attr('y', yValue + 16)
+      .attr('fill', DARK_THEME.textMuted)
+      .attr('font-size', '10px')
+      .text(subtitle);
   }
 }

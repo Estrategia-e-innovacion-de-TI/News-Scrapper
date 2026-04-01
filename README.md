@@ -108,6 +108,25 @@ Los snapshots se generan en backend y quedan persistidos/versionados para consum
 - enriquecimiento opcional con LLM en Bedrock para relabeling de clusters, `executive_summary`, `insights` y `recommendations`
 - trazabilidad LLM en `parameters.llm_enrichment` y persistencia de prompts en `llm_prompts`
 
+### Metodologia v3
+
+- documento tecnico: `docs/analytics-mapping-methodology.md`
+- snapshots `version: 3`
+- nuevos campos clave:
+  - `methodology_version`
+  - `cluster_quality`
+  - `taxonomy_matches`
+  - `impact_score_breakdown`
+  - `maturity_score_breakdown`
+  - `momentum_score_breakdown`
+  - `novelty_score_breakdown`
+  - `risk_severity`
+  - `representative_documents`
+  - `insight_evidence`
+  - `quality_checks`
+  - `filters_metadata`
+  - `comparative_signals`
+
 ## Configuracion compartida
 
 La resolucion de config ahora prioriza `shared/`:
@@ -152,9 +171,13 @@ Puertos:
 
 ## Validacion ejecutada
 
-- `python -m pytest -q` en `newsradar_back` -> `7 passed`
+- `python -m pytest -q tests/test_analytics_runtime.py` en `newsradar_back` -> `5 passed`
 - `python -m pytest -q` en `newsradar_aiagent` -> `3 passed`
 - `python -m compileall newsradar_back/src newsradar_smcp/src newsradar_aiagent/src`
+
+Nota:
+
+- `ng build` no pudo ejecutarse en este entorno porque `node`/`npm` no estan disponibles en PATH.
 
 ## TODOs reales
 
