@@ -75,6 +75,12 @@ def _json_candidates(text: str) -> list[str]:
     balanced = _extract_balanced_json(stripped)
     if balanced:
         candidates.append(balanced)
+    else:
+        for char in ("{", "["):
+            index = stripped.find(char)
+            if index >= 0:
+                candidates.append(stripped[index:])
+                break
 
     deduped: list[str] = []
     seen: set[str] = set()
@@ -146,6 +152,69 @@ def _unescape_json_candidate(text: str) -> str:
     return normalized
 
 
+def _escape_control_chars_inside_strings(text: str) -> str:
+    if not text:
+        return text
+    result: list[str] = []
+    in_string = False
+    escape = False
+    for char in text:
+        if escape:
+            result.append(char)
+            escape = False
+            continue
+        if char == "\\":
+            result.append(char)
+            escape = True
+            continue
+        if char == '"':
+            result.append(char)
+            in_string = not in_string
+            continue
+        if in_string and char in {"\n", "\r", "\t"}:
+            result.append(" ")
+            continue
+        result.append(char)
+    return "".join(result)
+
+
+def _close_truncated_json_candidate(text: str) -> str:
+    candidate = text.rstrip()
+    if not candidate or candidate[0] not in "{[":
+        return candidate
+
+    stack: list[str] = []
+    in_string = False
+    escape = False
+    for char in candidate:
+        if escape:
+            escape = False
+            continue
+        if char == "\\":
+            escape = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char in "{[":
+            stack.append(char)
+        elif char == "}" and stack and stack[-1] == "{":
+            stack.pop()
+        elif char == "]" and stack and stack[-1] == "[":
+            stack.pop()
+
+    while candidate.endswith((",", ":")):
+        candidate = candidate[:-1].rstrip()
+    if in_string:
+        candidate += '"'
+    while stack:
+        opener = stack.pop()
+        candidate += "}" if opener == "{" else "]"
+    return candidate
+
+
 def _canonical_response_key(key: Any) -> str:
     text = str(key).strip().lower()
     if not text:
@@ -186,12 +255,29 @@ def _parse_json_candidate(candidate: str) -> dict[str, Any]:
     if not candidate:
         return {}
 
-    attempts = [
+    base_attempts = [
         candidate.strip(),
-        _remove_trailing_commas(candidate.strip()),
         _unescape_json_candidate(candidate.strip()),
-        _remove_trailing_commas(_unescape_json_candidate(candidate.strip())),
     ]
+    attempts: list[str] = []
+    seen_attempts: set[str] = set()
+    for base in base_attempts:
+        variants = [
+            base,
+            _remove_trailing_commas(base),
+            _escape_control_chars_inside_strings(base),
+            _remove_trailing_commas(_escape_control_chars_inside_strings(base)),
+            _close_truncated_json_candidate(base),
+            _remove_trailing_commas(_close_truncated_json_candidate(base)),
+            _close_truncated_json_candidate(_escape_control_chars_inside_strings(base)),
+            _remove_trailing_commas(_close_truncated_json_candidate(_escape_control_chars_inside_strings(base))),
+        ]
+        for variant in variants:
+            normalized = variant.strip()
+            if normalized and normalized not in seen_attempts:
+                seen_attempts.add(normalized)
+                attempts.append(normalized)
+
     for attempt in attempts:
         try:
             parsed = json.loads(attempt)

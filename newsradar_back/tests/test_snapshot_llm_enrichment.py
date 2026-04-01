@@ -260,3 +260,52 @@ def test_snapshot_llm_enricher_accepts_escaped_json_and_key_variants(monkeypatch
     assert enriched["insights"] == ["Aumenta la presion regulatoria sobre modelos."]
     assert enriched["recommendations"] == ["Definir owner y criterios de control."]
     assert enriched["risk_signals"][0]["related_clusters"] == ["trend_mapping_cluster_1"]
+
+
+def test_snapshot_llm_enricher_recovers_truncated_report_json(monkeypatch) -> None:
+    monkeypatch.setenv("NEWSRADAR_SNAPSHOT_LLM_MODE", "enabled")
+
+    class FakeBedrockAdapter:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+        def invoke_claude(self, prompt: str, system: str = "", max_tokens: int = 1024) -> str:
+            if "Cluster data:" in prompt:
+                return (
+                    '{"label":"IA para operaciones","summary":"Cluster operativo.","category":"Inteligencia Artificial",'
+                    '"keywords":["ia","operaciones"],"relevance":"alta","executive_takeaway":"La IA acelera operaciones."}'
+                )
+            return '{ "executive_summary": "Este snapshot analiza 148 documentos en los ultimos 6 meses,\n' \
+                   'sin lograr formar grupos utiles ni identificar temas dominantes.'
+
+    monkeypatch.setattr(
+        "newsradar_api.shared_kernel.bedrock.snapshot_enricher.BedrockAdapter",
+        FakeBedrockAdapter,
+    )
+
+    payload = {
+        "report_type": "trend_mapping",
+        "generated_at": "2026-03-31T00:00:00+00:00",
+        "summary": {"total_documents": 148, "total_clusters": 1},
+        "clusters": [
+            {
+                "cluster_id": "trend_mapping_cluster_1",
+                "label": "IA",
+                "category": "Otros temas",
+                "summary": "old",
+                "keywords": ["old"],
+                "top_keywords": ["old"],
+                "relevance": "media",
+                "top_documents": [{"title": "Doc 1"}],
+            }
+        ],
+        "top_documents": [{"title": "Doc 1"}],
+        "sources_used": ["demo"],
+        "parameters": {},
+        "documents": [{"cluster_id": "trend_mapping_cluster_1", "title": "Doc 1"}],
+    }
+
+    enriched = SnapshotLLMEnricher("trend_mapping").enrich_payload(payload)
+
+    assert enriched["summary"]["executive_summary"].startswith("Este snapshot analiza 148 documentos")
+    assert enriched["parameters"]["llm_enrichment"]["used"] is True
