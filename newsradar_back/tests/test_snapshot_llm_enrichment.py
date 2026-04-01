@@ -196,3 +196,67 @@ def test_snapshot_llm_enricher_accepts_markdown_wrapped_json(monkeypatch) -> Non
     assert enriched["summary"]["executive_summary"] == "La IA domina el snapshot."
     assert enriched["recommendations"] == ["Acelerar monitoreo"]
     assert enriched["parameters"]["llm_enrichment"]["used"] is True
+
+
+def test_snapshot_llm_enricher_accepts_escaped_json_and_key_variants(monkeypatch) -> None:
+    monkeypatch.setenv("NEWSRADAR_SNAPSHOT_LLM_MODE", "enabled")
+
+    class FakeBedrockAdapter:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+        def invoke_claude(self, prompt: str, system: str = "", max_tokens: int = 1024) -> str:
+            if "Cluster data:" in prompt:
+                return (
+                    '{ \\"label\\": \\"Riesgo de IA: gobernanza de modelos\\", '
+                    '\\"category\\": \\"Regulacion\\", '
+                    '\\"summary\\": \\"Cluster sobre controles y supervision de IA.\\", '
+                    '\\"keywords\\": [\\"gobernanza\\", \\"modelos\\", \\"riesgo de ia\\"], '
+                    '\\"executive takeaway\\": \\"La gobernanza de modelos pasa a ser tema de decision.\\", '
+                    '\\"relevance\\": \\"alta\\" }'
+                )
+            return (
+                '{ \\"executive summary\\": \\"La gobernanza de IA gana peso en el snapshot.\\", '
+                '\\"insight\\": \\"Aumenta la presion regulatoria sobre modelos.\\", '
+                '\\"recommendation\\": \\"Definir owner y criterios de control.\\", '
+                '\\"risk signals\\": ['
+                '  { \\"type\\": \\"regulacion\\", \\"description\\": \\"Mayor escrutinio\\", '
+                '    \\"severity\\": \\"H\\", \\"related clusters\\": [\\"trend_mapping_cluster_1\\"] }'
+                '] }'
+            )
+
+    monkeypatch.setattr(
+        "newsradar_api.shared_kernel.bedrock.snapshot_enricher.BedrockAdapter",
+        FakeBedrockAdapter,
+    )
+
+    payload = {
+        "report_type": "trend_mapping",
+        "generated_at": "2026-03-31T00:00:00+00:00",
+        "summary": {"total_documents": 4, "total_clusters": 1},
+        "clusters": [
+            {
+                "cluster_id": "trend_mapping_cluster_1",
+                "label": "IA",
+                "category": "Otros temas",
+                "summary": "old",
+                "keywords": ["old"],
+                "top_keywords": ["old"],
+                "relevance": "media",
+                "top_documents": [{"title": "Doc 1"}],
+            }
+        ],
+        "top_documents": [{"title": "Doc 1"}],
+        "sources_used": ["demo"],
+        "parameters": {},
+        "documents": [{"cluster_id": "trend_mapping_cluster_1", "title": "Doc 1"}],
+    }
+
+    enriched = SnapshotLLMEnricher("trend_mapping").enrich_payload(payload)
+
+    assert enriched["clusters"][0]["label"] == "Riesgo de IA: gobernanza de modelos"
+    assert enriched["clusters"][0]["executive_takeaway"] == "La gobernanza de modelos pasa a ser tema de decision."
+    assert enriched["summary"]["executive_summary"] == "La gobernanza de IA gana peso en el snapshot."
+    assert enriched["insights"] == ["Aumenta la presion regulatoria sobre modelos."]
+    assert enriched["recommendations"] == ["Definir owner y criterios de control."]
+    assert enriched["risk_signals"][0]["related_clusters"] == ["trend_mapping_cluster_1"]

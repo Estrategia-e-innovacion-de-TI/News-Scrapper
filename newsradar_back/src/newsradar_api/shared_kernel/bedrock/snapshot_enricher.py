@@ -58,7 +58,7 @@ def _extract_json(text: str) -> dict[str, Any]:
     for candidate in _json_candidates(text):
         parsed = _parse_json_candidate(candidate)
         if parsed:
-            return parsed
+            return _normalize_response_mapping(parsed)
     return {}
 
 
@@ -130,6 +130,58 @@ def _remove_trailing_commas(text: str) -> str:
     return re.sub(r",(\s*[}\]])", r"\1", text)
 
 
+def _unescape_json_candidate(text: str) -> str:
+    normalized = text.strip()
+    if not normalized:
+        return normalized
+
+    # Bedrock occasionally returns escaped JSON fragments like:
+    # {\"executive summary\": \"...\"}
+    if '\\"' in normalized:
+        normalized = normalized.replace('\\"', '"')
+    if "\\n" in normalized:
+        normalized = normalized.replace("\\n", "\n")
+    if "\\t" in normalized:
+        normalized = normalized.replace("\\t", "\t")
+    return normalized
+
+
+def _canonical_response_key(key: Any) -> str:
+    text = str(key).strip().lower()
+    if not text:
+        return ""
+    normalized = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    aliases = {
+        "executive": "executive_summary",
+        "executive_overview": "executive_summary",
+        "executive_summary": "executive_summary",
+        "executive_takeaway": "executive_takeaway",
+        "dominant_risk": "dominant_risk",
+        "related_clusters": "related_clusters",
+        "risk_signals": "risk_signals",
+        "top_keywords": "keywords",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def _normalize_response_mapping(value: dict[str, Any]) -> dict[str, Any]:
+    normalized: dict[str, Any] = {}
+    for raw_key, raw_value in value.items():
+        key = _canonical_response_key(raw_key)
+        if not key:
+            continue
+        if isinstance(raw_value, dict):
+            normalized[key] = _normalize_response_mapping(raw_value)
+        elif isinstance(raw_value, list):
+            normalized[key] = [
+                _normalize_response_mapping(item) if isinstance(item, dict) else item
+                for item in raw_value
+            ]
+        else:
+            normalized[key] = raw_value
+    return normalized
+
+
 def _parse_json_candidate(candidate: str) -> dict[str, Any]:
     if not candidate:
         return {}
@@ -137,10 +189,16 @@ def _parse_json_candidate(candidate: str) -> dict[str, Any]:
     attempts = [
         candidate.strip(),
         _remove_trailing_commas(candidate.strip()),
+        _unescape_json_candidate(candidate.strip()),
+        _remove_trailing_commas(_unescape_json_candidate(candidate.strip())),
     ]
     for attempt in attempts:
         try:
             parsed = json.loads(attempt)
+            if isinstance(parsed, str):
+                reparsed = _parse_json_candidate(parsed)
+                if reparsed:
+                    return reparsed
             return parsed if isinstance(parsed, dict) else {}
         except json.JSONDecodeError:
             pass
@@ -148,6 +206,10 @@ def _parse_json_candidate(candidate: str) -> dict[str, Any]:
     for attempt in attempts:
         try:
             parsed = yaml.safe_load(attempt)
+            if isinstance(parsed, str):
+                reparsed = _parse_json_candidate(parsed)
+                if reparsed:
+                    return reparsed
             return parsed if isinstance(parsed, dict) else {}
         except yaml.YAMLError:
             pass
@@ -155,6 +217,9 @@ def _parse_json_candidate(candidate: str) -> dict[str, Any]:
 
 
 def _safe_string_list(value: Any, limit: int) -> list[str]:
+    if isinstance(value, str):
+        text = value.strip()
+        return [text] if text else []
     if not isinstance(value, list):
         return []
     result: list[str] = []
@@ -378,10 +443,13 @@ class SnapshotLLMEnricher:
         if executive:
             summary["executive_summary"] = str(executive).strip()
             payload["executive_summary"] = str(executive).strip()
-        insights = _safe_string_list(response.get("insights"), 6)
+        insights = _safe_string_list(response.get("insights") or response.get("insight"), 6)
         if insights:
             payload["insights"] = insights
-        recommendations = _safe_string_list(response.get("recommendations"), 6)
+        recommendations = _safe_string_list(
+            response.get("recommendations") or response.get("recommendation"),
+            6,
+        )
         if recommendations:
             payload["recommendations"] = recommendations
         risk_signals = response.get("risk_signals")
