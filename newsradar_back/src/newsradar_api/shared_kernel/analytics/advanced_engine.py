@@ -654,8 +654,9 @@ def _select_cluster_count(document_count: int) -> int:
 
 
 def _select_hdbscan_params(document_count: int) -> tuple[int, int]:
-    min_cluster_size = max(4, min(18, int(round(math.sqrt(document_count))) or 4))
-    min_samples = max(2, min(min_cluster_size - 1, int(round(min_cluster_size * 0.6)) or 2))
+    base_size = int(round(math.sqrt(document_count) * 0.9)) or 3
+    min_cluster_size = max(3, min(14, base_size))
+    min_samples = max(1, min(min_cluster_size - 1, int(round(min_cluster_size * 0.4)) or 1))
     return min_cluster_size, min_samples
 
 
@@ -866,16 +867,37 @@ def _cluster_features(features: np.ndarray) -> tuple[np.ndarray, str]:
         return np.zeros(rows, dtype=int), "single_cluster"
 
     if hdbscan is not None and rows >= 4:
+        base_cluster_size, base_min_samples = _select_hdbscan_params(rows)
+        attempts = [
+            (base_cluster_size, base_min_samples, 0.0),
+            (max(3, base_cluster_size - 1), max(1, base_min_samples - 1), 0.02),
+            (max(3, int(round(base_cluster_size * 0.8))), max(1, int(round(base_min_samples * 0.8))), 0.05),
+        ]
+        best_labels: np.ndarray | None = None
+        best_clustered = -1
+        best_clusters = -1
         try:
-            min_cluster_size, min_samples = _select_hdbscan_params(rows)
-            clusterer = hdbscan.HDBSCAN(
-                min_cluster_size=min_cluster_size,
-                min_samples=min_samples,
-                metric="euclidean",
-                cluster_selection_method="eom",
-            )
-            labels = np.asarray(clusterer.fit_predict(features), dtype=int)
-            return labels, "hdbscan"
+            for min_cluster_size, min_samples, epsilon in attempts:
+                clusterer = hdbscan.HDBSCAN(
+                    min_cluster_size=min_cluster_size,
+                    min_samples=min_samples,
+                    metric="euclidean",
+                    cluster_selection_method="eom",
+                    cluster_selection_epsilon=epsilon,
+                )
+                labels = np.asarray(clusterer.fit_predict(features), dtype=int)
+                clustered = int(np.sum(labels >= 0))
+                cluster_count = len({int(label) for label in labels if label >= 0})
+                if clustered > best_clustered or (
+                    clustered == best_clustered and cluster_count > best_clusters
+                ):
+                    best_labels = labels
+                    best_clustered = clustered
+                    best_clusters = cluster_count
+                if cluster_count >= 1 and clustered >= max(4, int(math.ceil(rows * 0.08))):
+                    return labels, "hdbscan"
+            if best_labels is not None and best_clusters >= 1:
+                return best_labels, "hdbscan"
         except Exception:
             pass
 
@@ -918,6 +940,7 @@ def _refine_labels_by_centroid_distance(
         return labels, set()
 
     dense = np.asarray(features, dtype=float)
+    original_clustered = int(np.sum(labels >= 0))
     norms = np.linalg.norm(dense, axis=1, keepdims=True)
     norms[norms == 0.0] = 1.0
     normalized = dense / norms
@@ -971,6 +994,11 @@ def _refine_labels_by_centroid_distance(
             if raw_label == label:
                 refined[index] = -1
                 pruned_indices.add(index)
+    refined_clustered = int(np.sum(refined >= 0))
+    if original_clustered >= 4 and refined_clustered == 0:
+        return labels, set()
+    if original_clustered >= 8 and refined_clustered < max(3, int(math.ceil(original_clustered * 0.3))):
+        return labels, set()
     return refined, pruned_indices
 
 

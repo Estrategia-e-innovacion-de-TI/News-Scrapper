@@ -234,3 +234,38 @@ def test_cluster_labels_filter_noise_and_infer_category(monkeypatch) -> None:
     assert cluster["label"] != "Más / And"
     assert "and" not in [keyword.lower() for keyword in cluster["keywords"]]
     assert "mas" not in [keyword.lower() for keyword in cluster["keywords"]]
+
+
+def test_hdbscan_all_noise_falls_back_to_kmeans(monkeypatch) -> None:
+    features = np.asarray(
+        [
+            [0.0, 0.0],
+            [0.1, 0.1],
+            [1.0, 1.0],
+            [1.1, 1.1],
+        ],
+        dtype=float,
+    )
+
+    class FakeHdbscanModule:
+        class HDBSCAN:
+            def __init__(self, *args, **kwargs) -> None:
+                return None
+
+            def fit_predict(self, values):
+                return np.asarray([-1, -1, -1, -1], dtype=int)
+
+    class FakeKMeans:
+        def __init__(self, n_clusters: int, random_state: int, n_init: int) -> None:
+            return None
+
+        def fit_predict(self, values):
+            return np.asarray([0, 0, 1, 1], dtype=int)
+
+    monkeypatch.setattr(advanced_engine, "hdbscan", FakeHdbscanModule)
+    monkeypatch.setattr(advanced_engine, "KMeans", FakeKMeans)
+
+    labels, method = advanced_engine._cluster_features(features)
+
+    assert method == "kmeans"
+    assert labels.tolist() == [0, 0, 1, 1]
