@@ -10,6 +10,7 @@ from newsradar_api.shared_kernel.analytics import advanced_engine
 from newsradar_api.shared_kernel.ingestion import runtime
 from newsradar_api.shared_kernel.snapshots.report_builder import (
     _attach_comparative_signals,
+    _legacy_cluster_id,
     build_riskmap_payload,
     build_trendmap_payload,
 )
@@ -332,3 +333,13 @@ def test_comparative_signals_reuse_lineage_and_update_quality_checks() -> None:
     assert cluster["comparative_signal"]["status"] == "accelerating"
     assert payload["quality_checks"]["lineage_reused_clusters"] == 1
     assert payload["quality_checks"]["stability_score_avg"] > 0
+
+
+def test_legacy_cluster_id_compacts_long_identifiers_stably() -> None:
+    original = "trend-inteligencia-artificial-inteligencia-artif-eba66c2c67"
+
+    compact = _legacy_cluster_id(original)
+
+    assert len(compact) <= 50
+    assert compact == _legacy_cluster_id(original)
+    assert compact != original

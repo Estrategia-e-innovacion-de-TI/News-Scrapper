@@ -23,6 +23,8 @@ from newsradar_api.shared_kernel.bedrock import SnapshotLLMEnricher
 from newsradar_api.shared_kernel.analytics import generate_report_analysis
 from newsradar_api.shared_kernel.config.paths import load_yaml_file, resolve_flow_path
 
+_LEGACY_CLUSTER_ID_MAX = 50
+
 
 def _legacy_direction(direction: str | None) -> str:
     return {
@@ -30,6 +32,16 @@ def _legacy_direction(direction: str | None) -> str:
         "down": "decreciente",
         "stable": "estable",
     }.get(direction or "", "estable")
+
+
+def _legacy_cluster_id(cluster_id: str) -> str:
+    value = str(cluster_id or "").strip()
+    if len(value) <= _LEGACY_CLUSTER_ID_MAX:
+        return value
+    digest = hashlib.sha1(value.encode("utf-8")).hexdigest()[:8]
+    prefix_length = _LEGACY_CLUSTER_ID_MAX - len(digest) - 1
+    prefix = value[:max(prefix_length, 1)].rstrip("-_")
+    return f"{prefix}-{digest}"[:_LEGACY_CLUSTER_ID_MAX]
 
 
 def _document_source_kind(doc: Document) -> str:
@@ -767,7 +779,7 @@ async def persist_snapshot(
         coords = cluster.get("coords") or {}
         session.add(
             Cluster(
-                cluster_id=cluster["cluster_id"],
+                cluster_id=_legacy_cluster_id(cluster["cluster_id"]),
                 label=cluster.get("label", cluster["cluster_id"]),
                 category=cluster.get("category") or cluster.get("dominant_risk") or "Otros",
                 summary=cluster.get("summary", ""),
