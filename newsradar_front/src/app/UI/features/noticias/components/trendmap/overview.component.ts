@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import {
   AfterViewInit,
   Component,
@@ -28,6 +29,7 @@ interface VolumePoint {
 @Component({
   selector: 'app-trendmap-overview',
   standalone: true,
+  imports: [DecimalPipe],
   template: `
     <div class="space-y-6">
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
