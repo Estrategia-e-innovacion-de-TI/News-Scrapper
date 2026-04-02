@@ -128,8 +128,6 @@ def _project_umap(
     spread: float = 2.0,
 ) -> list[tuple[float, float]]:
     """Project embeddings to 2D with UMAP + PCA (Req 14.4)."""
-    import umap
-
     valid_mask = np.array([len(e) > 0 for e in embeddings])
     if valid_mask.sum() < 3:
         return [(0.0, 0.0)] * len(embeddings)
@@ -146,6 +144,16 @@ def _project_umap(
     n_pca = min(50, padded.shape[1], padded.shape[0] - 1)
     if n_pca >= 2:
         padded = PCA(n_components=n_pca, random_state=random_state).fit_transform(padded)
+
+    try:
+        import umap
+    except Exception as exc:
+        logger.warning("UMAP unavailable (%s), using PCA scatter fallback", exc)
+        if padded.shape[1] >= 2:
+            return [(float(row[0]), float(row[1])) for row in padded[:, :2]]
+        if padded.shape[1] == 1:
+            return [(float(row[0]), 0.0) for row in padded]
+        return [(0.0, 0.0)] * len(embeddings)
 
     effective_neighbors = min(n_neighbors, int(valid_mask.sum()) - 1)
     effective_neighbors = max(effective_neighbors, 2)
@@ -196,9 +204,9 @@ def _compute_hull(
     if len(pts) < 3:
         pts = np.array(points)
 
-    from scipy.spatial import ConvexHull
-
     try:
+        from scipy.spatial import ConvexHull
+
         hull = ConvexHull(pts)
         return [[float(pts[v, 0]), float(pts[v, 1])] for v in hull.vertices]
     except Exception:
@@ -349,6 +357,308 @@ class TrendmapPipeline:
         TrendmapResponse
             Complete trendmap data ready for API response or JSON serialisation.
         """
+        articles_raw = _load_jsonl(self.articles_path, self.min_year, self.min_score)
+        papers_raw = _load_jsonl(self.papers_path, self.min_year, self.min_score)
+        response, _ = self.generate_from_records(
+            articles_raw,
+            papers_raw,
+            config=config,
+            persist_output=True,
+        )
+        return response
+
+    def generate_from_records(
+        self,
+        articles_raw: list[dict[str, Any]],
+        papers_raw: list[dict[str, Any]],
+        config: dict[str, Any] | None = None,
+        *,
+        persist_output: bool = False,
+    ) -> tuple[TrendmapResponse, dict[str, Any]]:
+        """Run the legacy trend pipeline on in-memory records."""
+        config = config or {}
+
+        for article in articles_raw:
+            article["_source_type"] = "news"
+        for paper in papers_raw:
+            paper["_source_type"] = "paper"
+        all_articles = articles_raw + papers_raw
+
+        logger.info(
+            "Loaded %d news + %d papers = %d total",
+            len(articles_raw), len(papers_raw), len(all_articles),
+        )
+
+        if len(all_articles) < 3:
+            logger.warning("Too few articles (%d) for trendmap", len(all_articles))
+            response = TrendmapResponse(
+                meta=TrendmapMeta(
+                    generated_at=datetime.utcnow().isoformat() + "Z",
+                    total_articles=len(articles_raw),
+                    total_papers=len(papers_raw),
+                    total_filtered=len(all_articles),
+                ),
+            )
+            return response, {
+                "embedding_method": "none",
+                "cluster_method": "insufficient_documents",
+                "projection_method": "none",
+                "silhouette_score": 0.0,
+                "noise_items": 0,
+                "labeling_method": "none",
+            }
+
+        for index, article in enumerate(all_articles):
+            article["article_id"] = _sha256(article.get("url", "") or article.get("title", str(index)))
+
+        texts = [
+            article.get("title", "") + "\n\n" + (article.get("excerpt", "") or article.get("text", "")[:500])
+            for article in all_articles
+        ]
+
+        bedrock_adapter = None
+        embeddings: list[list[float]] = []
+        embedding_method = "tfidf"
+
+        try:
+            from newsradar_api.infrastructure.driven_adapters.bedrock_adapter import BedrockAdapter
+
+            adapter = BedrockAdapter(cache_dir=self.output_dir / "embeddings_cache")
+            if adapter.is_available():
+                embeddings = adapter.get_embeddings(texts)
+                bedrock_adapter = adapter
+                embedding_method = "bedrock_titan_v2"
+                logger.info("Bedrock embeddings computed")
+        except Exception as exc:
+            logger.warning("Bedrock unavailable (%s), using TF-IDF fallback", exc)
+
+        if not embeddings or all(len(vector) == 0 for vector in embeddings):
+            embeddings = _embed_texts_tfidf(texts)
+            embedding_method = "tfidf"
+            logger.info("TF-IDF fallback embeddings computed")
+
+        umap_config = config.get("umap", {})
+        coords = _project_umap(
+            embeddings,
+            n_neighbors=umap_config.get("n_neighbors", 10),
+            min_dist=umap_config.get("min_dist", 0.3),
+            random_state=umap_config.get("random_state", 42),
+            spread=umap_config.get("spread", 2.0),
+        )
+        for index, (x_value, y_value) in enumerate(coords):
+            all_articles[index]["x_embed"] = round(x_value, 4)
+            all_articles[index]["y_embed"] = round(y_value, 4)
+
+        emb_array = np.array([
+            vector if len(vector) > 0 else [0.0] * (len(embeddings[0]) if embeddings[0] else 1)
+            for vector in embeddings
+        ])
+
+        from sklearn.decomposition import PCA
+
+        n_pca = min(50, emb_array.shape[1], emb_array.shape[0] - 1)
+        if n_pca >= 2:
+            emb_reduced = PCA(n_components=n_pca, random_state=42).fit_transform(emb_array)
+        else:
+            emb_reduced = emb_array
+
+        cluster_method = "legacy_hdbscan"
+        try:
+            import hdbscan
+
+            clusterer = hdbscan.HDBSCAN(
+                min_cluster_size=max(4, len(all_articles) // 40),
+                min_samples=3,
+                metric="euclidean",
+                cluster_selection_method="eom",
+            )
+            labels = clusterer.fit_predict(emb_reduced)
+        except Exception as exc:
+            logger.warning("Legacy HDBSCAN unavailable (%s), using single-cluster fallback", exc)
+            labels = np.zeros(len(all_articles), dtype=int)
+            cluster_method = "legacy_single_cluster_fallback"
+
+        n_found = len(set(label for label in labels if label >= 0))
+        n_noise = sum(1 for label in labels if label < 0)
+
+        silhouette = 0.0
+        if n_found >= 2:
+            mask = labels >= 0
+            if mask.sum() > n_found:
+                from sklearn.metrics import silhouette_score
+
+                silhouette = float(silhouette_score(emb_reduced[mask], labels[mask]))
+
+        logger.info(
+            "Trend legacy clustering: %d clusters, %d noise, silhouette=%.3f",
+            n_found, n_noise, silhouette,
+        )
+
+        cluster_article_map: dict[str, list[dict[str, Any]]] = {}
+        for index, label in enumerate(labels):
+            cluster_id = f"cluster_{label}" if label >= 0 else "unclustered"
+            all_articles[index]["cluster_id"] = cluster_id
+            cluster_article_map.setdefault(cluster_id, []).append(all_articles[index])
+
+        clusters_data: list[dict[str, Any]] = []
+        labeling_method = "legacy_llm" if bedrock_adapter is not None else "legacy_frequency_fallback"
+        for cluster_id, cluster_articles in sorted(cluster_article_map.items()):
+            if cluster_id == "unclustered":
+                continue
+            titles = [article.get("title", "")[:80] for article in cluster_articles[:20]]
+            label, category, summary, keywords, relevance = _label_cluster_with_llm(
+                titles,
+                bedrock_adapter,
+            )
+            clusters_data.append(
+                {
+                    "cluster_id": cluster_id,
+                    "label": label,
+                    "category": category,
+                    "summary": summary,
+                    "keywords": keywords,
+                    "relevance": relevance,
+                    "articles": cluster_articles,
+                }
+            )
+
+        clusters_out: list[TrendmapCluster] = []
+        for cluster in clusters_data:
+            cluster_articles = cluster["articles"]
+            cluster_coords = [
+                (article["x_embed"], article["y_embed"])
+                for article in cluster_articles
+                if "x_embed" in article
+            ]
+            hull_poly = _compute_hull(cluster_coords)
+            impact = _compute_impact(cluster_articles)
+            horizon, maturity_stage = _compute_horizon(impact, len(cluster_articles))
+            clusters_out.append(
+                TrendmapCluster(
+                    cluster_id=cluster["cluster_id"],
+                    label=cluster["label"],
+                    category=cluster["category"],
+                    summary=cluster["summary"],
+                    keywords=cluster["keywords"][:6],
+                    relevance=cluster["relevance"],
+                    item_count=len(cluster_articles),
+                    impact_score=impact,
+                    horizon_score=horizon,
+                    maturity_stage=maturity_stage,
+                    hull_polygon=hull_poly,
+                    articles=[article.get("article_id", "") for article in cluster_articles],
+                )
+            )
+
+        category_map: dict[str, list[TrendmapCluster]] = {}
+        for cluster in clusters_out:
+            category_map.setdefault(cluster.category, []).append(cluster)
+
+        super_clusters_out: list[SuperCluster] = []
+        for category, sub_clusters in category_map.items():
+            all_category_articles: list[dict[str, Any]] = []
+            for sub_cluster in sub_clusters:
+                all_category_articles.extend(cluster_article_map.get(sub_cluster.cluster_id, []))
+            category_coords = [
+                (article["x_embed"], article["y_embed"])
+                for article in all_category_articles
+                if "x_embed" in article
+            ]
+            category_hull = _compute_hull(category_coords) if len(category_coords) >= 3 else []
+            avg_impact = float(np.mean([sub_cluster.impact_score for sub_cluster in sub_clusters])) if sub_clusters else 0.0
+            super_clusters_out.append(
+                SuperCluster(
+                    category=category,
+                    clusters=[sub_cluster.cluster_id for sub_cluster in sub_clusters],
+                    hull_polygon=category_hull,
+                    total_items=len(all_category_articles),
+                    avg_impact=round(avg_impact, 1),
+                )
+            )
+
+        articles_out: list[TrendmapArticle] = []
+        for article in all_articles:
+            articles_out.append(
+                TrendmapArticle(
+                    id=article.get("article_id", ""),
+                    title=article.get("title", ""),
+                    source=article.get("source_id", ""),
+                    source_type=article.get("_source_type", "unknown"),
+                    date=article.get("published_at", ""),
+                    score=float(article.get("relevance_score", 0)),
+                    url=article.get("url", ""),
+                    x_embed=article.get("x_embed", 0.0),
+                    y_embed=article.get("y_embed", 0.0),
+                    cluster_id=article.get("cluster_id", "unclustered"),
+                )
+            )
+
+        trends_out: list[TrendEntry] = []
+        for super_cluster in super_clusters_out:
+            related_clusters = [cluster for cluster in clusters_out if cluster.category == super_cluster.category]
+            avg_score = float(np.mean([cluster.impact_score for cluster in related_clusters])) if related_clusters else 0.0
+            trends_out.append(
+                TrendEntry(
+                    date=datetime.utcnow().strftime("%Y-%m"),
+                    topic=super_cluster.category,
+                    count=super_cluster.total_items,
+                    avg_score=round(avg_score, 1),
+                )
+            )
+
+        risk_signals: list[RiskSignal] = []
+        for cluster in clusters_out:
+            if cluster.impact_score >= 70 and cluster.relevance == "alta":
+                risk_signals.append(
+                    RiskSignal(
+                        type="high_impact_cluster",
+                        description=f"Cluster '{cluster.label}' con alto impacto ({cluster.impact_score})",
+                        severity="H",
+                        related_clusters=[cluster.cluster_id],
+                    )
+                )
+
+        categories = set(cluster.category for cluster in clusters_out)
+        meta = TrendmapMeta(
+            generated_at=datetime.utcnow().isoformat() + "Z",
+            total_articles=len(articles_raw),
+            total_papers=len(papers_raw),
+            total_filtered=len(all_articles),
+            total_clusters=len(clusters_out),
+            total_categories=len(categories),
+            silhouette_score=round(silhouette, 3),
+        )
+
+        response = TrendmapResponse(
+            meta=meta,
+            clusters=clusters_out,
+            super_clusters=super_clusters_out,
+            articles=articles_out,
+            trends=trends_out,
+            insights=[],
+            recommendations=[],
+            risk_signals=risk_signals,
+        )
+
+        if persist_output:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = self.output_dir / "trendmap.json"
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(response.model_dump_json(indent=2))
+            logger.info(
+                "Saved trendmap.json: %d clusters, %d articles",
+                len(clusters_out), len(articles_out),
+            )
+
+        return response, {
+            "embedding_method": embedding_method,
+            "cluster_method": cluster_method,
+            "projection_method": "legacy_umap_pca",
+            "silhouette_score": round(silhouette, 3),
+            "noise_items": n_noise,
+            "labeling_method": labeling_method,
+        }
+
         config = config or {}
 
         # ── Step 1: Load & filter ──

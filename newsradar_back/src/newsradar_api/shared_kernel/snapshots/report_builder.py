@@ -21,6 +21,9 @@ from newsradar_api.infrastructure.driven_adapters.db_models import (
 )
 from newsradar_api.shared_kernel.bedrock import SnapshotLLMEnricher
 from newsradar_api.shared_kernel.analytics import generate_report_analysis
+from newsradar_api.shared_kernel.analytics.legacy_trend_adapter import (
+    build_legacy_trendmap_payload,
+)
 from newsradar_api.shared_kernel.config.paths import load_yaml_file, resolve_flow_path
 
 _LEGACY_CLUSTER_ID_MAX = 50
@@ -94,6 +97,30 @@ def _flow_analytics_settings(report_type: str) -> dict[str, Any]:
         return {}
     analytics = load_yaml_file(path).get("analytics") or {}
     return analytics if isinstance(analytics, dict) else {}
+
+
+def _snapshot_llm_enabled(report_type: str, *, default: bool = True) -> bool:
+    analytics = _flow_analytics_settings(report_type)
+    raw = analytics.get("snapshot_llm_enabled")
+    if raw is None:
+        return default
+    return bool(raw)
+
+
+def _mark_snapshot_llm_skipped(payload: dict[str, Any], report_type: str, reason: str) -> dict[str, Any]:
+    parameters = payload.setdefault("parameters", {})
+    parameters["llm_enrichment"] = {
+        "enabled": False,
+        "used": False,
+        "report_type": report_type,
+        "provider": "bedrock",
+        "mode": "disabled",
+        "cluster_calls": 0,
+        "report_calls": 0,
+        "errors": [],
+        "reason": reason,
+    }
+    return payload
 
 
 def _cluster_taxonomy_set(cluster: dict[str, Any]) -> set[str]:
@@ -338,6 +365,17 @@ def _attach_comparative_signals(payload: dict[str, Any], previous_payload: dict[
 
 
 def build_trendmap_payload(documents: list[Document], window_months: int) -> dict[str, Any]:
+    analytics_settings = _flow_analytics_settings("trend_mapping")
+    if str(analytics_settings.get("analysis_engine") or "").strip().lower() == "legacy_trend_pipeline_adapter":
+        payload = build_legacy_trendmap_payload(documents, window_months)
+        if _snapshot_llm_enabled("trend_mapping", default=False):
+            return SnapshotLLMEnricher("trend_mapping").enrich_payload(payload)
+        return _mark_snapshot_llm_skipped(
+            payload,
+            "trend_mapping",
+            "snapshot llm disabled by trend_mapping flow config",
+        )
+
     analysis = generate_report_analysis(documents, "trend_mapping", window_months)
     generated_at = analysis["generated_at"]
     clusters = analysis["clusters"]
@@ -454,7 +492,13 @@ def build_trendmap_payload(documents: list[Document], window_months: int) -> dic
         "sources_used": [item["source"] for item in analysis["source_mix"]],
         "parameters": analysis["parameters"],
     }
-    return SnapshotLLMEnricher("trend_mapping").enrich_payload(payload)
+    if _snapshot_llm_enabled("trend_mapping", default=True):
+        return SnapshotLLMEnricher("trend_mapping").enrich_payload(payload)
+    return _mark_snapshot_llm_skipped(
+        payload,
+        "trend_mapping",
+        "snapshot llm disabled by trend_mapping flow config",
+    )
 
 
 def build_riskmap_payload(documents: list[Document], window_months: int) -> dict[str, Any]:

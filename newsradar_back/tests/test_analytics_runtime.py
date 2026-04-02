@@ -80,11 +80,12 @@ def test_snapshot_builders_emit_advanced_analytics_payloads() -> None:
     risk_payload = build_riskmap_payload(risk_docs, window_months=6)
 
     assert trend_payload["version"] == 3
-    assert trend_payload["parameters"]["vectorizer"] == "tfidf_ngram_v1"
+    assert trend_payload["parameters"]["analysis_engine"] == "legacy_trend_pipeline_adapter"
+    assert trend_payload["parameters"]["vectorizer"] == "legacy_tfidf_fallback_or_bedrock"
     assert trend_payload["charts"]["embedding_scatter"]
     assert trend_payload["clusters"]
     assert "executive_summary" in trend_payload["summary"]
-    assert trend_payload["quality_checks"]["methodology_version"] == "analytics_methodology_v5"
+    assert trend_payload["quality_checks"]["methodology_version"] == "legacy_trend_pipeline_adapter_v1"
     assert trend_payload["quality_checks"]["cluster_coverage"] >= 0
     assert "cluster_cards" in trend_payload
 
