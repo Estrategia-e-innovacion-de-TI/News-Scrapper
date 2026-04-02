@@ -763,7 +763,7 @@ def _document_from_search_metadata(
     seen_hashes: set[str],
 ) -> Document | None:
     text = " ".join(
-        part for part in [item.title or "", item.snippet or "", " ".join(item.query_terms or [])] if part
+        part for part in [item.title or "", item.snippet or ""] if part
     ).strip()
     if not text:
         item.status = ItemStatus.ERROR

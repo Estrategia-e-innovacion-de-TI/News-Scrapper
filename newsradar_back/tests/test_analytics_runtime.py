@@ -38,6 +38,9 @@ def _doc(
     score: int = 70,
     days_ago: int = 0,
     keywords: list[str] | None = None,
+    query_terms: list[str] | None = None,
+    origin: str | None = None,
+    text: str | None = None,
 ) -> SimpleNamespace:
     published_at = datetime.now(timezone.utc) - timedelta(days=days_ago)
     return SimpleNamespace(
@@ -54,7 +57,9 @@ def _doc(
         excerpt=f"Resumen de {title}",
         matched_keywords=keywords or [],
         materialized_events=[],
-        text=f"{title} {category or risk_type or ''} {' '.join(keywords or [])}",
+        text=text or f"{title} {category or risk_type or ''} {' '.join(keywords or [])}",
+        query_terms=query_terms or [],
+        origin=origin,
     )
 
 
@@ -249,6 +254,41 @@ def test_cluster_labels_filter_noise_and_infer_category(monkeypatch) -> None:
     assert cluster["label"] != "Más / And"
     assert "and" not in [keyword.lower() for keyword in cluster["keywords"]]
     assert "mas" not in [keyword.lower() for keyword in cluster["keywords"]]
+
+
+def test_search_seed_terms_do_not_pollute_semantic_representation() -> None:
+    search_doc = _doc(
+        "tw-search",
+        "Bank pilots document automation",
+        source_id="arxiv",
+        source_type="paper",
+        score=78,
+        days_ago=4,
+        keywords=["machine learning", "document intelligence"],
+        query_terms=["machine learning"],
+        origin="search_ingest",
+        text="Banks are piloting document automation workflows with OCR and policy extraction.",
+    )
+    regular_doc = _doc(
+        "tw-regular",
+        "Bank pilots document automation",
+        source_id="rss-tech",
+        source_type="rss",
+        score=78,
+        days_ago=4,
+        keywords=["machine learning", "document intelligence"],
+        text="Banks are piloting document automation workflows with OCR and policy extraction.",
+    )
+
+    search_text = advanced_engine._document_text(search_doc, "trend_mapping")
+    regular_text = advanced_engine._document_text(regular_doc, "trend_mapping")
+    search_profile = advanced_engine._document_profile(search_doc, "trend_mapping", 6)
+    regular_profile = advanced_engine._document_profile(regular_doc, "trend_mapping", 6)
+
+    assert "machine learning" not in search_text.lower()
+    assert "machine learning" in regular_text.lower()
+    assert "machine learning" not in " ".join(search_profile.taxonomy_matches[0].get("matched_terms") or []).lower()
+    assert "machine learning" in regular_profile.normalized_keywords
 
 
 def test_hdbscan_all_noise_falls_back_to_kmeans(monkeypatch) -> None:

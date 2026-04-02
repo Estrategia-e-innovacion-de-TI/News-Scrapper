@@ -480,7 +480,7 @@ def _meaningful_terms(terms: list[str], limit: int = 6) -> list[str]:
 def _fallback_terms_from_docs(docs: list[Any], limit: int = 6) -> list[str]:
     counter: Counter[str] = Counter()
     for doc in docs:
-        for keyword in getattr(doc, "matched_keywords", []) or []:
+        for keyword in _semantic_keywords(doc):
             cleaned = _clean_term(_safe_text(keyword))
             if cleaned:
                 counter[cleaned] += 2.5
@@ -499,13 +499,45 @@ def _fallback_terms_from_docs(docs: list[Any], limit: int = 6) -> list[str]:
     return [term for term, _ in counter.most_common(limit)]
 
 
+def _semantic_keywords(doc: Any) -> list[str]:
+    keywords = [_safe_text(item) for item in (getattr(doc, "matched_keywords", []) or []) if _safe_text(item)]
+    if not keywords:
+        return []
+
+    origin = _safe_text(getattr(doc, "origin", "")).lower()
+    source_id = _safe_text(getattr(doc, "source_id", "")).lower()
+    query_terms = {
+        _normalize_text(item)
+        for item in (getattr(doc, "query_terms", []) or [])
+        if _normalize_text(item)
+    }
+    if not query_terms or (origin != "search_ingest" and source_id not in {"google_news", "arxiv"}):
+        return keywords
+
+    filtered: list[str] = []
+    for keyword in keywords:
+        normalized_keyword = _normalize_text(keyword)
+        if not normalized_keyword:
+            continue
+        leaked_from_query = any(
+            normalized_keyword == query_term
+            or normalized_keyword in query_term
+            or query_term in normalized_keyword
+            for query_term in query_terms
+        )
+        if leaked_from_query:
+            continue
+        filtered.append(keyword)
+    return filtered
+
+
 def _representation_fragments(doc: Any, report_type: str, *, embedding: bool) -> list[str]:
     settings = _analytics_settings(report_type)
     text_limit = settings["embedding_text_chars"] if embedding else settings["representation_text_chars"]
     title = _strip_editorial_boilerplate(_safe_text(getattr(doc, "title", "")), max_chars=220)
     excerpt = _strip_editorial_boilerplate(_safe_text(getattr(doc, "excerpt", "")), max_chars=480)
     body = _strip_editorial_boilerplate(_safe_text(getattr(doc, "text", "")), max_chars=text_limit)
-    keywords = [item for item in (getattr(doc, "matched_keywords", []) or []) if _safe_text(item).strip()]
+    keywords = _semantic_keywords(doc)
     events = [item for item in (getattr(doc, "materialized_events", []) or []) if _safe_text(item).strip()]
     fragments = [
         title,
@@ -608,7 +640,7 @@ def _match_taxonomy(doc: Any, report_type: str) -> list[dict[str, Any]]:
     title = _normalize_text(_strip_editorial_boilerplate(_safe_text(getattr(doc, "title", "")), max_chars=220))
     excerpt = _normalize_text(_strip_editorial_boilerplate(_safe_text(getattr(doc, "excerpt", "")), max_chars=420))
     text = _normalize_text(_strip_editorial_boilerplate(_safe_text(getattr(doc, "text", "")), max_chars=1800))
-    keywords = _normalize_text(" ".join(getattr(doc, "matched_keywords", []) or []))
+    keywords = _normalize_text(" ".join(_semantic_keywords(doc)))
     explicit = _normalize_text(_safe_text(getattr(doc, "risk_type", None) if report_type == "risk_mapping" else getattr(doc, "category", None)))
 
     results: list[dict[str, Any]] = []
@@ -682,7 +714,7 @@ def _document_profile(doc: Any, report_type: str, window_months: int) -> Documen
     normalized_title = _normalize_text(_strip_editorial_boilerplate(_safe_text(getattr(doc, "title", "")), max_chars=220))
     normalized_excerpt = _normalize_text(_strip_editorial_boilerplate(_safe_text(getattr(doc, "excerpt", "")), max_chars=420))
     normalized_text = _normalize_text(_document_text(doc, report_type))
-    normalized_keywords = _normalize_text(" ".join(getattr(doc, "matched_keywords", []) or []))
+    normalized_keywords = _normalize_text(" ".join(_semantic_keywords(doc)))
     age_days = max(0.0, (now - (doc_date or now)).total_seconds() / 86400.0)
     recency_signal = max(0.0, 1.0 - min(age_days / window_days, 1.0))
     taxonomy_matches = _match_taxonomy(doc, report_type)
@@ -1304,7 +1336,7 @@ def _cluster_terms(
             scores[cleaned] += max(0.6, 2.8 - rank * 0.14)
 
     for doc in docs:
-        for keyword in getattr(doc, "matched_keywords", []) or []:
+        for keyword in _semantic_keywords(doc):
             cleaned = _clean_term(_safe_text(keyword))
             if cleaned and not _is_generic_label_candidate(cleaned):
                 scores[cleaned] += 2.1
