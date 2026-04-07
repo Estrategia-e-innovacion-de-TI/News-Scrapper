@@ -112,7 +112,7 @@ async def search(
     terms: list[str] | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
-    max_items: int = 30,
+    max_items: int = 80,
 ) -> list[QueueItem]:
     """Search Google News RSS and return discovered items.
 

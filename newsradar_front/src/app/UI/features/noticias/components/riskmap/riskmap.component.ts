@@ -28,8 +28,10 @@ export class RiskmapComponent implements OnInit {
 
   readonly snapshot = signal<RiskmapData | null>(null);
   readonly loading = signal(false);
-  readonly running = signal(false);
+  readonly ingesting = signal(false);
+  readonly generating = signal(false);
   readonly error = signal<string | null>(null);
+  readonly statusMessage = signal<string | null>(null);
   readonly selectedCluster = signal<RiskmapCluster | null>(null);
   readonly filterCategory = signal<string | null>(null);
   readonly filterSourceType = signal<string | null>(null);
@@ -139,23 +141,45 @@ export class RiskmapComponent implements OnInit {
   }
 
   runRiskmap(): void {
-    this.running.set(true);
+    this.ingesting.set(true);
     this.error.set(null);
+    this.statusMessage.set(null);
     this.http.post(`${this.baseUrl}/riskmap/run`, {
       catalog_path: 'catalog.yaml',
       days: 7,
-      max_items_per_source: 20,
+      max_items_per_source: 60,
       classifier_mode: 'llm',
       window_months: 6,
       force_snapshot: false,
+      generate_snapshot_after_ingest: false,
+    }).subscribe({
+      next: (response: any) => {
+        this.ingesting.set(false);
+        this.statusMessage.set(`Ingesta de riesgos iniciada. Run ID: ${response?.run_id ?? 'pendiente'}. Genera el reporte cuando termine la ejecucion.`);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.error.set(err.error?.detail ?? 'No se pudo iniciar la ingesta de riesgos.');
+        this.ingesting.set(false);
+      },
+    });
+  }
+
+  generateRiskmap(): void {
+    this.generating.set(true);
+    this.error.set(null);
+    this.statusMessage.set(null);
+    this.http.post(`${this.baseUrl}/riskmap/generate`, {
+      window_months: 6,
+      force: true,
     }).subscribe({
       next: () => {
-        this.running.set(false);
+        this.generating.set(false);
+        this.statusMessage.set('Reporte de riesgos generado con el corpus disponible.');
         this.load();
       },
       error: (err: HttpErrorResponse) => {
-        this.error.set(err.error?.detail ?? 'No se pudo iniciar el risk mapping.');
-        this.running.set(false);
+        this.error.set(err.error?.detail ?? 'No se pudo generar el reporte de riesgos.');
+        this.generating.set(false);
       },
     });
   }

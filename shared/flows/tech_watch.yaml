@@ -11,7 +11,8 @@ sources:
     provider: google_news
     enabled: true
     max_queries: 5
-    max_items: 25
+    max_items_per_query: 50
+    max_items_total: 250
   arxiv_papers:
     schedule: weekly
     provider: arxiv

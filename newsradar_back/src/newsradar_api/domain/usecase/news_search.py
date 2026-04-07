@@ -16,6 +16,7 @@ Validates: Requirements 1.1-1.5, 2.1-2.5, 9.1-9.5, 10.1-10.5,
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from typing import Any
 
@@ -44,6 +45,16 @@ RISK_PRESETS = {
 GOOGLE_NEWS_RSS = "https://news.google.com/rss/search?q={query}&hl=es-419&gl=CO&ceid=CO:es-419"
 
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+DEFAULT_GOOGLE_NEWS_MAX_ITEMS = _env_int("NEWSRADAR_GOOGLE_NEWS_ADHOC_MAX_ITEMS", 80)
+
+
 def _build_query(
     company: str | None = None,
     terms: list[str] | None = None,
@@ -65,7 +76,7 @@ def _build_query(
     return query
 
 
-async def search_google_news(query: str, max_items: int = 30) -> list[dict]:
+async def search_google_news(query: str, max_items: int = DEFAULT_GOOGLE_NEWS_MAX_ITEMS) -> list[dict]:
     """Search Google News RSS via the GoogleNewsConnector.
 
     Wraps the connector's ``search()`` and converts QueueItems back to
@@ -138,7 +149,7 @@ def _resolve_preset_terms(terms_preset: str) -> list[str]:
 
 
 def _classify_document(
-    text: str, title: str, query_type: str, classifier_mode: str = "rules",
+    text: str, title: str, query_type: str, classifier_mode: str = "llm",
 ) -> dict:
     """Classify a document using LLM or rules classifier."""
     if classifier_mode == "llm":
@@ -164,7 +175,7 @@ async def search_aras(
     risk_category: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
-    classifier_mode: str = "rules",
+    classifier_mode: str = "llm",
 ) -> dict:
     """Execute ARAS search using new components."""
     run_id = str(uuid.uuid4())[:8]
@@ -181,7 +192,7 @@ async def search_aras(
         return {"run_id": run_id, "total_documents": 0, "total_classified": 0, "results": []}
 
     query = _build_query(company=search_company, date_from=date_from, date_to=date_to)
-    entries = await search_google_news(query, max_items=30)
+    entries = await search_google_news(query, max_items=DEFAULT_GOOGLE_NEWS_MAX_ITEMS)
 
     results = []
     classified_count = 0
@@ -233,7 +244,7 @@ async def search_riesgos(
     terms_preset: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
-    classifier_mode: str = "rules",
+    classifier_mode: str = "llm",
 ) -> dict:
     """Execute Riesgos search using new components."""
     run_id = str(uuid.uuid4())[:8]
@@ -248,7 +259,7 @@ async def search_riesgos(
         return {"run_id": run_id, "total_documents": 0, "total_classified": 0, "results": []}
 
     query = _build_query(terms=search_terms, date_from=date_from, date_to=date_to)
-    entries = await search_google_news(query, max_items=30)
+    entries = await search_google_news(query, max_items=DEFAULT_GOOGLE_NEWS_MAX_ITEMS)
 
     category = terms_preset.replace("_", " ").title() if terms_preset else "Riesgo Emergente"
 

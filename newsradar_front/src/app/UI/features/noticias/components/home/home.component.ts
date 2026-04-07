@@ -14,12 +14,14 @@ import { RouterLink } from '@angular/router';
               Radar de Noticias Bancolombia
             </p>
             <h1 class="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-dark-text sm:text-4xl">
-              Inteligencia documental para anticipar tendencias, senales y riesgos.
+              Un radar para convertir ruido externo en decisiones de innovacion.
             </h1>
             <p class="mt-4 max-w-3xl text-sm leading-7 text-dark-muted">
-              Este artefacto de Navi consolida fuentes de noticias, papers y reportes para convertir
-              vigilancia tecnologica en snapshots accionables. La analitica ocurre en backend y el
-              frontend presenta lectura ejecutiva, clusters, evidencias y trazabilidad.
+              Este artefacto de Navi ayuda a identificar que temas estan ganando traccion,
+              cuales merecen exploracion, que riesgos empiezan a emerger y donde conviene
+              enfocar conversaciones, pilotos o vigilancia prioritaria. El resultado no es
+              solo una lista de noticias: es una lectura accionable con evidencia, clusters,
+              recomendaciones y trazabilidad documental.
             </p>
 
             <div class="mt-6 flex flex-wrap gap-3">
@@ -41,13 +43,13 @@ import { RouterLink } from '@angular/router';
           <div class="border-t border-dark-border bg-gradient-to-br from-yellow-50 via-white to-sky-50 p-6 lg:border-l lg:border-t-0">
             <div class="rounded-3xl border border-white/70 bg-white/85 p-5 shadow-sm">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-dark-muted">
-                Flujo operativo
+                Que puedes obtener
               </p>
               <div class="mt-4 space-y-3 text-sm text-dark-muted">
-                <p><span class="font-semibold text-dark-text">1.</span> Ingesta noticias, papers y fuentes especializadas.</p>
-                <p><span class="font-semibold text-dark-text">2.</span> Normaliza texto, score, fuente y senales temporales.</p>
-                <p><span class="font-semibold text-dark-text">3.</span> Construye snapshots JSON para tendencias y riesgos.</p>
-                <p><span class="font-semibold text-dark-text">4.</span> Expone clusters, insights, recomendaciones y evidencia.</p>
+                <p><span class="font-semibold text-dark-text">Oportunidades:</span> temas emergentes que pueden alimentar discovery, pilotos y apuestas de negocio.</p>
+                <p><span class="font-semibold text-dark-text">Priorizacion:</span> lectura por impacto, madurez, momentum y novedad para separar senales fuertes de ruido.</p>
+                <p><span class="font-semibold text-dark-text">Riesgos:</span> senales tempranas de ciberseguridad, regulacion, fraude, reputacion u operacion.</p>
+                <p><span class="font-semibold text-dark-text">Evidencia:</span> documentos representativos, fuentes, rationale y recomendaciones para discutir con contexto.</p>
               </div>
               <a
                 routerLink="../tech-watch"
@@ -62,24 +64,24 @@ import { RouterLink } from '@angular/router';
 
       <div class="grid gap-4 md:grid-cols-3">
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
-          <h2 class="text-sm font-semibold text-dark-text">Mapa de tendencias</h2>
+          <h2 class="text-sm font-semibold text-dark-text">Detectar donde mirar</h2>
           <p class="mt-2 text-sm leading-6 text-dark-muted">
-            Agrupa evidencia documental en clusters interpretables, priorizados por impacto,
-            madurez, momentum y novedad.
+            El radar agrupa senales dispersas en temas coherentes para mostrar que esta
+            creciendo, que se esta consolidando y que todavia es una senal debil.
           </p>
         </section>
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
-          <h2 class="text-sm font-semibold text-dark-text">Mapa de riesgos</h2>
+          <h2 class="text-sm font-semibold text-dark-text">Decidir con evidencia</h2>
           <p class="mt-2 text-sm leading-6 text-dark-muted">
-            Reutiliza la base analitica para detectar senales de riesgo, severidad,
-            persistencia y documentos representativos.
+            Cada cluster trae documentos representativos, keywords, insight, recomendacion
+            y rationale para soportar discusiones ejecutivas y decisiones de portafolio.
           </p>
         </section>
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
-          <h2 class="text-sm font-semibold text-dark-text">Snapshot-driven</h2>
+          <h2 class="text-sm font-semibold text-dark-text">Anticipar riesgos</h2>
           <p class="mt-2 text-sm leading-6 text-dark-muted">
-            La interfaz no recalcula analitica: consume snapshots versionados para mantener
-            trazabilidad, reproducibilidad y separacion backend/frontend.
+            La misma base permite observar riesgos emergentes, severidad, persistencia y
+            momentum para priorizar conversaciones con tecnologia, negocio y control.
           </p>
         </section>
       </div>

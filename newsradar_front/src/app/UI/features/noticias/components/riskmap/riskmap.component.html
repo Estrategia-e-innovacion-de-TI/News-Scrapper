@@ -6,11 +6,11 @@
           <div>
             <h2 class="text-2xl font-semibold">Mapa de riesgos</h2>
             <p class="mt-2 max-w-3xl text-sm leading-6 text-dark-muted">
-              Analisis snapshot-driven, comparable con el mapa de tendencias y centrado en severidad,
-              persistencia, momentum y explicabilidad documental.
+              Radar snapshot-driven de riesgos emergentes: identifica patrones sospechosos,
+              senales tempranas, severidad, persistencia y momentum para la organizacion.
             </p>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex flex-wrap items-center justify-end gap-3">
             @if (snapshot()?.methodology_version) {
               <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
                 {{ methodologyLabel(snapshot()?.methodology_version) }}
@@ -18,14 +18,27 @@
             }
             <button
               class="rounded-full border border-yellow-400 bg-yellow-300 px-4 py-2 text-sm font-medium text-dark-text shadow-sm disabled:opacity-50"
-              [disabled]="running()"
+              [disabled]="generating()"
+              type="button"
+              (click)="generateRiskmap()"
+            >
+              @if (generating()) { Generando... } @else { Generar reporte }
+            </button>
+            <button
+              class="rounded-full border border-dark-border bg-white px-4 py-2 text-sm font-medium text-dark-text shadow-sm disabled:opacity-50"
+              [disabled]="ingesting()"
               type="button"
               (click)="runRiskmap()"
             >
-              @if (running()) { Ejecutando... } @else { Regenerar snapshot }
+              @if (ingesting()) { Ejecutando... } @else { Ejecutar ingesta }
             </button>
           </div>
         </div>
+        @if (statusMessage()) {
+          <div class="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            {{ statusMessage() }}
+          </div>
+        }
         @if (snapshot()?.summary?.executive_summary) {
           <p class="mt-4 text-sm leading-6 text-dark-text/90">
             {{ snapshot()?.summary?.executive_summary }}

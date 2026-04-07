@@ -19,10 +19,11 @@ router = APIRouter()
 class RiskmapRunRequest(BaseModel):
     catalog_path: str = Field("catalog.yaml")
     days: int = Field(7, ge=1, le=365)
-    max_items_per_source: int = Field(20, ge=1, le=100)
-    classifier_mode: str = Field("rules")
+    max_items_per_source: int = Field(60, ge=1, le=200)
+    classifier_mode: str = Field("llm")
     window_months: int = Field(6, ge=1, le=24)
     force_snapshot: bool = Field(False)
+    generate_snapshot_after_ingest: bool = Field(False)
 
 
 @router.post("/run")
@@ -45,7 +46,14 @@ async def run_riskmap(
 
 
 @router.post("/generate")
-async def generate_riskmap_snapshot(window_months: int = Query(6, ge=1, le=24), force: bool = Query(False)) -> dict:
+async def generate_riskmap_snapshot(
+    config: dict | None = None,
+    window_months: int = Query(6, ge=1, le=24),
+    force: bool = Query(False),
+) -> dict:
+    if config:
+        window_months = int(config.get("window_months", window_months))
+        force = bool(config.get("force", force))
     snapshot = await service.generate_snapshot(window_months=window_months, force=force)
     return {"snapshot_id": str(snapshot.id), "status": "completed", **(snapshot.summary_json or {})}
 

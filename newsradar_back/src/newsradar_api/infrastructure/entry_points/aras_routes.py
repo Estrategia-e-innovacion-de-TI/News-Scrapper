@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,16 @@ from newsradar_api.infrastructure.driven_adapters.db_models import ExportAudit, 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 EXPORT_DIR = Path(gettempdir()) / "newsradar_exports"
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+GOOGLE_NEWS_ADHOC_MAX_ITEMS = _env_int("NEWSRADAR_GOOGLE_NEWS_ADHOC_MAX_ITEMS", 80)
 
 _llm_classifier = None
 _llm_reranker = None
@@ -116,7 +127,7 @@ async def search_aras_endpoint(
     )
 
     run_id = str(uuid.uuid4())[:8]
-    classifier_mode = request.classifier or "rules"
+    classifier_mode = request.classifier or "llm"
     company = request.company or request.issuer
     search_terms = _search_terms(request)
 
@@ -138,7 +149,7 @@ async def search_aras_endpoint(
         date_from=request.date_from.isoformat() if request.date_from else None,
         date_to=request.date_to.isoformat() if request.date_to else None,
     )
-    entries = await search_google_news(query, max_items=30)
+    entries = await search_google_news(query, max_items=GOOGLE_NEWS_ADHOC_MAX_ITEMS)
 
     from newsradar_api.domain.model.pipeline_models import FetchMethod, QueueItem
 

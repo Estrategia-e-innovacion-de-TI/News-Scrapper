@@ -170,14 +170,10 @@ async def run_risk_mapping_job(**params: Any) -> dict[str, Any]:
     run_id = params.pop("run_id")
     window_months = int(params.pop("window_months", 6))
     force_snapshot = bool(params.pop("force_snapshot", False))
+    generate_snapshot_after_ingest = bool(params.pop("generate_snapshot_after_ingest", False))
     await _set_job_status("risk_mapping_ingest", "risk_mapping", schedule="weekly", status="running")
     try:
         result = await run_ingestion_with_fallback(run_id, "riesgos_news", adhoc=False, **params)
-        snapshot = await generate_riskmap_snapshot_job(
-            window_months=window_months,
-            source_execution_id=result.get("execution_id"),
-            force=force_snapshot,
-        )
         await _set_job_status(
             "risk_mapping_ingest",
             "risk_mapping",
@@ -185,11 +181,18 @@ async def run_risk_mapping_job(**params: Any) -> dict[str, Any]:
             status="completed",
             execution_id=result.get("execution_id"),
         )
-        return {
+        response = {
             "run_id": result.get("run_id", run_id),
             "execution_id": result.get("execution_id"),
-            "snapshot_id": str(snapshot.id),
         }
+        if generate_snapshot_after_ingest:
+            snapshot = await generate_riskmap_snapshot_job(
+                window_months=window_months,
+                source_execution_id=result.get("execution_id"),
+                force=force_snapshot,
+            )
+            response["snapshot_id"] = str(snapshot.id)
+        return response
     except Exception as exc:
         await _set_job_status(
             "risk_mapping_ingest",

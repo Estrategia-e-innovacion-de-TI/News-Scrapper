@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import math
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -119,6 +119,13 @@ def _enabled_flow_source(focus: str | None, key: str) -> dict[str, Any]:
     if isinstance(raw, dict) and raw.get("enabled", False):
         return raw
     return {}
+
+
+def _positive_int(value: Any, default: int, *, minimum: int = 1) -> int:
+    try:
+        return max(minimum, int(value))
+    except (TypeError, ValueError):
+        return max(minimum, default)
 
 
 def _batch_search_groups(focus: str | None) -> list[list[str]]:
@@ -299,17 +306,27 @@ async def _augment_with_batch_google_news(
     if not search_groups:
         return
 
-    max_queries = int(source_cfg.get("max_queries", 6))
-    max_items = int(source_cfg.get("max_items", 18))
-    per_query = max(4, min(max_items, max(4, math.ceil(max_items / max(max_queries, 1)))))
+    max_queries = _positive_int(source_cfg.get("max_queries"), 6)
+    per_query = _positive_int(
+        source_cfg.get("max_items_per_query", source_cfg.get("max_items")),
+        30,
+        minimum=4,
+    )
+    max_total = _positive_int(
+        source_cfg.get("max_items_total"),
+        max_queries * per_query,
+        minimum=per_query,
+    )
 
     batch_items: list[QueueItem] = []
     for group in search_groups[:max_queries]:
+        if len(batch_items) >= max_total:
+            break
         items = await google_news_connector.search(
             terms=group,
             date_from=state.date_from,
             date_to=state.date_to,
-            max_items=per_query,
+            max_items=min(per_query, max_total - len(batch_items)),
         )
         for item in items:
             item.query_terms = list(group)
@@ -335,7 +352,14 @@ async def _augment_with_batch_google_news(
             source_metrics["google_news"],
             discovered=discovered,
         )
-        logger.info("Batch Google News added %d items for focus=%s", discovered, state.focus)
+        logger.info(
+            "Batch Google News added %d items for focus=%s max_queries=%d per_query=%d max_total=%d",
+            discovered,
+            state.focus,
+            max_queries,
+            per_query,
+            max_total,
+        )
 
 
 async def _augment_with_batch_arxiv(
@@ -527,7 +551,7 @@ async def discover_items_node(state: GraphState) -> dict[str, Any]:
             terms=terms_list,
             date_from=state.date_from,
             date_to=state.date_to,
-            max_items=30,
+            max_items=_positive_int(os.getenv("NEWSRADAR_GOOGLE_NEWS_ADHOC_MAX_ITEMS"), 80),
         )
         if gn_items:
             for item in gn_items:

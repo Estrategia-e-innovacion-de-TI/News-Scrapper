@@ -1,5 +1,5 @@
 flow: risk_mapping
-description: Risk mapping batch sobre noticias y fuentes institucionales especializadas.
+description: Radar batch de riesgos emergentes sobre noticias y fuentes institucionales especializadas.
 default_window_months: 6
 sources:
   risk_news:
@@ -10,8 +10,9 @@ sources:
     schedule: weekly
     provider: google_news
     enabled: true
-    max_queries: 6
-    max_items: 30
+    max_queries: 8
+    max_items_per_query: 60
+    max_items_total: 360
   institutional_reports:
     schedule: bimonthly
     type: institutional_report
@@ -24,7 +25,7 @@ sources:
       - allianz
       - aon
 scoring:
-  classifier_mode: rules
+  classifier_mode: llm
   llm_prompt: rerank_riesgo.yaml
   min_relevance: 40
 analytics:
