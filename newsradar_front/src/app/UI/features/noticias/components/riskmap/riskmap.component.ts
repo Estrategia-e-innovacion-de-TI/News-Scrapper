@@ -3,14 +3,32 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, Inject, OnInit, computed, inject, signal } from '@angular/core';
 import { API_BASE_URL } from '../../../../../config/api.token';
 import { DARK_THEME, LifecycleStage, RiskmapCluster, RiskmapData } from '../../../../../domain/noticias/models';
+import { RiskmapDetailComponent } from './riskmap-detail.component';
+import { RiskmapImpactComponent } from './riskmap-impact.component';
+import { RiskmapMapComponent } from './riskmap-map.component';
+import { RiskmapOverviewComponent } from './riskmap-overview.component';
 
 type RiskSort = 'severity' | 'momentum' | 'persistence' | 'impact' | 'novelty' | 'size';
 type RiskBand = 'low' | 'medium' | 'high';
+type RiskTabId = 'resumen' | 'mapa' | 'impacto' | 'detalle';
+
+const RISK_TABS: Array<{ id: RiskTabId; label: string }> = [
+  { id: 'resumen', label: 'Resumen' },
+  { id: 'mapa', label: 'Mapa' },
+  { id: 'impacto', label: 'Impacto de riesgo' },
+  { id: 'detalle', label: 'Detalle' },
+];
 
 @Component({
   selector: 'app-riskmap',
   standalone: true,
-  imports: [DecimalPipe],
+  imports: [
+    DecimalPipe,
+    RiskmapDetailComponent,
+    RiskmapImpactComponent,
+    RiskmapMapComponent,
+    RiskmapOverviewComponent,
+  ],
   templateUrl: './riskmap.component.html',
 })
 export class RiskmapComponent implements OnInit {
@@ -25,6 +43,8 @@ export class RiskmapComponent implements OnInit {
     { value: 'novelty', label: 'Novedad' },
     { value: 'size', label: 'Tamano' },
   ] as const;
+  readonly tabs = RISK_TABS;
+  readonly activeTab = signal<RiskTabId>('resumen');
 
   readonly snapshot = signal<RiskmapData | null>(null);
   readonly loading = signal(false);
@@ -99,6 +119,24 @@ export class RiskmapComponent implements OnInit {
       x: this.scatterX(cluster.risk_severity),
       y: this.scatterY(cluster.momentum_score),
       r: 8 + (cluster.item_count / maxCount) * 18,
+      color: this.colorFor(cluster.category),
+    }));
+  });
+
+  readonly clusterMapPoints = computed(() => {
+    const items = this.filteredClusters();
+    const maxCount = Math.max(...items.map((cluster) => cluster.item_count), 1);
+    const xs = items.map((cluster) => cluster.coords?.x ?? 0);
+    const ys = items.map((cluster) => cluster.coords?.y ?? 0);
+    const minX = Math.min(...xs, 0);
+    const maxX = Math.max(...xs, 1);
+    const minY = Math.min(...ys, 0);
+    const maxY = Math.max(...ys, 1);
+    return items.map((cluster) => ({
+      cluster,
+      x: this.scaleToRange(cluster.coords?.x ?? 0, minX, maxX, 56, 584),
+      y: this.scaleToRange(cluster.coords?.y ?? 0, minY, maxY, 308, 36),
+      r: 9 + (cluster.item_count / maxCount) * 20,
       color: this.colorFor(cluster.category),
     }));
   });
@@ -249,6 +287,14 @@ export class RiskmapComponent implements OnInit {
   stageLabel(value: string): string { return value.replaceAll('_', ' '); }
   shortLabel(value: string, maxLength: number): string { return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value; }
 
+  tabClass(tabId: RiskTabId): string {
+    const base = 'px-4 py-2 text-sm font-medium transition-colors cursor-pointer ';
+    if (this.activeTab() === tabId) {
+      return base + 'text-dark-accent border-b-2 border-dark-accent';
+    }
+    return base + 'text-dark-muted hover:text-dark-text';
+  }
+
   methodologyLabel(value: string | undefined): string {
     if (!value) return '';
     const normalized = value.toLowerCase();
@@ -304,6 +350,14 @@ export class RiskmapComponent implements OnInit {
       case 'severity':
       default: return cluster.risk_severity;
     }
+  }
+
+  private scaleToRange(value: number, min: number, max: number, outMin: number, outMax: number): number {
+    if (max === min) {
+      return (outMin + outMax) / 2;
+    }
+    const ratio = (value - min) / (max - min);
+    return outMin + Math.max(0, Math.min(1, ratio)) * (outMax - outMin);
   }
 
   private syncSelectedCluster(): void {
