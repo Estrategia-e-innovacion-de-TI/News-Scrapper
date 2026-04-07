@@ -28,7 +28,7 @@ const SORT_OPTIONS: SortOption[] = [
   standalone: true,
   imports: [DecimalPipe],
   template: `
-    <aside class="w-80 shrink-0 space-y-4">
+    <aside class="w-full shrink-0 space-y-4 2xl:w-80">
       <section class="rounded-2xl border border-dark-border bg-dark-surface p-4">
         <div class="flex items-center justify-between gap-3">
           <div>

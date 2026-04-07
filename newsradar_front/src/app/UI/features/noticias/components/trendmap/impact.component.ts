@@ -2,6 +2,7 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  OnDestroy,
   effect,
   input,
   viewChild,
@@ -32,20 +33,20 @@ const STAGE_COLORS: Record<LifecycleStage, string> = {
   selector: 'app-trendmap-impact',
   standalone: true,
   template: `
-    <div class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+    <div class="rounded-2xl border border-dark-border bg-white p-5 shadow-sm">
       <div class="flex items-start justify-between gap-4">
         <div>
           <h4 class="text-sm font-semibold text-dark-text">Impacto vs madurez</h4>
           <p class="mt-1 text-xs leading-5 text-dark-muted">
-            Burbujas por cluster con tamano segun volumen y color segun hype stage.
+            Burbujas por cluster con tamano segun volumen y color segun etapa. Pasa el cursor para ver evidencia.
           </p>
         </div>
       </div>
-      <svg #chart [attr.width]="width" [attr.height]="height"></svg>
+      <svg #chart class="mt-4 h-auto w-full max-w-full" [attr.width]="width" [attr.height]="height"></svg>
     </div>
   `,
 })
-export class TrendmapImpactComponent implements AfterViewInit {
+export class TrendmapImpactComponent implements AfterViewInit, OnDestroy {
   readonly clusters = input<TrendmapCluster[]>([]);
   readonly chartRef = viewChild.required<ElementRef<SVGSVGElement>>('chart');
 
@@ -53,6 +54,7 @@ export class TrendmapImpactComponent implements AfterViewInit {
   readonly height = HEIGHT;
 
   private initialized = false;
+  private tooltip: HTMLDivElement | null = null;
 
   constructor() {
     effect(() => {
@@ -67,9 +69,19 @@ export class TrendmapImpactComponent implements AfterViewInit {
     this.render(this.clusters());
   }
 
+  ngOnDestroy(): void {
+    this.tooltip?.remove();
+    this.tooltip = null;
+  }
+
   private render(clusters: TrendmapCluster[]): void {
     const svg = d3.select(this.chartRef().nativeElement);
     svg.selectAll('*').remove();
+    svg
+      .attr('width', '100%')
+      .attr('height', HEIGHT)
+      .attr('viewBox', `0 0 ${WIDTH} ${HEIGHT}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet');
 
     if (clusters.length === 0) {
       return;
@@ -91,7 +103,7 @@ export class TrendmapImpactComponent implements AfterViewInit {
       .append('rect')
       .attr('width', WIDTH)
       .attr('height', HEIGHT)
-      .attr('fill', DARK_THEME.bg)
+      .attr('fill', '#ffffff')
       .attr('rx', 12);
 
     svg
@@ -100,7 +112,7 @@ export class TrendmapImpactComponent implements AfterViewInit {
       .attr('y', MARGIN.top)
       .attr('width', quadrantX - MARGIN.left)
       .attr('height', quadrantY - MARGIN.top)
-      .attr('fill', '#132033');
+      .attr('fill', '#fff7ed');
 
     svg
       .append('rect')
@@ -108,7 +120,7 @@ export class TrendmapImpactComponent implements AfterViewInit {
       .attr('y', MARGIN.top)
       .attr('width', MARGIN.left + innerWidth - quadrantX)
       .attr('height', quadrantY - MARGIN.top)
-      .attr('fill', '#1a2b3a');
+      .attr('fill', '#fef9c3');
 
     svg
       .append('rect')
@@ -116,7 +128,7 @@ export class TrendmapImpactComponent implements AfterViewInit {
       .attr('y', quadrantY)
       .attr('width', quadrantX - MARGIN.left)
       .attr('height', MARGIN.top + innerHeight - quadrantY)
-      .attr('fill', '#101e2e');
+      .attr('fill', '#f8fafc');
 
     svg
       .append('rect')
@@ -124,7 +136,7 @@ export class TrendmapImpactComponent implements AfterViewInit {
       .attr('y', quadrantY)
       .attr('width', MARGIN.left + innerWidth - quadrantX)
       .attr('height', MARGIN.top + innerHeight - quadrantY)
-      .attr('fill', '#18272f');
+      .attr('fill', '#ecfdf5');
 
     svg
       .append('g')
@@ -207,21 +219,19 @@ export class TrendmapImpactComponent implements AfterViewInit {
       .attr('fill', (cluster) => STAGE_COLORS[cluster.hype_stage])
       .attr('fill-opacity', 0.75)
       .attr('stroke', '#e2e8f0')
-      .attr('stroke-opacity', 0.15)
-      .attr('stroke-width', 1.2);
-
-    bubbles
-      .append('title')
-      .text(
-        (cluster) =>
-          `${cluster.label}
-Impacto: ${cluster.impact_score.toFixed(1)}
-Madurez: ${cluster.maturity_score.toFixed(1)}
-Momentum: ${cluster.momentum_score.toFixed(1)}
-Novedad: ${cluster.novelty_score.toFixed(1)}
-Docs: ${cluster.item_count}
-Stage: ${cluster.hype_stage.replaceAll('_', ' ')}`,
-      );
+      .attr('stroke-opacity', 0.9)
+      .attr('stroke-width', 1.4)
+      .style('cursor', 'pointer')
+      .on('mouseenter', (event, cluster) => {
+        this.showClusterTooltip(cluster);
+        this.positionTooltip(event);
+      })
+      .on('mousemove', (event) => {
+        this.positionTooltip(event);
+      })
+      .on('mouseleave', () => {
+        this.hideTooltip();
+      });
 
     bubbles
       .filter((cluster) => r(cluster.item_count) >= 14)
@@ -261,5 +271,75 @@ Stage: ${cluster.hype_stage.replaceAll('_', ' ')}`,
       .attr('fill', DARK_THEME.textMuted)
       .attr('font-size', '10px')
       .text(subtitle);
+  }
+
+  private ensureTooltip(): HTMLDivElement {
+    if (this.tooltip) {
+      return this.tooltip;
+    }
+    const tooltip = document.createElement('div');
+    tooltip.style.position = 'fixed';
+    tooltip.style.pointerEvents = 'none';
+    tooltip.style.zIndex = '1000';
+    tooltip.style.maxWidth = '340px';
+    tooltip.style.padding = '12px 14px';
+    tooltip.style.borderRadius = '14px';
+    tooltip.style.border = '1px solid #e2e8f0';
+    tooltip.style.background = 'rgba(255, 255, 255, 0.98)';
+    tooltip.style.color = '#2c2a29';
+    tooltip.style.boxShadow = '0 18px 40px rgba(15, 23, 42, 0.18)';
+    tooltip.style.fontSize = '12px';
+    tooltip.style.lineHeight = '1.5';
+    tooltip.style.opacity = '0';
+    tooltip.style.transition = 'opacity 120ms ease';
+    document.body.appendChild(tooltip);
+    this.tooltip = tooltip;
+    return tooltip;
+  }
+
+  private showClusterTooltip(cluster: TrendmapCluster): void {
+    const tooltip = this.ensureTooltip();
+    const stage = cluster.hype_stage.replaceAll('_', ' ');
+    const keywords = cluster.top_keywords.slice(0, 4).join(', ');
+    tooltip.innerHTML = `
+      <div style="font-weight:700; color:#2c2a29;">${this.escapeHtml(cluster.label)}</div>
+      <div style="margin-top:2px; color:#64748b;">${this.escapeHtml(cluster.category)} | ${this.escapeHtml(stage)}</div>
+      <div style="margin-top:8px;">Impacto ${cluster.impact_score.toFixed(0)} | Madurez ${cluster.maturity_score.toFixed(0)} | Momentum ${cluster.momentum_score.toFixed(0)}</div>
+      <div>Docs ${cluster.item_count} | Calidad ${cluster.cluster_quality.score.toFixed(0)} | Novedad ${cluster.novelty_score.toFixed(0)}</div>
+      <div style="margin-top:8px; color:#475569;">${this.escapeHtml(cluster.executive_takeaway || cluster.summary)}</div>
+      <div style="margin-top:8px; color:#64748b;">${this.escapeHtml(keywords)}</div>
+    `;
+    tooltip.style.opacity = '1';
+  }
+
+  private positionTooltip(event: MouseEvent): void {
+    const tooltip = this.ensureTooltip();
+    const padding = 14;
+    const rect = tooltip.getBoundingClientRect();
+    const left = Math.min(
+      event.clientX + padding,
+      window.innerWidth - rect.width - padding,
+    );
+    const top = Math.min(
+      event.clientY + padding,
+      window.innerHeight - rect.height - padding,
+    );
+    tooltip.style.left = `${Math.max(padding, left)}px`;
+    tooltip.style.top = `${Math.max(padding, top)}px`;
+  }
+
+  private hideTooltip(): void {
+    if (this.tooltip) {
+      this.tooltip.style.opacity = '0';
+    }
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
   }
 }

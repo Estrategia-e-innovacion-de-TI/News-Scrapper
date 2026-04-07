@@ -23,7 +23,7 @@ import {
             </p>
           </div>
           <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
-            {{ methodology()?.methodology_version ?? qualityChecks()?.methodology_version ?? 'analytics_methodology_v3' }}
+            {{ methodologyLabel(methodology()?.methodology_version ?? qualityChecks()?.methodology_version ?? 'analytics_methodology_v3') }}
           </span>
         </div>
       </section>
@@ -205,6 +205,17 @@ export class TrendmapMethodologyComponent {
       value: Array.isArray(value) ? value.join(', ') : String(value),
     }));
   });
+
+  methodologyLabel(value: string): string {
+    const normalized = value.toLowerCase();
+    if (normalized.includes('build_trendmap') || normalized.includes('trend_pipeline_adapter')) {
+      return 'Motor analitico de tendencias v2';
+    }
+    if (normalized.includes('analytics_methodology')) {
+      return 'Motor analitico avanzado';
+    }
+    return value.replaceAll('_', ' ');
+  }
 
   readonly clusteringEntries = computed(() => {
     const clustering = this.methodology()?.clustering ?? {};

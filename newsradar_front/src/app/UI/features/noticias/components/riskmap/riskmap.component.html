@@ -13,7 +13,7 @@
           <div class="flex items-center gap-3">
             @if (snapshot()?.methodology_version) {
               <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
-                {{ snapshot()?.methodology_version }}
+                {{ methodologyLabel(snapshot()?.methodology_version) }}
               </span>
             }
             <button
@@ -340,8 +340,8 @@
             </svg>
           </section>
 
-          <div class="grid gap-6 xl:grid-cols-2">
-            <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+          <div class="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <section class="min-w-0 overflow-hidden rounded-2xl border border-dark-border bg-dark-surface p-5">
               <h4 class="text-sm font-semibold text-dark-text">Taxonomia y temporalidad</h4>
               <div class="mt-4 space-y-4">
                 <div>
@@ -349,11 +349,11 @@
                   <div class="mt-3 space-y-2">
                     @for (item of taxonomyBreakdown().slice(0, 6); track item.name) {
                       <div>
-                        <div class="flex items-center justify-between gap-3 text-xs text-dark-muted">
-                          <span>{{ item.name }}</span>
-                          <span>{{ item.score | number:'1.0-2' }}</span>
+                        <div class="flex min-w-0 items-center justify-between gap-3 text-xs text-dark-muted">
+                          <span class="min-w-0 truncate" [title]="item.name">{{ item.name }}</span>
+                          <span class="shrink-0">{{ item.score | number:'1.0-2' }}</span>
                         </div>
-                        <div class="mt-1 h-2 rounded-full bg-dark-border">
+                        <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-dark-border">
                           <div class="h-full rounded-full bg-amber-500" [style.width.%]="ratio(item.score, taxonomyMax())"></div>
                         </div>
                       </div>
@@ -365,11 +365,11 @@
                   <div class="mt-3 space-y-2">
                     @for (item of monthlyVolume().slice(-6); track item.bucket) {
                       <div>
-                        <div class="flex items-center justify-between gap-3 text-xs text-dark-muted">
-                          <span>{{ item.bucket }}</span>
-                          <span>{{ item.count }}</span>
+                        <div class="flex min-w-0 items-center justify-between gap-3 text-xs text-dark-muted">
+                          <span class="min-w-0 truncate">{{ item.bucket }}</span>
+                          <span class="shrink-0">{{ item.count }}</span>
                         </div>
-                        <div class="mt-1 h-2 rounded-full bg-dark-border">
+                        <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-dark-border">
                           <div class="h-full rounded-full bg-emerald-400" [style.width.%]="ratio(item.count, monthlyVolumeMax())"></div>
                         </div>
                       </div>
@@ -379,7 +379,7 @@
               </div>
             </section>
 
-            <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
+            <section class="min-w-0 overflow-hidden rounded-2xl border border-dark-border bg-dark-surface p-5">
               <h4 class="text-sm font-semibold text-dark-text">Source mix e insights</h4>
               <div class="mt-4 space-y-4">
                 <div>
@@ -387,11 +387,11 @@
                   <div class="mt-3 space-y-2">
                     @for (item of sourceMix().slice(0, 6); track item.source) {
                       <div>
-                        <div class="flex items-center justify-between gap-3 text-xs text-dark-muted">
-                          <span>{{ item.source }}</span>
-                          <span>{{ item.count }}</span>
+                        <div class="flex min-w-0 items-center justify-between gap-3 text-xs text-dark-muted">
+                          <span class="min-w-0 truncate" [title]="item.source">{{ item.source }}</span>
+                          <span class="shrink-0">{{ item.count }}</span>
                         </div>
-                        <div class="mt-1 h-2 rounded-full bg-dark-border">
+                        <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-dark-border">
                           <div class="h-full rounded-full bg-sky-400" [style.width.%]="ratio(item.count, sourceMixMax())"></div>
                         </div>
                       </div>

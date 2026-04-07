@@ -225,6 +225,18 @@ export class RiskmapComponent implements OnInit {
   stageLabel(value: string): string { return value.replaceAll('_', ' '); }
   shortLabel(value: string, maxLength: number): string { return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value; }
 
+  methodologyLabel(value: string | undefined): string {
+    if (!value) return '';
+    const normalized = value.toLowerCase();
+    if (normalized.includes('build_trendmap') || normalized.includes('trend_pipeline_adapter')) {
+      return 'Motor analitico de tendencias v2';
+    }
+    if (normalized.includes('analytics_methodology')) {
+      return 'Motor analitico avanzado';
+    }
+    return value.replaceAll('_', ' ');
+  }
+
   stageBadge(value: string): string {
     const base = 'rounded-full border px-2 py-1 text-[10px] font-medium ';
     if (value === 'weak_signal') return base + 'border-yellow-500 bg-yellow-100 text-yellow-900';

@@ -134,7 +134,7 @@ interface VolumePoint {
                         ></span>
                         {{ card.category }}
                       </span>
-                      <span class="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-[10px] text-sky-200">
+                      <span class="rounded-full border border-sky-500 bg-sky-50 px-2 py-1 text-[10px] text-sky-700">
                         {{ formatStage(card.hype_stage) }}
                       </span>
                       @if (card.comparative_signal) {
@@ -211,7 +211,7 @@ interface VolumePoint {
                 @if ((card.impact_targets?.length ?? 0) > 0) {
                   <div class="mt-4 flex flex-wrap gap-2">
                     @for (target of (card.impact_targets ?? []).slice(0, 3); track target) {
-                      <span class="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] text-emerald-200">
+                      <span class="rounded-full border border-emerald-500 bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700">
                         {{ target }}
                       </span>
                     }
@@ -231,13 +231,13 @@ interface VolumePoint {
         </section>
       }
 
-      <div class="grid gap-6 xl:grid-cols-2">
+      <div class="grid gap-6 2xl:grid-cols-2">
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
           <h4 class="text-sm font-semibold text-dark-text">Taxonomia dominante</h4>
           <p class="mt-1 text-xs text-dark-muted">
             Peso agregado de matches taxonomicos sobre clusters detectados.
           </p>
-          <svg #taxonomyChart></svg>
+          <svg #taxonomyChart class="mt-3 h-auto w-full max-w-full overflow-visible"></svg>
         </section>
 
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
@@ -245,7 +245,7 @@ interface VolumePoint {
           <p class="mt-1 text-xs text-dark-muted">
             Evolucion del corpus analizado dentro de la ventana del snapshot.
           </p>
-          <svg #monthlyChart></svg>
+          <svg #monthlyChart class="mt-3 h-auto w-full max-w-full overflow-visible"></svg>
         </section>
       </div>
 
@@ -386,12 +386,16 @@ export class TrendmapOverviewComponent implements AfterViewInit {
     const svg = d3.select(this.taxonomyChartRef().nativeElement);
     svg.selectAll('*').remove();
 
-    const width = 520;
+    const width = 680;
     const rowHeight = 38;
     const height = Math.max(220, data.length * rowHeight + 40);
-    const margin = { top: 10, right: 24, bottom: 24, left: 170 };
+    const margin = { top: 10, right: 56, bottom: 24, left: 230 };
 
-    svg.attr('width', width).attr('height', height);
+    svg
+      .attr('width', '100%')
+      .attr('height', height)
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet');
 
     if (data.length === 0) {
       svg
@@ -441,7 +445,7 @@ export class TrendmapOverviewComponent implements AfterViewInit {
     svg
       .append('g')
       .attr('transform', `translate(${margin.left},0)`)
-      .call(d3.axisLeft(y))
+      .call(d3.axisLeft(y).tickFormat((value) => this.shortChartLabel(String(value), 28)))
       .selectAll('text')
       .attr('fill', DARK_THEME.text)
       .attr('font-size', '11px');
@@ -463,11 +467,15 @@ export class TrendmapOverviewComponent implements AfterViewInit {
     const svg = d3.select(this.monthlyChartRef().nativeElement);
     svg.selectAll('*').remove();
 
-    const width = 520;
+    const width = 680;
     const height = 280;
-    const margin = { top: 12, right: 18, bottom: 42, left: 44 };
+    const margin = { top: 12, right: 28, bottom: 42, left: 48 };
 
-    svg.attr('width', width).attr('height', height);
+    svg
+      .attr('width', '100%')
+      .attr('height', height)
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet');
 
     if (data.length === 0) {
       svg
@@ -540,5 +548,9 @@ export class TrendmapOverviewComponent implements AfterViewInit {
       .attr('font-size', '10px');
 
     svg.selectAll('.domain, .tick line').attr('stroke', DARK_THEME.border);
+  }
+
+  private shortChartLabel(value: string, maxLength: number): string {
+    return value.length > maxLength ? `${value.slice(0, maxLength - 3)}...` : value;
   }
 }

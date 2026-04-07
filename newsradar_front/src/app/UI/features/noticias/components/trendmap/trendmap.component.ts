@@ -53,7 +53,7 @@ const TABS: Tab[] = [
               </div>
               @if (service.data()?.methodology_version) {
                 <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
-                  {{ service.data()?.methodology_version }}
+                  {{ methodologyLabel(service.data()?.methodology_version) }}
                 </span>
               }
             </div>
@@ -117,7 +117,7 @@ const TABS: Tab[] = [
             }
           </nav>
 
-          <div class="flex gap-6">
+          <div class="flex flex-col gap-6 2xl:flex-row">
             <!-- Main content -->
             <div class="flex-1 min-w-0">
               @switch (activeTab()) {
@@ -223,5 +223,17 @@ export class TrendmapComponent implements OnInit {
       return base + 'text-dark-accent border-b-2 border-dark-accent';
     }
     return base + 'text-dark-muted hover:text-dark-text';
+  }
+
+  methodologyLabel(value: string | undefined): string {
+    if (!value) return '';
+    const normalized = value.toLowerCase();
+    if (normalized.includes('build_trendmap') || normalized.includes('trend_pipeline_adapter')) {
+      return 'Motor analitico de tendencias v2';
+    }
+    if (normalized.includes('analytics_methodology')) {
+      return 'Motor analitico avanzado';
+    }
+    return value.replaceAll('_', ' ');
   }
 }

@@ -93,7 +93,7 @@ type SortDir = 'asc' | 'desc';
                 @if ((cluster()!.impact_targets?.length ?? 0) > 0) {
                   <div class="mt-3 flex flex-wrap gap-2">
                     @for (target of (cluster()!.impact_targets ?? []).slice(0, 4); track target) {
-                      <span class="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
+                      <span class="rounded-full border border-emerald-500 bg-emerald-50 px-3 py-1 text-xs text-emerald-700">
                         {{ target }}
                       </span>
                     }
