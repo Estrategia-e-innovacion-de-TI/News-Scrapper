@@ -301,6 +301,9 @@ export class RiskmapComponent implements OnInit {
     if (normalized.includes('build_trendmap') || normalized.includes('trend_pipeline_adapter')) {
       return 'Motor analitico de tendencias v2';
     }
+    if (normalized.includes('build_riskmap') || normalized.includes('risk_pipeline_adapter')) {
+      return 'Motor analitico de riesgos v2';
+    }
     if (normalized.includes('analytics_methodology')) {
       return 'Motor analitico avanzado';
     }

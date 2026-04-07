@@ -382,6 +382,8 @@ def _build_document_payload(
         "summary": _safe_text(getattr(original_doc, "excerpt", "")) or _safe_text(getattr(original_doc, "title", "")),
         "category": category,
         "risk_type": getattr(original_doc, "risk_type", None),
+        "severity": getattr(original_doc, "severity", None),
+        "severity_confidence": getattr(original_doc, "severity_confidence", None),
         "taxonomy_matches": [],
         "source_weight": 86.0 if _document_source_type(original_doc) in {"paper", "pdf", "institutional_report", "patent"} else 55.0,
         "duplicate_signature": article_id,

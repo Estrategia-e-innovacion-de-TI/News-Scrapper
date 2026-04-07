@@ -24,6 +24,9 @@ from newsradar_api.shared_kernel.analytics import generate_report_analysis
 from newsradar_api.shared_kernel.analytics.legacy_trend_adapter import (
     build_legacy_trendmap_payload,
 )
+from newsradar_api.shared_kernel.analytics.legacy_risk_adapter import (
+    build_legacy_riskmap_payload,
+)
 from newsradar_api.shared_kernel.config.paths import load_yaml_file, resolve_flow_path
 
 _LEGACY_CLUSTER_ID_MAX = 50
@@ -507,6 +510,22 @@ def build_trendmap_payload(documents: list[Document], window_months: int) -> dic
 
 
 def build_riskmap_payload(documents: list[Document], window_months: int) -> dict[str, Any]:
+    analytics_settings = _flow_analytics_settings("risk_mapping")
+    analysis_engine = str(analytics_settings.get("analysis_engine") or "").strip().lower()
+    if analysis_engine in {"build_riskmap_adapter", "legacy_risk_pipeline_adapter"}:
+        payload = build_legacy_riskmap_payload(
+            documents,
+            window_months,
+            min_relevance_score=float(analytics_settings.get("min_relevance_for_clustering") or 40),
+        )
+        if _snapshot_llm_enabled("risk_mapping", default=False):
+            return SnapshotLLMEnricher("risk_mapping").enrich_payload(payload)
+        return _mark_snapshot_llm_skipped(
+            payload,
+            "risk_mapping",
+            "snapshot llm disabled by risk_mapping flow config",
+        )
+
     analysis = generate_report_analysis(documents, "risk_mapping", window_months)
     generated_at = analysis["generated_at"]
     clusters = analysis["clusters"]

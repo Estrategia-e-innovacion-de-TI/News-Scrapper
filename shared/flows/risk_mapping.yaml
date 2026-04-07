@@ -29,8 +29,10 @@ scoring:
   llm_prompt: rerank_riesgo.yaml
   min_relevance: 40
 analytics:
+  analysis_engine: build_riskmap_adapter
   cluster_method: bedrock_embeddings_hdbscan_with_fallback
   snapshot_llm_prompt: snapshot_riskmap.yaml
+  snapshot_llm_enabled: false
   persist_snapshots: true
   min_relevance_for_clustering: 40
   weak_signal_max_documents: 4
