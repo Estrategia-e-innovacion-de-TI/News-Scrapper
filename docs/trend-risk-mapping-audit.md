@@ -1,7 +1,34 @@
 # Trend/Risk Mapping Audit Notes
 
-Este documento resume la implementacion aplicada en `analytics_methodology_v5`.
-La fuente de verdad sigue siendo el codigo en backend y frontend.
+Este documento resume la implementacion aplicada sobre el codigo real. La fuente
+de verdad sigue siendo el backend y frontend, no los README.
+
+## Actualizacion Trend Mapping
+
+Trend Mapping ya no usa el motor `analytics_methodology_v5` como fuente primaria.
+El flujo `shared/flows/trend_mapping.yaml` selecciona
+`legacy_trend_pipeline_adapter`, que adapta la logica funcional observada en
+`News-Scrapper-deprecated/News-Scrapper/trendmap/scripts/build_trendmap.py` al
+snapshot JSON v3 actual.
+
+Puntos migrados/adaptados:
+
+- Representacion: `title + excerpt/text` como en `build_trendmap.py`.
+- Proyeccion: UMAP con fallback PCA cuando `umap` no esta disponible.
+- Clustering: KMeans con seleccion de K por silhouette como referencia funcional,
+  seguido por HDBSCAN cuando produce suficientes clusters y poco ruido.
+- Fallback operativo: si HDBSCAN falta o colapsa a muy pocos clusters, el adapter
+  usa KMeans por silhouette en vez de un `single_cluster`.
+- Labeling: mantiene el prompt de labeling por cluster con Claude/Bedrock cuando
+  hay runtime disponible y fallback lexicografico cuando no lo hay.
+- Snapshot: la salida se transforma a `clusters`, `cluster_cards`, `insights`,
+  `recommendations`, `risk_signals`, `quality_checks`, `filters_metadata` y
+  `parameters` del contrato snapshot-driven actual.
+- LLM de snapshot: queda deshabilitado para Trend desde config para no reescribir
+  ni aplanar labels/insights ya generados por el flujo de analisis.
+
+La version metodologica actual de Trend es
+`deprecated_build_trendmap_adapter_v2`.
 
 ## Cambios implementados
 

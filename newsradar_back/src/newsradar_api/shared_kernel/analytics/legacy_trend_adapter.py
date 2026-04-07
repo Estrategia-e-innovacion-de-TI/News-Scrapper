@@ -13,7 +13,7 @@ from newsradar_api.infrastructure.pipeline.trendmap_pipeline import TrendmapPipe
 
 from .advanced_engine import _build_breakdown, _cluster_signal_state, _score_band
 
-_METHOD_VERSION = "legacy_trend_pipeline_adapter_v1"
+_METHOD_VERSION = "deprecated_build_trendmap_adapter_v2"
 _GARTNER_STAGES = (
     "innovation_trigger",
     "peak_of_inflated_expectations",

@@ -462,32 +462,91 @@ class TrendmapPipeline:
         else:
             emb_reduced = emb_array
 
-        cluster_method = "legacy_hdbscan"
+        from sklearn.cluster import KMeans
+        from sklearn.metrics import silhouette_score
+
+        sample_count = len(all_articles)
+        k_min = min(max(3, sample_count // 60), sample_count - 1)
+        k_max = min(12, max(k_min, sample_count // 10), sample_count - 1)
+        best_k = k_min
+        best_score = -1.0
+        kmeans_labels: np.ndarray | None = None
+
+        for k_value in range(k_min, k_max + 1):
+            candidate = KMeans(n_clusters=k_value, random_state=42, n_init=10)
+            trial_labels = candidate.fit_predict(emb_reduced)
+            trial_score = float(
+                silhouette_score(
+                    emb_reduced,
+                    trial_labels,
+                    sample_size=min(500, sample_count),
+                )
+            )
+            if trial_score > best_score:
+                best_k = k_value
+                best_score = trial_score
+                kmeans_labels = trial_labels
+
+        if kmeans_labels is None:
+            kmeans_labels = np.zeros(sample_count, dtype=int)
+            best_k = 1
+            best_score = 0.0
+
+        logger.info(
+            "Legacy KMeans reference: K=%d, silhouette=%.3f",
+            best_k,
+            best_score,
+        )
+
+        labels = kmeans_labels
+        cluster_method = "legacy_kmeans_silhouette"
+        silhouette = max(best_score, 0.0)
+        n_found = len(set(int(label) for label in labels if label >= 0))
+        n_noise = 0
+
         try:
             import hdbscan
 
             clusterer = hdbscan.HDBSCAN(
-                min_cluster_size=max(4, len(all_articles) // 40),
+                min_cluster_size=max(4, sample_count // 40),
                 min_samples=3,
                 metric="euclidean",
                 cluster_selection_method="eom",
             )
-            labels = clusterer.fit_predict(emb_reduced)
+            hdbscan_labels = clusterer.fit_predict(emb_reduced)
+            hdbscan_found = len(set(int(label) for label in hdbscan_labels if label >= 0))
+            hdbscan_noise = sum(1 for label in hdbscan_labels if label < 0)
+            min_acceptable_clusters = max(2, min(best_k, max(3, best_k // 2)))
+            excessive_noise = hdbscan_noise / max(sample_count, 1) > 0.70
+
+            if hdbscan_found >= min_acceptable_clusters and not excessive_noise:
+                labels = hdbscan_labels
+                cluster_method = "legacy_hdbscan"
+                n_found = hdbscan_found
+                n_noise = hdbscan_noise
+                if n_found >= 2:
+                    mask = labels >= 0
+                    if mask.sum() > n_found:
+                        silhouette = float(silhouette_score(emb_reduced[mask], labels[mask]))
+                logger.info(
+                    "Legacy HDBSCAN accepted: %d clusters, %d noise, silhouette=%.3f",
+                    n_found,
+                    n_noise,
+                    silhouette,
+                )
+            else:
+                logger.warning(
+                    "Legacy HDBSCAN rejected: %d clusters, %d noise; using KMeans K=%d",
+                    hdbscan_found,
+                    hdbscan_noise,
+                    best_k,
+                )
         except Exception as exc:
-            logger.warning("Legacy HDBSCAN unavailable (%s), using single-cluster fallback", exc)
-            labels = np.zeros(len(all_articles), dtype=int)
-            cluster_method = "legacy_single_cluster_fallback"
-
-        n_found = len(set(label for label in labels if label >= 0))
-        n_noise = sum(1 for label in labels if label < 0)
-
-        silhouette = 0.0
-        if n_found >= 2:
-            mask = labels >= 0
-            if mask.sum() > n_found:
-                from sklearn.metrics import silhouette_score
-
-                silhouette = float(silhouette_score(emb_reduced[mask], labels[mask]))
+            logger.warning(
+                "Legacy HDBSCAN unavailable (%s), using KMeans K=%d fallback",
+                exc,
+                best_k,
+            )
 
         logger.info(
             "Trend legacy clustering: %d clusters, %d noise, silhouette=%.3f",

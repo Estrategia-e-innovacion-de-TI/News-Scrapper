@@ -3,7 +3,7 @@
   "generated_at": "2026-04-01T15:00:00Z",
   "window_months": 6,
   "version": 3,
-  "methodology_version": "analytics_methodology_v5",
+  "methodology_version": "deprecated_build_trendmap_adapter_v2",
   "meta": {
     "generated_at": "2026-04-01T15:00:00Z",
     "total_articles": 2,
@@ -14,7 +14,7 @@
     "unclustered_documents": 0,
     "total_categories": 2,
     "silhouette_score": 0.1175,
-    "methodology_version": "analytics_methodology_v5"
+    "methodology_version": "deprecated_build_trendmap_adapter_v2"
   },
   "summary": {
     "total_documents": 4,
@@ -40,8 +40,8 @@
     "silhouette_score": 0.1175,
     "cluster_quality_avg": 88.7,
     "taxonomy_coverage": 100.0,
-    "methodology_version": "analytics_methodology_v5",
-    "executive_summary": "Se analizaron 4 documentos en 6 meses bajo analytics_methodology_v5. El snapshot concentra 2 clusters utiles, 4 documentos agrupados y 0 sin cluster. Los temas/riesgos mas relevantes son Copilots y Agentic, Tokenized Deposits y Settlement, con calidad media 88.7/100, cobertura taxonomica 100% y silhouette 0.1175. La clusterizacion excluye relevancia < 40 y envia a sin cluster los registros alejados de centroides."
+    "methodology_version": "deprecated_build_trendmap_adapter_v2",
+    "executive_summary": "Se analizaron 4 documentos en 6 meses bajo deprecated_build_trendmap_adapter_v2. El snapshot concentra 2 clusters utiles, 4 documentos agrupados y 0 sin cluster. Los temas/riesgos mas relevantes son Copilots y Agentic, Tokenized Deposits y Settlement, con calidad media 88.7/100, cobertura taxonomica 100% y silhouette 0.1175. La clusterizacion usa el adapter derivado de build_trendmap legacy con KMeans por silhouette y HDBSCAN cuando aporta suficiente separacion."
   },
   "clusters": [
     {
@@ -3231,7 +3231,7 @@
     }
   ],
   "quality_checks": {
-    "methodology_version": "analytics_methodology_v5",
+    "methodology_version": "deprecated_build_trendmap_adapter_v2",
     "cluster_coherence_avg": 82.8,
     "cluster_quality_avg": 88.7,
     "cluster_coverage": 100.0,
@@ -3403,7 +3403,7 @@
     }
   ],
   "methodology": {
-    "methodology_version": "analytics_methodology_v5",
+    "methodology_version": "deprecated_build_trendmap_adapter_v2",
     "representation": {
       "document_text": "titulo ponderado + excerpt depurado + cuerpo sin boilerplate + keywords + categoria/risk_type + metadata de fuente",
       "feature_space": "hybrid_lexical_aux_v2",
@@ -3477,7 +3477,7 @@
     "cluster_input_dim": 22,
     "auxiliary_feature_count": 19,
     "taxonomy_version": "analytics_taxonomy_v1",
-    "methodology_version": "analytics_methodology_v5",
+    "methodology_version": "deprecated_build_trendmap_adapter_v2",
     "lineage_similarity_threshold": 0.52,
     "reuse_previous_cluster_ids": true,
     "full_reclustering_policy": "full_recluster_each_snapshot_with_lineage_reuse",

@@ -85,7 +85,7 @@ def test_snapshot_builders_emit_advanced_analytics_payloads() -> None:
     assert trend_payload["charts"]["embedding_scatter"]
     assert trend_payload["clusters"]
     assert "executive_summary" in trend_payload["summary"]
-    assert trend_payload["quality_checks"]["methodology_version"] == "legacy_trend_pipeline_adapter_v1"
+    assert trend_payload["quality_checks"]["methodology_version"] == "deprecated_build_trendmap_adapter_v2"
     assert trend_payload["quality_checks"]["cluster_coverage"] >= 0
     assert "cluster_cards" in trend_payload
 
