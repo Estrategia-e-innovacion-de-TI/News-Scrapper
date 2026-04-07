@@ -5,8 +5,8 @@ import { DocumentResult, RiesgosPreset } from '../../../../../domain/noticias/mo
 import { API_BASE_URL } from '../../../../../config/api.token';
 
 const PRESETS: { value: string; label: string }[] = [
-  { value: '', label: '— Sin preset —' },
-  { value: 'ciber', label: 'Cibernético' },
+  { value: '', label: 'Sin preset' },
+  { value: 'ciber', label: 'Cibernetico' },
   { value: 'fraude', label: 'Fraude' },
   { value: 'operacional', label: 'Operacional' },
   { value: 'ambiental_social', label: 'Ambiental / Social' },
@@ -18,63 +18,91 @@ const PRESETS: { value: string; label: string }[] = [
   standalone: true,
   imports: [ReactiveFormsModule],
   template: `
-    <form [formGroup]="form" (ngSubmit)="onSubmit()" aria-label="Búsqueda Riesgos Emergentes">
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" aria-label="Busqueda de riesgos emergentes">
       <fieldset>
-        <legend class="text-sm font-semibold mb-3">Parámetros de búsqueda</legend>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <legend class="mb-3 text-sm font-semibold">Parametros de busqueda</legend>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div class="md:col-span-2">
-            <label for="riesgos-terms" class="block text-sm mb-1">Términos (separados por coma)</label>
-            <input id="riesgos-terms" formControlName="terms"
-              class="w-full border rounded px-3 py-2 text-sm" placeholder="ransomware, phishing, breach" />
+            <label for="riesgos-terms" class="mb-1 block text-sm">Terminos separados por coma</label>
+            <input
+              id="riesgos-terms"
+              formControlName="terms"
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm"
+              placeholder="ransomware, phishing, breach"
+            />
           </div>
+
           <div>
-            <label for="riesgos-preset" class="block text-sm mb-1">Preset</label>
-            <select id="riesgos-preset" formControlName="preset"
-              class="w-full border rounded px-3 py-2 text-sm">
+            <label for="riesgos-preset" class="mb-1 block text-sm">Preset</label>
+            <select
+              id="riesgos-preset"
+              formControlName="preset"
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm"
+            >
               @for (p of presets; track p.value) {
                 <option [value]="p.value">{{ p.label }}</option>
               }
             </select>
           </div>
+
           <div>
-            <label for="riesgos-classifier" class="block text-sm mb-1">Clasificador</label>
-            <select id="riesgos-classifier" formControlName="classifier"
-              class="w-full border rounded px-3 py-2 text-sm">
+            <label for="riesgos-classifier" class="mb-1 block text-sm">Clasificador</label>
+            <select
+              id="riesgos-classifier"
+              formControlName="classifier"
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm"
+            >
+              <option value="llm">LLM (por defecto)</option>
               <option value="rules">Reglas</option>
-              <option value="llm">LLM</option>
             </select>
           </div>
+
           <div>
-            <label for="riesgos-date-from" class="block text-sm mb-1">Desde</label>
-            <input id="riesgos-date-from" type="date" formControlName="dateFrom"
-              class="w-full border rounded px-3 py-2 text-sm" />
+            <label for="riesgos-date-from" class="mb-1 block text-sm">Desde</label>
+            <input
+              id="riesgos-date-from"
+              type="date"
+              formControlName="dateFrom"
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm"
+            />
           </div>
+
           <div>
-            <label for="riesgos-date-to" class="block text-sm mb-1">Hasta</label>
-            <input id="riesgos-date-to" type="date" formControlName="dateTo"
-              class="w-full border rounded px-3 py-2 text-sm" />
+            <label for="riesgos-date-to" class="mb-1 block text-sm">Hasta</label>
+            <input
+              id="riesgos-date-to"
+              type="date"
+              formControlName="dateTo"
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm"
+            />
           </div>
         </div>
       </fieldset>
 
       @if (validationError()) {
-        <p class="text-red-600 text-sm mt-2" role="alert">{{ validationError() }}</p>
+        <p class="mt-2 text-sm text-red-700" role="alert">{{ validationError() }}</p>
       }
 
-      <div class="flex gap-2 mt-4">
-        <button type="submit" [disabled]="loading()"
-          class="px-4 py-2 bg-yellow-400 text-black rounded text-sm font-medium disabled:opacity-50">
+      <div class="mt-4 flex gap-2">
+        <button
+          type="submit"
+          [disabled]="loading()"
+          class="rounded-xl bg-yellow-300 px-4 py-2 text-sm font-semibold text-dark-text shadow-sm disabled:opacity-50"
+        >
           @if (loading()) {
-            <span class="inline-block animate-spin mr-2">⏳</span> Buscando...
+            Buscando...
           } @else {
             Buscar
           }
         </button>
 
         @if (excelUrl()) {
-          <button type="button" (click)="downloadExcel()"
-            class="px-4 py-2 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600">
-            📥 Exportar Excel
+          <button
+            type="button"
+            (click)="downloadExcel()"
+            class="rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+          >
+            Exportar Excel
           </button>
         }
       </div>
@@ -98,7 +126,7 @@ export class RiesgosSearchFormComponent {
   readonly form: FormGroup = this.fb.group({
     terms: [''],
     preset: [''],
-    classifier: ['rules'],
+    classifier: ['llm'],
     dateFrom: [''],
     dateTo: [''],
   });
@@ -110,11 +138,11 @@ export class RiesgosSearchFormComponent {
 
     const termsList = (v.terms as string)
       .split(',')
-      .map((t: string) => t.trim())
+      .map((term: string) => term.trim())
       .filter(Boolean);
 
     if (termsList.length === 0 && !v.preset) {
-      this.validationError.set('Seleccione un preset o ingrese términos de búsqueda.');
+      this.validationError.set('Seleccione un preset o ingrese terminos de busqueda.');
       return;
     }
 

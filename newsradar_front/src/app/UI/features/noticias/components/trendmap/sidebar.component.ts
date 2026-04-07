@@ -136,6 +136,22 @@ const SORT_OPTIONS: SortOption[] = [
 
           <label class="grid gap-1">
             <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
+              Impacto
+            </span>
+            <select
+              class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
+              [value]="filterImpactBand() ?? ''"
+              (change)="onImpactBandChange($event)"
+            >
+              <option value="">Todos</option>
+              @for (item of impactBands; track item.value) {
+                <option [value]="item.value">{{ item.label }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="grid gap-1">
+            <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
               Estado de senal
             </span>
             <select
@@ -337,7 +353,7 @@ const SORT_OPTIONS: SortOption[] = [
                     {{ cluster.comparative_signal.status }} · {{ cluster.comparative_signal.stability_score ?? 0 | number:'1.0-0' }}
                   </span>
                 } @else if (cluster.weak_signal_flag) {
-                  <span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-300">
+                  <span class="rounded-full border border-yellow-500 bg-yellow-100 px-2 py-1 text-yellow-900">
                     weak signal
                   </span>
                 }
@@ -364,6 +380,7 @@ export class TrendmapSidebarComponent {
   readonly filterSourceType = input<string | null>(null);
   readonly filterMaturityStage = input<string | null>(null);
   readonly filterHypeStage = input<LifecycleStage | null>(null);
+  readonly filterImpactBand = input<'low' | 'medium' | 'high' | null>(null);
   readonly filterSignalState = input<string | null>(null);
   readonly filterComparativeStatus = input<'new' | 'accelerating' | 'cooling' | 'stable' | null>(null);
   readonly filterNoveltyBand = input<string | null>(null);
@@ -376,6 +393,7 @@ export class TrendmapSidebarComponent {
   readonly sourceTypeChanged = output<string | null>();
   readonly maturityStageChanged = output<string | null>();
   readonly hypeStageChanged = output<LifecycleStage | null>();
+  readonly impactBandChanged = output<'low' | 'medium' | 'high' | null>();
   readonly signalStateChanged = output<string | null>();
   readonly comparativeStatusChanged = output<'new' | 'accelerating' | 'cooling' | 'stable' | null>();
   readonly noveltyBandChanged = output<string | null>();
@@ -384,6 +402,11 @@ export class TrendmapSidebarComponent {
   readonly clearRequested = output<void>();
 
   readonly sortOptions = SORT_OPTIONS;
+  readonly impactBands = [
+    { value: 'high', label: 'Alto (70+)' },
+    { value: 'medium', label: 'Medio (45-69)' },
+    { value: 'low', label: 'Bajo (<45)' },
+  ] as const;
 
   readonly categoriesList = computed(
     () => this.filtersMetadata()?.categories ?? this.categories(),
@@ -443,6 +466,11 @@ export class TrendmapSidebarComponent {
     this.hypeStageChanged.emit(value || null);
   }
 
+  onImpactBandChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as 'low' | 'medium' | 'high' | '';
+    this.impactBandChanged.emit(value || null);
+  }
+
   onWeakSignalsChange(event: Event): void {
     this.weakSignalsChanged.emit((event.target as HTMLInputElement).checked);
   }
@@ -474,24 +502,24 @@ export class TrendmapSidebarComponent {
   cardClass(cluster: TrendmapCluster): string {
     const isSelected = this.selectedCluster()?.cluster_id === cluster.cluster_id;
     if (isSelected) {
-      return 'border-amber-500/70 bg-dark-bg';
+      return 'border-yellow-500 bg-yellow-50';
     }
-    return 'border-dark-border bg-dark-bg/40 hover:border-dark-muted hover:bg-dark-bg/70';
+    return 'border-dark-border bg-white hover:border-yellow-400 hover:bg-yellow-50';
   }
 
   signalBadge(cluster: TrendmapCluster): string {
     const base =
       'inline-flex rounded-full border px-2 py-1 text-[10px] font-medium leading-none ';
     if (cluster.weak_signal_flag) {
-      return base + 'border-amber-500/50 bg-amber-500/10 text-amber-300';
+      return base + 'border-yellow-500 bg-yellow-100 text-yellow-900';
     }
     if (cluster.hype_stage === 'productive_adoption') {
-      return base + 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300';
+      return base + 'border-emerald-500 bg-emerald-50 text-emerald-700';
     }
     if (cluster.hype_stage === 'correction') {
-      return base + 'border-rose-500/40 bg-rose-500/10 text-rose-300';
+      return base + 'border-rose-500 bg-rose-50 text-rose-700';
     }
-    return base + 'border-sky-500/40 bg-sky-500/10 text-sky-300';
+    return base + 'border-sky-500 bg-sky-50 text-sky-700';
   }
 
   categoryColor(category: string): string {

@@ -392,13 +392,26 @@ def _build_document_payload(
     }
 
 
-def build_legacy_trendmap_payload(documents: list[Any], window_months: int) -> dict[str, Any]:
+def build_legacy_trendmap_payload(
+    documents: list[Any],
+    window_months: int,
+    *,
+    min_relevance_score: float = 40.0,
+) -> dict[str, Any]:
     pipeline = TrendmapPipeline(min_year=1970, min_score=0)
+    threshold = float(min_relevance_score)
+    input_document_count = len(documents)
+    eligible_documents = [
+        doc
+        for doc in documents
+        if float(getattr(doc, "relevance_score", 0) or 0) > threshold
+    ]
+    filtered_document_count = input_document_count - len(eligible_documents)
     news_records: list[dict[str, Any]] = []
     paper_records: list[dict[str, Any]] = []
     original_by_article_id: dict[str, Any] = {}
 
-    for doc in documents:
+    for doc in eligible_documents:
         article_id = _record_id(doc)
         original_by_article_id[article_id] = doc
         record = _doc_to_record(doc)
@@ -744,12 +757,18 @@ def build_legacy_trendmap_payload(documents: list[Any], window_months: int) -> d
             "total_clusters": len(clusters_payload),
             "clustered_documents": clustered_count,
             "unclustered_documents": unclustered_count,
+            "input_documents": input_document_count,
+            "relevance_filtered_documents": filtered_document_count,
+            "min_relevance_score": threshold,
             "total_categories": len(super_clusters),
             "silhouette_score": artifacts["silhouette_score"],
             "methodology_version": _METHOD_VERSION,
         },
         "summary": {
             "total_documents": document_count,
+            "input_documents": input_document_count,
+            "relevance_filtered_documents": filtered_document_count,
+            "min_relevance_score": threshold,
             "total_clusters": len(clusters_payload),
             "clustered_documents": clustered_count,
             "unclustered_documents": unclustered_count,
@@ -814,13 +833,16 @@ def build_legacy_trendmap_payload(documents: list[Any], window_months: int) -> d
             "taxonomy_coverage": taxonomy_coverage,
             "keyword_usefulness_ratio": keyword_usefulness_ratio,
             "weak_signal_clusters": len(weak_signal_clusters),
+            "input_documents": input_document_count,
+            "relevance_filtered_documents": filtered_document_count,
+            "min_relevance_score": threshold,
             "low_quality_clusters": len([cluster for cluster in clusters_payload if cluster["cluster_quality"]["score"] < 55]),
             "duplicate_pressure_avg": duplicate_pressure_avg,
             "stability_score_avg": 0.0,
         },
         "filters_metadata": {
             "categories": sorted({cluster["category"] for cluster in clusters_payload}),
-            "source_types": sorted({_document_source_type(doc) for doc in documents}),
+            "source_types": sorted({_document_source_type(doc) for doc in eligible_documents}),
             "sources": [source for source, _ in source_mix.most_common(20)],
             "maturity_stages": list(_GARTNER_STAGES),
             "hype_stages": list(_HYPE_STAGE_ORDER),
@@ -865,6 +887,10 @@ def build_legacy_trendmap_payload(documents: list[Any], window_months: int) -> d
             "projection_method": artifacts["projection_method"],
             "feature_space": artifacts["embedding_method"],
             "representation_mode": "legacy_title_excerpt_text",
+            "min_relevance_score": threshold,
+            "relevance_filter_operator": ">",
+            "input_documents": input_document_count,
+            "relevance_filtered_documents": filtered_document_count,
             "embedding_provider": "bedrock" if artifacts["embedding_method"] == "bedrock_titan_v2" else None,
             "embedding_model_id": "legacy_bedrock_titan_v2" if artifacts["embedding_method"] == "bedrock_titan_v2" else None,
             "embedding_attempted": artifacts["embedding_method"] == "bedrock_titan_v2",

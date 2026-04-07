@@ -367,7 +367,11 @@ def _attach_comparative_signals(payload: dict[str, Any], previous_payload: dict[
 def build_trendmap_payload(documents: list[Document], window_months: int) -> dict[str, Any]:
     analytics_settings = _flow_analytics_settings("trend_mapping")
     if str(analytics_settings.get("analysis_engine") or "").strip().lower() == "legacy_trend_pipeline_adapter":
-        payload = build_legacy_trendmap_payload(documents, window_months)
+        payload = build_legacy_trendmap_payload(
+            documents,
+            window_months,
+            min_relevance_score=float(analytics_settings.get("min_relevance_for_clustering") or 40),
+        )
         if _snapshot_llm_enabled("trend_mapping", default=False):
             return SnapshotLLMEnricher("trend_mapping").enrich_payload(payload)
         return _mark_snapshot_llm_skipped(

@@ -59,21 +59,28 @@ const STAGE_Y: Record<LifecycleStage, number> = {
   productive_adoption: 0.68,
 };
 
+interface HypePoint {
+  cluster: TrendmapCluster;
+  x: number;
+  y: number;
+  radius: number;
+}
+
 @Component({
   selector: 'app-hype-cycle',
   standalone: true,
   template: `
-    <div class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+    <div class="rounded-2xl border border-dark-border bg-dark-surface p-5 shadow-sm">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h4 class="text-sm font-semibold text-dark-text">Hype cycle operativo</h4>
           <p class="mt-1 text-xs leading-5 text-dark-muted">
             La etapa sale de madurez, impacto, momentum, novedad e incertidumbre. Haz hover
-            sobre una etapa o burbuja para ver el detalle.
+            sobre una etapa o burbuja para ver el detalle; si hay puntos apilados veras el grupo completo.
           </p>
         </div>
         <button
-          class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted transition hover:text-dark-text"
+          class="rounded-full border border-dark-border bg-white px-3 py-1 text-xs font-medium text-dark-muted transition hover:border-yellow-400 hover:text-dark-text"
           type="button"
           (click)="toggleStage(null)"
         >
@@ -90,14 +97,14 @@ const STAGE_Y: Record<LifecycleStage, number> = {
             (click)="toggleStage(stage)"
           >
             {{ stageLabel(stage) }}
-            <span class="ml-2 rounded-full bg-dark-bg px-2 py-0.5 text-[10px] text-dark-muted">
+            <span class="ml-2 rounded-full bg-white px-2 py-0.5 text-[10px] text-dark-muted">
               {{ stageCount(stage) }}
             </span>
           </button>
         }
       </div>
 
-      <svg #chart class="mt-4" [attr.width]="width" [attr.height]="height"></svg>
+      <svg #chart class="mt-4 w-full max-w-full" [attr.width]="width" [attr.height]="height"></svg>
     </div>
   `,
 })
@@ -140,9 +147,9 @@ export class HypeCycleComponent implements AfterViewInit {
   stageChipClass(stage: LifecycleStage): string {
     const selected = this.selectedStage() === stage;
     if (selected) {
-      return 'border-amber-500/50 bg-amber-500/10 text-amber-200';
+      return 'border-yellow-500 bg-yellow-100 text-dark-text shadow-sm';
     }
-    return 'border-dark-border bg-dark-bg text-dark-muted hover:border-dark-muted hover:text-dark-text';
+    return 'border-dark-border bg-white text-dark-muted hover:border-yellow-400 hover:bg-yellow-50 hover:text-dark-text';
   }
 
   toggleStage(stage: LifecycleStage | null): void {
@@ -232,7 +239,7 @@ export class HypeCycleComponent implements AfterViewInit {
       .datum([[x(0), y(0.16)], ...anchors, [x(1), y(0.7)]] as [number, number][])
       .attr('d', curve)
       .attr('fill', 'none')
-      .attr('stroke', '#475569')
+      .attr('stroke', '#cbd5e1')
       .attr('stroke-width', 2.5)
       .attr('stroke-dasharray', '7,4');
 
@@ -272,8 +279,18 @@ export class HypeCycleComponent implements AfterViewInit {
       .domain([0, d3.max(clusters, (cluster) => cluster.item_count) ?? 1])
       .range([7, 26]);
 
-    const color = d3.scaleOrdinal<string, string>(d3.schemeTableau10);
+    const color = d3.scaleOrdinal<string, string>([
+      '#0057b8',
+      '#f6c600',
+      '#00a86b',
+      '#f97316',
+      '#475569',
+      '#0ea5e9',
+      '#dc2626',
+      '#7c3aed',
+    ]);
     const stageCounts = new Map<LifecycleStage, number>();
+    const placedPoints: HypePoint[] = [];
 
     clusters.forEach((cluster) => {
       const stage = cluster.hype_stage;
@@ -287,6 +304,13 @@ export class HypeCycleComponent implements AfterViewInit {
       const bubbleX = baseX + jitterX;
       const bubbleY = baseY + jitterY;
       const bubbleRadius = radius(cluster.item_count);
+      const point: HypePoint = {
+        cluster,
+        x: bubbleX,
+        y: bubbleY,
+        radius: bubbleRadius,
+      };
+      placedPoints.push(point);
 
       const group = svg.append('g').style('cursor', 'pointer');
       group
@@ -295,12 +319,12 @@ export class HypeCycleComponent implements AfterViewInit {
         .attr('cy', bubbleY)
         .attr('r', bubbleRadius)
         .attr('fill', color(cluster.category))
-        .attr('fill-opacity', 0.82)
-        .attr('stroke', selectedStage === stage ? '#fbbf24' : '#e2e8f0')
-        .attr('stroke-opacity', selectedStage === stage ? 0.9 : 0.15)
+        .attr('fill-opacity', 0.9)
+        .attr('stroke', selectedStage === stage ? '#2c2a29' : '#ffffff')
+        .attr('stroke-opacity', selectedStage === stage ? 0.9 : 0.95)
         .attr('stroke-width', selectedStage === stage ? 2.0 : 1.2)
         .on('mouseenter', (event) => {
-          this.showClusterTooltip(cluster);
+          this.showClusterGroupTooltip(this.overlappingPoints(point, placedPoints));
           this.positionTooltip(event);
         })
         .on('mousemove', (event) => {
@@ -338,10 +362,10 @@ export class HypeCycleComponent implements AfterViewInit {
     tooltip.style.maxWidth = '320px';
     tooltip.style.padding = '10px 12px';
     tooltip.style.borderRadius = '14px';
-    tooltip.style.border = '1px solid rgba(148, 163, 184, 0.28)';
-    tooltip.style.background = 'rgba(15, 23, 42, 0.96)';
-    tooltip.style.color = '#dbe4f0';
-    tooltip.style.boxShadow = '0 16px 30px rgba(2, 6, 23, 0.35)';
+    tooltip.style.border = '1px solid rgba(226, 232, 240, 0.95)';
+    tooltip.style.background = 'rgba(255, 255, 255, 0.98)';
+    tooltip.style.color = '#2c2a29';
+    tooltip.style.boxShadow = '0 18px 40px rgba(15, 23, 42, 0.18)';
     tooltip.style.fontSize = '12px';
     tooltip.style.lineHeight = '1.5';
     tooltip.style.opacity = '0';
@@ -351,18 +375,44 @@ export class HypeCycleComponent implements AfterViewInit {
     return tooltip;
   }
 
-  private showClusterTooltip(cluster: TrendmapCluster): void {
+  private showClusterGroupTooltip(points: HypePoint[]): void {
     const tooltip = this.ensureTooltip();
-    const keywords = cluster.top_keywords.slice(0, 3).join(', ');
+    const clusters = points.map((point) => point.cluster);
+    const primary = clusters[0];
+    if (!primary) {
+      return;
+    }
+    if (clusters.length > 1) {
+      const rows = clusters
+        .slice(0, 6)
+        .map((cluster) => `
+          <div style="border-top:1px solid #e2e8f0; margin-top:8px; padding-top:8px;">
+            <div style="font-weight:700; color:#2c2a29;">${this.escapeHtml(cluster.label)}</div>
+            <div style="color:#64748b;">${this.escapeHtml(cluster.category)} | ${this.escapeHtml(this.stageLabel(cluster.hype_stage))}</div>
+            <div style="margin-top:4px;">Impacto ${cluster.impact_score.toFixed(0)} | Madurez ${cluster.maturity_score.toFixed(0)} | Momentum ${cluster.momentum_score.toFixed(0)}</div>
+            <div style="margin-top:4px; color:#475569;">${this.escapeHtml(cluster.executive_takeaway || cluster.summary)}</div>
+          </div>
+        `)
+        .join('');
+      tooltip.innerHTML = `
+        <div style="font-weight:700; color:#2c2a29;">${clusters.length} elementos superpuestos o cercanos</div>
+        <div style="margin-top:2px; color:#64748b;">Click en una burbuja para seleccionar el cluster visible.</div>
+        ${rows}
+      `;
+      tooltip.style.opacity = '1';
+      return;
+    }
+
+    const keywords = primary.top_keywords.slice(0, 3).join(', ');
     tooltip.innerHTML = `
-      <div style="font-weight:600; color:#f8fafc;">${this.escapeHtml(cluster.label)}</div>
-      <div style="margin-top:2px; color:#94a3b8;">${this.escapeHtml(cluster.category)} | ${this.escapeHtml(this.stageLabel(cluster.hype_stage))}</div>
+      <div style="font-weight:700; color:#2c2a29;">${this.escapeHtml(primary.label)}</div>
+      <div style="margin-top:2px; color:#64748b;">${this.escapeHtml(primary.category)} | ${this.escapeHtml(this.stageLabel(primary.hype_stage))}</div>
       <div style="margin-top:8px;">
-        Impacto ${cluster.impact_score.toFixed(0)} | Madurez ${cluster.maturity_score.toFixed(0)} | Momentum ${cluster.momentum_score.toFixed(0)}
+        Impacto ${primary.impact_score.toFixed(0)} | Madurez ${primary.maturity_score.toFixed(0)} | Momentum ${primary.momentum_score.toFixed(0)}
       </div>
-      <div>Docs ${cluster.item_count} | Calidad ${cluster.cluster_quality.score.toFixed(0)}</div>
-      <div style="margin-top:8px; color:#cbd5e1;">${this.escapeHtml(cluster.executive_takeaway)}</div>
-      <div style="margin-top:8px; color:#94a3b8;">${this.escapeHtml(keywords)}</div>
+      <div>Docs ${primary.item_count} | Calidad ${primary.cluster_quality.score.toFixed(0)}</div>
+      <div style="margin-top:8px; color:#475569;">${this.escapeHtml(primary.executive_takeaway || primary.summary)}</div>
+      <div style="margin-top:8px; color:#64748b;">${this.escapeHtml(keywords)}</div>
     `;
     tooltip.style.opacity = '1';
   }
@@ -374,10 +424,10 @@ export class HypeCycleComponent implements AfterViewInit {
       .map((cluster) => this.escapeHtml(cluster.label))
       .join('<br/>');
     tooltip.innerHTML = `
-      <div style="font-weight:600; color:#f8fafc;">${this.escapeHtml(this.stageLabel(stage))}</div>
-      <div style="margin-top:2px; color:#94a3b8;">${clusters.length} clusters en esta etapa</div>
-      <div style="margin-top:8px; color:#cbd5e1;">${labels || 'Sin clusters visibles'}</div>
-      <div style="margin-top:8px; color:#94a3b8;">Click para filtrar esta etapa</div>
+      <div style="font-weight:700; color:#2c2a29;">${this.escapeHtml(this.stageLabel(stage))}</div>
+      <div style="margin-top:2px; color:#64748b;">${clusters.length} clusters en esta etapa</div>
+      <div style="margin-top:8px; color:#475569;">${labels || 'Sin clusters visibles'}</div>
+      <div style="margin-top:8px; color:#64748b;">Click para filtrar esta etapa</div>
     `;
     tooltip.style.opacity = '1';
   }
@@ -392,6 +442,16 @@ export class HypeCycleComponent implements AfterViewInit {
     if (this.tooltip) {
       this.tooltip.style.opacity = '0';
     }
+  }
+
+  private overlappingPoints(target: HypePoint, points: HypePoint[]): HypePoint[] {
+    return points.filter((point) => {
+      const dx = point.x - target.x;
+      const dy = point.y - target.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      return point.cluster.hype_stage === target.cluster.hype_stage
+        && distance <= Math.max(34, point.radius + target.radius + 6);
+    });
   }
 
   private escapeHtml(value: string): string {

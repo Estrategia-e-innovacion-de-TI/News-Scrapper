@@ -10,28 +10,28 @@ import { DocumentResult } from '../../../../../domain/noticias/models';
   imports: [ArasSearchFormComponent, RiesgosSearchFormComponent, ResultsTableComponent],
   template: `
     <div class="space-y-6" data-testid="content-riesgos">
-      <h2 class="text-lg font-semibold">ARAS / Riesgos</h2>
+      <h2 class="text-lg font-semibold">ARAS y riesgos</h2>
       <p class="text-sm text-gray-500">
-        Consulta por empresa, emisor o NIT, y tambien por terminos generales de riesgo desde la misma vista.
+        Consulta por Empresa/Emisor o NIT, y tambien por terminos generales de riesgo desde la misma vista.
       </p>
 
-      <div class="flex gap-2 border-b border-gray-200 mb-4" role="tablist" aria-label="Sub-secciones de Riesgos">
+      <div class="mb-4 flex gap-2 rounded-2xl border border-dark-border bg-white p-2 shadow-sm" role="tablist" aria-label="Sub-secciones de Riesgos">
         <button
           role="tab"
           [attr.aria-selected]="activeSubTab() === 'aras'"
-          class="px-3 py-1.5 text-sm rounded-t"
-          [class.bg-yellow-400]="activeSubTab() === 'aras'"
+          class="rounded-xl px-3 py-1.5 text-sm"
+          [class.bg-yellow-300]="activeSubTab() === 'aras'"
           [class.font-semibold]="activeSubTab() === 'aras'"
           [class.text-gray-600]="activeSubTab() !== 'aras'"
           (click)="activeSubTab.set('aras')"
         >
-          Empresa / emisor
+          Empresa/Emisor
         </button>
         <button
           role="tab"
           [attr.aria-selected]="activeSubTab() === 'riesgos'"
-          class="px-3 py-1.5 text-sm rounded-t"
-          [class.bg-yellow-400]="activeSubTab() === 'riesgos'"
+          class="rounded-xl px-3 py-1.5 text-sm"
+          [class.bg-yellow-300]="activeSubTab() === 'riesgos'"
           [class.font-semibold]="activeSubTab() === 'riesgos'"
           [class.text-gray-600]="activeSubTab() !== 'riesgos'"
           (click)="activeSubTab.set('riesgos')"

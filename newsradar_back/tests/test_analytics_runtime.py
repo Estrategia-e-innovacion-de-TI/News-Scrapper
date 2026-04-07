@@ -69,6 +69,7 @@ def test_snapshot_builders_emit_advanced_analytics_payloads() -> None:
         _doc("tw-2", "Modelos fundacionales en seguros", source_id="rss-tech", source_type="rss", category="IA", score=85, days_ago=12, keywords=["modelos", "seguros"]),
         _doc("tw-3", "Tokenizacion de activos bancarios", source_id="paper-tech", source_type="paper", category="Blockchain", score=78, days_ago=20, keywords=["tokenizacion", "activos"]),
         _doc("tw-4", "Patentes de vision computacional", source_id="patent-tech", source_type="patent", category="Vision", score=73, days_ago=28, keywords=["vision", "patentes"]),
+        _doc("tw-low", "Ruido tecnologico de baja relevancia", source_id="rss-noise", source_type="rss", category="Otros", score=40, days_ago=2, keywords=["ruido"]),
     ]
     risk_docs = [
         _doc("rk-1", "Alerta de ransomware en banca", source_id="wef", source_type="pdf", risk_type="ciberseguridad", score=95, days_ago=3, keywords=["ransomware", "ciber"]),
@@ -86,6 +87,11 @@ def test_snapshot_builders_emit_advanced_analytics_payloads() -> None:
     assert trend_payload["clusters"]
     assert "executive_summary" in trend_payload["summary"]
     assert trend_payload["quality_checks"]["methodology_version"] == "deprecated_build_trendmap_adapter_v2"
+    assert trend_payload["parameters"]["min_relevance_score"] == 40.0
+    assert trend_payload["parameters"]["relevance_filter_operator"] == ">"
+    assert trend_payload["summary"]["input_documents"] == 5
+    assert trend_payload["summary"]["total_documents"] == 4
+    assert trend_payload["summary"]["relevance_filtered_documents"] == 1
     assert trend_payload["quality_checks"]["cluster_coverage"] >= 0
     assert "cluster_cards" in trend_payload
 

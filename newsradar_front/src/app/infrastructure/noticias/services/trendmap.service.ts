@@ -27,6 +27,7 @@ export class TrendmapSignalService {
   readonly filterSourceType = signal<string | null>(null);
   readonly filterMaturityStage = signal<string | null>(null);
   readonly filterHypeStage = signal<LifecycleStage | null>(null);
+  readonly filterImpactBand = signal<'low' | 'medium' | 'high' | null>(null);
   readonly filterSignalState = signal<string | null>(null);
   readonly filterComparativeStatus = signal<'new' | 'accelerating' | 'cooling' | 'stable' | null>(null);
   readonly filterNoveltyBand = signal<string | null>(null);
@@ -44,8 +45,10 @@ export class TrendmapSignalService {
     if (!d) return [];
 
     const category = this.filterCategory();
+    const sourceType = this.filterSourceType();
     const maturityStage = this.filterMaturityStage();
     const hypeStage = this.filterHypeStage();
+    const impactBand = this.filterImpactBand();
     const signalState = this.filterSignalState();
     const comparativeStatus = this.filterComparativeStatus();
     const noveltyBand = this.filterNoveltyBand();
@@ -54,8 +57,15 @@ export class TrendmapSignalService {
 
     const clusters = d.clusters.filter((cluster) => {
       if (category && cluster.category !== category) return false;
+      if (sourceType) {
+        const hasSource = d.articles.some(
+          (article) => article.cluster_id === cluster.cluster_id && article.source_type === sourceType,
+        );
+        if (!hasSource) return false;
+      }
       if (maturityStage && cluster.maturity_stage !== maturityStage) return false;
       if (hypeStage && cluster.hype_stage !== hypeStage) return false;
+      if (impactBand && this.impactBand(cluster.impact_score) !== impactBand) return false;
       if (signalState && cluster.signal_state !== signalState) return false;
       if (comparativeStatus && cluster.comparative_signal?.status !== comparativeStatus) return false;
       if (noveltyBand && cluster.novelty_band !== noveltyBand) return false;
@@ -113,7 +123,9 @@ export class TrendmapSignalService {
 
   readonly highlightCards = computed(() => {
     const d = this.data();
-    return (d?.cluster_cards ?? []).slice(0, 6);
+    if (!d?.cluster_cards) return [];
+    const visible = new Set(this.filteredClusters().map((cluster) => cluster.cluster_id));
+    return d.cluster_cards.filter((card) => visible.has(card.cluster_id)).slice(0, 6);
   });
 
   readonly activeFilterSummary = computed(() => {
@@ -122,6 +134,7 @@ export class TrendmapSignalService {
     if (this.filterSourceType()) active.push(`Fuente: ${this.filterSourceType()}`);
     if (this.filterMaturityStage()) active.push(`Madurez: ${this.filterMaturityStage()}`);
     if (this.filterHypeStage()) active.push(`Hype: ${this.filterHypeStage()}`);
+    if (this.filterImpactBand()) active.push(`Impacto: ${this.filterImpactBand()}`);
     if (this.filterSignalState()) active.push(`Estado: ${this.filterSignalState()}`);
     if (this.filterComparativeStatus()) active.push(`Comparativo: ${this.filterComparativeStatus()}`);
     if (this.filterNoveltyBand()) active.push(`Novedad: ${this.filterNoveltyBand()}`);
@@ -181,6 +194,11 @@ export class TrendmapSignalService {
     this.syncSelectedCluster();
   }
 
+  setFilterImpactBand(band: 'low' | 'medium' | 'high' | null): void {
+    this.filterImpactBand.set(band);
+    this.syncSelectedCluster();
+  }
+
   setFilterSignalState(state: string | null): void {
     this.filterSignalState.set(state);
     this.syncSelectedCluster();
@@ -211,6 +229,7 @@ export class TrendmapSignalService {
     this.filterSourceType.set(null);
     this.filterMaturityStage.set(null);
     this.filterHypeStage.set(null);
+    this.filterImpactBand.set(null);
     this.filterSignalState.set(null);
     this.filterComparativeStatus.set(null);
     this.filterNoveltyBand.set(null);
@@ -229,5 +248,11 @@ export class TrendmapSignalService {
     if (!current || !visible.some((cluster) => cluster.cluster_id === current.cluster_id)) {
       this.selectedCluster.set(visible[0]);
     }
+  }
+
+  private impactBand(score: number): 'low' | 'medium' | 'high' {
+    if (score >= 70) return 'high';
+    if (score >= 45) return 'medium';
+    return 'low';
   }
 }

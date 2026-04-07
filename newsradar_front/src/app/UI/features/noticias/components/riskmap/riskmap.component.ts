@@ -145,7 +145,7 @@ export class RiskmapComponent implements OnInit {
       catalog_path: 'catalog.yaml',
       days: 7,
       max_items_per_source: 20,
-      classifier_mode: 'rules',
+      classifier_mode: 'llm',
       window_months: 6,
       force_snapshot: false,
     }).subscribe({
@@ -227,21 +227,21 @@ export class RiskmapComponent implements OnInit {
 
   stageBadge(value: string): string {
     const base = 'rounded-full border px-2 py-1 text-[10px] font-medium ';
-    if (value === 'weak_signal') return base + 'border-amber-500/40 bg-amber-500/10 text-amber-300';
-    if (value === 'correction') return base + 'border-rose-500/40 bg-rose-500/10 text-rose-300';
-    if (value === 'productive_adoption' || value === 'consolidation') return base + 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300';
-    return base + 'border-sky-500/40 bg-sky-500/10 text-sky-300';
+    if (value === 'weak_signal') return base + 'border-yellow-500 bg-yellow-100 text-yellow-900';
+    if (value === 'correction') return base + 'border-rose-500 bg-rose-50 text-rose-700';
+    if (value === 'productive_adoption' || value === 'consolidation') return base + 'border-emerald-500 bg-emerald-50 text-emerald-700';
+    return base + 'border-sky-500 bg-sky-50 text-sky-700';
   }
 
   severityBadge(value: 'H' | 'M' | 'L'): string {
     const base = 'rounded-full border px-2 py-1 text-[10px] font-medium ';
-    if (value === 'H') return base + 'border-rose-500/40 bg-rose-500/10 text-rose-300';
-    if (value === 'M') return base + 'border-amber-500/40 bg-amber-500/10 text-amber-300';
-    return base + 'border-sky-500/40 bg-sky-500/10 text-sky-300';
+    if (value === 'H') return base + 'border-rose-500 bg-rose-50 text-rose-700';
+    if (value === 'M') return base + 'border-yellow-500 bg-yellow-100 text-yellow-900';
+    return base + 'border-sky-500 bg-sky-50 text-sky-700';
   }
 
   clusterCardClass(cluster: RiskmapCluster): string {
-    return this.selectedCluster()?.cluster_id === cluster.cluster_id ? 'border-amber-500/70 bg-dark-bg' : 'border-dark-border bg-dark-bg/40 hover:border-dark-muted hover:bg-dark-bg/70';
+    return this.selectedCluster()?.cluster_id === cluster.cluster_id ? 'border-yellow-500 bg-yellow-50' : 'border-dark-border bg-white hover:border-yellow-400 hover:bg-yellow-50';
   }
 
   scatterX(value: number): number { return 56 + (Math.max(0, Math.min(100, value)) / 100) * 528; }

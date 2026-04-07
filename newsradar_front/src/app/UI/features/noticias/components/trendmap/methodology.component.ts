@@ -192,7 +192,7 @@ export class TrendmapMethodologyComponent {
     {
       label: 'Severidad y persistencia de riesgo',
       description:
-        'Risk Mapping usa formulas paralelas para severidad potencial y persistencia, de modo que el mapa sea comparable pero orientado a materialidad.',
+        'El mapa de riesgos usa formulas paralelas para severidad potencial y persistencia, de modo que el mapa sea comparable pero orientado a materialidad.',
       value:
         'Severidad: 0.26 relevancia + 0.24 materialidad + 0.18 autoridad + 0.16 diversidad + 0.16 foco taxonomico. Persistencia: 0.40 recurrencia + 0.20 escala + 0.15 autoridad + 0.15 coherencia + 0.10 diversidad',
     },

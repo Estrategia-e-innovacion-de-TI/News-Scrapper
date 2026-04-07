@@ -330,12 +330,12 @@ export interface TrendmapData {
 }
 
 export const DARK_THEME = {
-  bg: '#0f172a',
-  surface: '#111827',
-  border: '#243043',
-  text: '#dbe4f0',
-  textMuted: '#94a3b8',
-  accent: '#f59e0b',
+  bg: '#f7f8fa',
+  surface: '#ffffff',
+  border: '#e2e8f0',
+  text: '#2c2a29',
+  textMuted: '#64748b',
+  accent: '#e3b505',
 } as const;
 
 export interface Cluster extends TrendmapCluster {}

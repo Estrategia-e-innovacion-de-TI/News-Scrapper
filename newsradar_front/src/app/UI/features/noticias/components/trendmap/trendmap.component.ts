@@ -20,7 +20,7 @@ const TABS: Tab[] = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'mapa', label: 'Mapa' },
   { id: 'impacto', label: 'Impacto' },
-  { id: 'hype', label: 'Hype Cycle' },
+  { id: 'hype', label: 'Ciclo de madurez' },
   { id: 'detalle', label: 'Detalle' },
   { id: 'metodologia', label: 'Metodología' },
 ];
@@ -45,9 +45,9 @@ const TABS: Tab[] = [
           <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
             <div class="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h2 class="text-2xl font-semibold">Trend Mapping</h2>
+                <h2 class="text-2xl font-semibold">Mapa de tendencias</h2>
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-dark-muted">
-                  Snapshot-driven, con scoring interpretable, clusterización híbrida y detalle
+                  Analisis snapshot-driven con scoring interpretable, clusterizacion hibrida y detalle
                   explicable por cluster.
                 </p>
               </div>
@@ -101,7 +101,7 @@ const TABS: Tab[] = [
         @if (service.loading()) {
           <p class="text-dark-muted text-sm">Cargando datos de tendencias...</p>
         } @else if (service.error()) {
-          <p class="text-red-400 text-sm" role="alert">{{ service.error() }}</p>
+          <p class="text-red-700 text-sm" role="alert">{{ service.error() }}</p>
         } @else {
           <!-- Tabs -->
           <nav class="flex border-b border-dark-border mb-6" role="tablist">
@@ -170,6 +170,7 @@ const TABS: Tab[] = [
                 [filterSourceType]="service.filterSourceType()"
                 [filterMaturityStage]="service.filterMaturityStage()"
                 [filterHypeStage]="service.filterHypeStage()"
+                [filterImpactBand]="service.filterImpactBand()"
                 [filterSignalState]="service.filterSignalState()"
                 [filterComparativeStatus]="service.filterComparativeStatus()"
                 [filterNoveltyBand]="service.filterNoveltyBand()"
@@ -181,6 +182,7 @@ const TABS: Tab[] = [
                 (sourceTypeChanged)="service.setFilterSourceType($event)"
                 (maturityStageChanged)="service.setFilterMaturityStage($event)"
                 (hypeStageChanged)="service.setFilterHypeStage($event)"
+                (impactBandChanged)="service.setFilterImpactBand($event)"
                 (signalStateChanged)="service.setFilterSignalState($event)"
                 (comparativeStatusChanged)="service.setFilterComparativeStatus($event)"
                 (noveltyBandChanged)="service.setFilterNoveltyBand($event)"

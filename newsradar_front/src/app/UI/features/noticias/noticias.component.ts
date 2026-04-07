@@ -8,11 +8,11 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'tech-watch', label: 'Vigilancia Tecnologica', route: 'tech-watch' },
-  { id: 'trendmap', label: 'Trend Mapping', route: 'trendmap' },
-  { id: 'subscriptions', label: 'Subscripciones', route: 'subscriptions' },
-  { id: 'aras', label: 'ARAS / Riesgos', route: 'aras' },
-  { id: 'riskmap', label: 'Risk Mapping', route: 'riskmap' },
+  { id: 'tech-watch', label: 'Vigilancia tecnologica', route: 'tech-watch' },
+  { id: 'trendmap', label: 'Mapa de tendencias', route: 'trendmap' },
+  { id: 'subscriptions', label: 'Suscripciones', route: 'subscriptions' },
+  { id: 'aras', label: 'ARAS y riesgos', route: 'aras' },
+  { id: 'riskmap', label: 'Mapa de riesgos', route: 'riskmap' },
 ];
 
 @Component({
@@ -21,13 +21,17 @@ const TABS: TabDef[] = [
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   encapsulation: ViewEncapsulation.Emulated,
   template: `
-    <div class="p-4">
-      <nav class="flex flex-wrap gap-1 border-b border-gray-200 mb-6" role="tablist" aria-label="Secciones principales">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <nav
+        class="mb-6 flex flex-wrap gap-2 rounded-2xl border border-dark-border bg-white p-2 shadow-sm"
+        role="tablist"
+        aria-label="Secciones principales"
+      >
         @for (tab of tabs; track tab.id) {
           <a
             [routerLink]="tab.route"
-            routerLinkActive="border-b-2 border-yellow-400 text-black font-semibold"
-            class="px-4 py-2 text-sm text-gray-600 hover:text-black transition-colors"
+            routerLinkActive="bg-yellow-300 text-dark-text shadow-sm"
+            class="rounded-xl px-4 py-2 text-sm font-medium text-dark-muted transition-colors hover:bg-yellow-50 hover:text-dark-text"
             role="tab"
             [attr.aria-selected]="activeTab() === tab.id"
             (click)="activeTab.set(tab.id)"

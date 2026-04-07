@@ -1,3 +1,39 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --nr-bg: #f7f8fa;
+  --nr-surface: #ffffff;
+  --nr-text: #2c2a29;
+  --nr-muted: #64748b;
+  --nr-border: #e2e8f0;
+  --nr-accent: #ffd204;
+  --nr-accent-strong: #c99700;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--nr-bg);
+  color: var(--nr-text);
+  font-family: "Aptos", "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+select,
+input,
+button {
+  font: inherit;
+}
+
+select,
+input,
+textarea {
+  background-color: #ffffff;
+  color: var(--nr-text);
+}

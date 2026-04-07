@@ -9,75 +9,103 @@ import { API_BASE_URL } from '../../../../../config/api.token';
   standalone: true,
   imports: [ReactiveFormsModule],
   template: `
-    <form [formGroup]="form" (ngSubmit)="onSubmit()" aria-label="Búsqueda ARAS">
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" aria-label="Busqueda ARAS">
       <fieldset>
-        <legend class="text-sm font-semibold mb-3">Parámetros de búsqueda ARAS</legend>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label for="aras-company" class="block text-sm mb-1">Empresa</label>
-            <input id="aras-company" formControlName="company"
-              class="w-full border rounded px-3 py-2 text-sm" placeholder="Nombre de la empresa" />
+        <legend class="mb-3 text-sm font-semibold">Parametros de busqueda ARAS</legend>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div class="md:col-span-2">
+            <label for="aras-company" class="mb-1 block text-sm">Empresa/Emisor</label>
+            <input
+              id="aras-company"
+              formControlName="company"
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm"
+              placeholder="Nombre empresarial, razon social o emisor"
+            />
           </div>
+
           <div>
-            <label for="aras-issuer" class="block text-sm mb-1">Emisor</label>
-            <input id="aras-issuer" formControlName="issuer"
-              class="w-full border rounded px-3 py-2 text-sm" placeholder="Nombre del emisor" />
+            <label for="aras-nit" class="mb-1 block text-sm">NIT</label>
+            <input
+              id="aras-nit"
+              formControlName="nit"
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm"
+              placeholder="900123456-7"
+            />
           </div>
+
           <div>
-            <label for="aras-nit" class="block text-sm mb-1">NIT</label>
-            <input id="aras-nit" formControlName="nit"
-              class="w-full border rounded px-3 py-2 text-sm" placeholder="900123456-7" />
-          </div>
-          <div>
-            <label for="aras-risk-category" class="block text-sm mb-1">Tipo de riesgo</label>
-            <select id="aras-risk-category" formControlName="riskCategory"
-              class="w-full border rounded px-3 py-2 text-sm">
-              <option value="">— Todos —</option>
+            <label for="aras-risk-category" class="mb-1 block text-sm">Tipo de riesgo</label>
+            <select
+              id="aras-risk-category"
+              formControlName="riskCategory"
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm"
+            >
+              <option value="">Todos</option>
               <option value="lavado_activos">Lavado de activos</option>
               <option value="financiamiento_terrorismo">Financiamiento del terrorismo</option>
               <option value="fraude">Fraude</option>
-              <option value="corrupcion">Corrupción</option>
+              <option value="corrupcion">Corrupcion</option>
               <option value="sanciones">Sanciones</option>
               <option value="pep">PEP</option>
               <option value="ambiental">Ambiental</option>
               <option value="social">Social</option>
             </select>
           </div>
+
           <div>
-            <label for="aras-classifier" class="block text-sm mb-1">Clasificador</label>
-            <select id="aras-classifier" formControlName="classifier"
-              class="w-full border rounded px-3 py-2 text-sm">
+            <label for="aras-classifier" class="mb-1 block text-sm">Clasificador</label>
+            <select
+              id="aras-classifier"
+              formControlName="classifier"
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm"
+            >
+              <option value="llm">LLM (por defecto)</option>
               <option value="rules">Reglas</option>
-              <option value="llm">LLM</option>
             </select>
           </div>
+
           <div>
-            <label for="aras-date-from" class="block text-sm mb-1">Desde</label>
-            <input id="aras-date-from" type="date" formControlName="dateFrom"
-              class="w-full border rounded px-3 py-2 text-sm" />
+            <label for="aras-date-from" class="mb-1 block text-sm">Desde</label>
+            <input
+              id="aras-date-from"
+              type="date"
+              formControlName="dateFrom"
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm"
+            />
           </div>
+
           <div>
-            <label for="aras-date-to" class="block text-sm mb-1">Hasta</label>
-            <input id="aras-date-to" type="date" formControlName="dateTo"
-              class="w-full border rounded px-3 py-2 text-sm" />
+            <label for="aras-date-to" class="mb-1 block text-sm">Hasta</label>
+            <input
+              id="aras-date-to"
+              type="date"
+              formControlName="dateTo"
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm"
+            />
           </div>
         </div>
       </fieldset>
 
-      <div class="flex gap-2 mt-4">
-        <button type="submit" [disabled]="loading()"
-          class="px-4 py-2 bg-yellow-400 text-black rounded text-sm font-medium disabled:opacity-50">
+      <div class="mt-4 flex gap-2">
+        <button
+          type="submit"
+          [disabled]="loading()"
+          class="rounded-xl bg-yellow-300 px-4 py-2 text-sm font-semibold text-dark-text shadow-sm disabled:opacity-50"
+        >
           @if (loading()) {
-            <span class="inline-block animate-spin mr-2">⏳</span> Buscando...
+            Buscando...
           } @else {
             Buscar
           }
         </button>
 
         @if (excelUrl()) {
-          <button type="button" (click)="downloadExcel()"
-            class="px-4 py-2 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600">
-            📥 Exportar Excel
+          <button
+            type="button"
+            (click)="downloadExcel()"
+            class="rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+          >
+            Exportar Excel
           </button>
         }
       </div>
@@ -98,10 +126,9 @@ export class ArasSearchFormComponent {
 
   readonly form: FormGroup = this.fb.group({
     company: [''],
-    issuer: [''],
     nit: [''],
     riskCategory: [''],
-    classifier: ['rules'],
+    classifier: ['llm'],
     dateFrom: [''],
     dateTo: [''],
   });
@@ -115,7 +142,7 @@ export class ArasSearchFormComponent {
     this.api
       .searchAras({
         company: v.company || undefined,
-        issuer: v.issuer || undefined,
+        issuer: v.company || undefined,
         nit: v.nit || undefined,
         risk_category: v.riskCategory || undefined,
         classifier: v.classifier || undefined,

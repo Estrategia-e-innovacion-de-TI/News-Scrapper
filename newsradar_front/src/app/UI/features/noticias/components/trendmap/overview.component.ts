@@ -147,7 +147,7 @@ interface VolumePoint {
                     <p class="mt-2 text-xs leading-5 text-dark-muted">{{ card.subtitle }}</p>
                   </div>
                   @if (card.weak_signal_flag) {
-                    <span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300">
+                    <span class="rounded-full border border-yellow-500 bg-yellow-100 px-2 py-1 text-[10px] text-yellow-900">
                       weak signal
                     </span>
                   }
@@ -172,7 +172,7 @@ interface VolumePoint {
 
                   @if (card.decision_prompt) {
                     <div class="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
-                      <p class="text-[11px] uppercase tracking-[0.14em] text-amber-200">Decision sugerida</p>
+                      <p class="text-[11px] uppercase tracking-[0.14em] text-yellow-800">Decision sugerida</p>
                       <p class="mt-2 text-sm leading-6 text-dark-text/90">
                         {{ card.decision_prompt }}
                       </p>
@@ -293,7 +293,7 @@ interface VolumePoint {
                       <p class="text-sm font-medium text-dark-text">{{ item.label }}</p>
                       <p class="mt-1 text-xs text-dark-muted">{{ item.subtitle }}</p>
                     </div>
-                    <span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300">
+                    <span class="rounded-full border border-yellow-500 bg-yellow-100 px-2 py-1 text-[10px] text-yellow-900">
                       {{ item.hype_stage.replaceAll('_', ' ') }}
                     </span>
                   </div>

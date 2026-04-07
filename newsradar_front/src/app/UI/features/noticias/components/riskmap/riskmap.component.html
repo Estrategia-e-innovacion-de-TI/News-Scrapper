@@ -4,9 +4,9 @@
       <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 class="text-2xl font-semibold">Risk Mapping</h2>
+            <h2 class="text-2xl font-semibold">Mapa de riesgos</h2>
             <p class="mt-2 max-w-3xl text-sm leading-6 text-dark-muted">
-              Snapshot-driven, comparable con Trend Mapping y centrado en severidad,
+              Analisis snapshot-driven, comparable con el mapa de tendencias y centrado en severidad,
               persistencia, momentum y explicabilidad documental.
             </p>
           </div>
@@ -17,7 +17,7 @@
               </span>
             }
             <button
-              class="rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200 disabled:opacity-50"
+              class="rounded-full border border-yellow-400 bg-yellow-300 px-4 py-2 text-sm font-medium text-dark-text shadow-sm disabled:opacity-50"
               [disabled]="running()"
               type="button"
               (click)="runRiskmap()"
@@ -68,10 +68,10 @@
     @if (loading()) {
       <p class="text-sm text-dark-muted">Cargando snapshot de riesgos...</p>
     } @else if (error()) {
-      <p class="text-sm text-red-400" role="alert">{{ error() }}</p>
+      <p class="text-sm text-red-700" role="alert">{{ error() }}</p>
     } @else if (!snapshot()) {
       <div class="rounded-2xl border border-dark-border bg-dark-surface p-6 text-sm text-dark-muted">
-        No hay snapshot de Risk Mapping disponible.
+        No hay snapshot de mapa de riesgos disponible.
       </div>
     } @else {
       <div class="grid gap-6 xl:grid-cols-[320px_1fr]">
