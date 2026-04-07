@@ -50,9 +50,14 @@ async def executions(session: AsyncSession = Depends(get_session)) -> list[dict]
 @router.get("/documents")
 async def documents(
     limit: int = Query(100, ge=1, le=500),
+    min_relevance_score: int | None = Query(40, ge=0, le=100),
     session: AsyncSession = Depends(get_session),
 ) -> list[dict]:
-    rows = await service.list_documents(session, limit=limit)
+    rows = await service.list_documents(
+        session,
+        limit=limit,
+        min_relevance_score=min_relevance_score,
+    )
     return [
         {
             "id": str(row.id),

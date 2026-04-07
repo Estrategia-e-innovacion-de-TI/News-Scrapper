@@ -1,4 +1,4 @@
-"""Legacy trend pipeline adapter for snapshot-driven Trend Mapping."""
+"""Build-trendmap adapter for snapshot-driven Trend Mapping."""
 from __future__ import annotations
 
 import hashlib
@@ -13,7 +13,7 @@ from newsradar_api.infrastructure.pipeline.trendmap_pipeline import TrendmapPipe
 
 from .advanced_engine import _build_breakdown, _cluster_signal_state, _score_band
 
-_METHOD_VERSION = "deprecated_build_trendmap_adapter_v2"
+_METHOD_VERSION = "build_trendmap_adapter_v3"
 _GARTNER_STAGES = (
     "innovation_trigger",
     "peak_of_inflated_expectations",
@@ -227,7 +227,7 @@ def _taxonomy_matches(category: str, keywords: list[str]) -> list[dict[str, Any]
             "name": category or "Innovación General",
             "score": round(score, 3),
             "matched_terms": keywords[:5],
-            "matched_fields": ["legacy_cluster_label", "legacy_cluster_keywords"],
+            "matched_fields": ["cluster_label", "cluster_keywords"],
             "sector_tags": _impact_targets(category)[:3],
             "capability_tags": _impact_targets(category)[1:3],
         }
@@ -299,7 +299,7 @@ def _score_breakdowns(
     )
     impact_breakdown["score"] = round(impact_score, 1)
     maturity_breakdown = _build_breakdown(
-        "0.55 stage legacy + 0.25 actividad temporal + 0.20 volumen observado",
+        "0.55 stage base + 0.25 actividad temporal + 0.20 volumen observado",
         {"stage_signal": 0.55, "active_months": 0.25, "volume": 0.20},
         {
             "stage_signal": maturity_score / 100.0,
@@ -388,7 +388,7 @@ def _build_document_payload(
         "duplicate_flag": False,
         "recency_score": recency_score,
         "unclustered": cluster_id == "sin_cluster",
-        "unclustered_reason": "legacy_hdbscan_noise" if cluster_id == "sin_cluster" else None,
+        "unclustered_reason": "cluster_noise" if cluster_id == "sin_cluster" else None,
     }
 
 
@@ -523,7 +523,7 @@ def build_legacy_trendmap_payload(
             f"crecimiento {round(temporal['growth_ratio'] * 100)}% con foco en {', '.join(keywords[:3]) or cluster.category.lower()}."
         )
         rationale = (
-            f"Cluster generado por el pipeline legacy usando {artifacts['embedding_method']} + {artifacts['cluster_method']}, "
+            f"Cluster generado por el pipeline build_trendmap usando {artifacts['embedding_method']} + {artifacts['cluster_method']}, "
             f"etiquetado con {artifacts['labeling_method']} y consolidado alrededor de {', '.join(keywords[:3]) or label}."
         )
         executive_takeaway = (
@@ -599,7 +599,7 @@ def build_legacy_trendmap_payload(
             "insight_evidence": [
                 {"type": "coverage", "detail": f"{len(cluster_docs)} documentos, {source_count} fuentes, {temporal['active_months']} meses activos"},
                 {"type": "tempo", "detail": f"direccion {temporal['direction']}, crecimiento {round(temporal['growth_ratio'] * 100)}%, aceleracion {round(temporal['acceleration_ratio'] * 100)}%"},
-                {"type": "legacy", "detail": f"maturity legacy {cluster.maturity_stage}, silhouette global {artifacts['silhouette_score']}"},
+                {"type": "methodology", "detail": f"maturity base {cluster.maturity_stage}, silhouette global {artifacts['silhouette_score']}"},
             ],
             "executive_takeaway": executive_takeaway,
             "what_is_happening": summary,
@@ -706,14 +706,14 @@ def build_legacy_trendmap_payload(
     if weak_signal_clusters:
         insights.append("Weak signals priorizados: " + ", ".join(cluster["label"] for cluster in weak_signal_clusters[:3]) + ".")
     if unclustered_ratio >= 20:
-        insights.append(f"El {unclustered_ratio}% del corpus quedo sin cluster legacy y requiere revision de ruido o dispersion tematica.")
+        insights.append(f"El {unclustered_ratio}% del corpus quedo sin cluster y requiere revision de ruido o dispersion tematica.")
 
     recommendations = [cluster["decision_prompt"] for cluster in clusters_payload[:3]]
     if weak_signal_clusters:
         recommendations.append("Separar weak signals del resto del portafolio para evitar que pierdan visibilidad frente al volumen dominante.")
 
     executive_summary = (
-        f"El analisis legacy procesó {document_count} documentos en {window_months} meses y consolidó "
+        f"El analisis build_trendmap procesó {document_count} documentos en {window_months} meses y consolidó "
         f"{len(clusters_payload)} clusters utiles. Destacan {', '.join(cluster['label'] for cluster in clusters_payload[:3]) or 'senales dispersas'}, "
         f"con cobertura {cluster_coverage}%, calidad media {quality_avg}/100 y silhouette {artifacts['silhouette_score']}."
     )
@@ -868,11 +868,11 @@ def build_legacy_trendmap_payload(
             "clustering": {
                 "cluster_method": artifacts["cluster_method"],
                 "noise_label": "sin_cluster",
-                "source": "legacy TrendmapPipeline adaptado a snapshots v3",
+                "source": "build_trendmap adapter integrado a snapshots v3",
             },
             "scoring": {
-                "impact": "heuristica legacy basada en score medio, volumen, recencia y diversidad",
-                "maturity": "stage legacy + horizonte + actividad temporal",
+                "impact": "heuristica build_trendmap basada en score medio, volumen, recencia y diversidad",
+                "maturity": "stage base + horizonte + actividad temporal",
                 "momentum": "crecimiento observado sobre meses activos del cluster",
                 "novelty": "baja madurez + recencia + escala acotada",
                 "uncertainty": "poca escala + baja diversidad + actividad limitada",
@@ -881,18 +881,18 @@ def build_legacy_trendmap_payload(
         "sources_used": [source for source, _ in source_mix.most_common()],
         "parameters": {
             "window_months": window_months,
-            "analysis_engine": "legacy_trend_pipeline_adapter",
+            "analysis_engine": "build_trendmap_adapter",
             "cluster_method": artifacts["cluster_method"],
-            "vectorizer": "legacy_tfidf_fallback_or_bedrock",
+            "vectorizer": "build_trendmap_tfidf_fallback_or_bedrock",
             "projection_method": artifacts["projection_method"],
             "feature_space": artifacts["embedding_method"],
-            "representation_mode": "legacy_title_excerpt_text",
+            "representation_mode": "build_trendmap_title_excerpt_text",
             "min_relevance_score": threshold,
             "relevance_filter_operator": ">",
             "input_documents": input_document_count,
             "relevance_filtered_documents": filtered_document_count,
             "embedding_provider": "bedrock" if artifacts["embedding_method"] == "bedrock_titan_v2" else None,
-            "embedding_model_id": "legacy_bedrock_titan_v2" if artifacts["embedding_method"] == "bedrock_titan_v2" else None,
+            "embedding_model_id": "build_trendmap_bedrock_titan_v2" if artifacts["embedding_method"] == "bedrock_titan_v2" else None,
             "embedding_attempted": artifacts["embedding_method"] == "bedrock_titan_v2",
             "embedding_error": None,
             "noise_label": "sin_cluster",
@@ -900,7 +900,7 @@ def build_legacy_trendmap_payload(
             "unclustered_documents": unclustered_count,
             "cluster_input_dim": 0,
             "methodology_version": _METHOD_VERSION,
-            "legacy_labeling_method": artifacts["labeling_method"],
-            "legacy_noise_items": artifacts["noise_items"],
+            "labeling_method": artifacts["labeling_method"],
+            "noise_items": artifacts["noise_items"],
         },
     }

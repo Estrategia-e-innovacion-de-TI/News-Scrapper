@@ -12,7 +12,12 @@ export const NOTICIAS_ROUTES: Routes = [
     path: '',
     component: NoticiasComponent,
     children: [
-      { path: '', redirectTo: 'tech-watch', pathMatch: 'full' },
+      { path: '', redirectTo: 'home', pathMatch: 'full' },
+      {
+        path: 'home',
+        loadComponent: () =>
+          import('./components/home/home.component').then((m) => m.NoticiasHomeComponent),
+      },
       {
         path: 'tech-watch',
         loadComponent: () =>

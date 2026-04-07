@@ -499,7 +499,7 @@ class TrendmapPipeline:
         )
 
         labels = kmeans_labels
-        cluster_method = "legacy_kmeans_silhouette"
+        cluster_method = "build_trendmap_kmeans_silhouette"
         silhouette = max(best_score, 0.0)
         n_found = len(set(int(label) for label in labels if label >= 0))
         n_noise = 0
@@ -521,7 +521,7 @@ class TrendmapPipeline:
 
             if hdbscan_found >= min_acceptable_clusters and not excessive_noise:
                 labels = hdbscan_labels
-                cluster_method = "legacy_hdbscan"
+                cluster_method = "build_trendmap_hdbscan"
                 n_found = hdbscan_found
                 n_noise = hdbscan_noise
                 if n_found >= 2:
@@ -560,7 +560,7 @@ class TrendmapPipeline:
             cluster_article_map.setdefault(cluster_id, []).append(all_articles[index])
 
         clusters_data: list[dict[str, Any]] = []
-        labeling_method = "legacy_llm" if bedrock_adapter is not None else "legacy_frequency_fallback"
+        labeling_method = "build_trendmap_llm" if bedrock_adapter is not None else "build_trendmap_frequency_fallback"
         for cluster_id, cluster_articles in sorted(cluster_article_map.items()):
             if cluster_id == "unclustered":
                 continue
@@ -712,7 +712,7 @@ class TrendmapPipeline:
         return response, {
             "embedding_method": embedding_method,
             "cluster_method": cluster_method,
-            "projection_method": "legacy_umap_pca",
+            "projection_method": "build_trendmap_umap_pca",
             "silhouette_score": round(silhouette, 3),
             "noise_items": n_noise,
             "labeling_method": labeling_method,

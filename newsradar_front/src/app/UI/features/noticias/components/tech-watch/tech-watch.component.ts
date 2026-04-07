@@ -35,9 +35,9 @@ interface TopicView {
     <div class="space-y-6">
       <div class="flex items-start justify-between gap-4">
         <div>
-          <h2 class="text-lg font-semibold">Vigilancia tecnologica</h2>
+          <h2 class="text-lg font-semibold">Administracion de ingesta</h2>
           <p class="text-sm text-gray-500">
-            Estado de ejecuciones, documentos persistidos, topicos disponibles y acceso al snapshot analitico.
+            Estado de ejecuciones, documentos persistidos con relevancia mayor a 40, topicos disponibles y snapshot analitico.
           </p>
         </div>
         <button
@@ -150,7 +150,7 @@ export class TechWatchComponent implements OnInit {
         this.loading.set(false);
       },
     });
-    this.http.get<DocumentView[]>(`${this.baseUrl}/tech-watch/documents?limit=20`).subscribe({
+    this.http.get<DocumentView[]>(`${this.baseUrl}/tech-watch/documents?limit=20&min_relevance_score=40`).subscribe({
       next: (documents) => this.documents.set(documents),
       error: () => this.documents.set([]),
     });

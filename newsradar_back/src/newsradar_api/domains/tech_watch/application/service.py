@@ -40,13 +40,20 @@ async def list_executions(session: AsyncSession) -> list[Execution]:
     return list((await session.execute(stmt)).scalars().all())
 
 
-async def list_documents(session: AsyncSession, limit: int = 100) -> list[Document]:
+async def list_documents(
+    session: AsyncSession,
+    limit: int = 100,
+    *,
+    min_relevance_score: int | None = 40,
+) -> list[Document]:
     stmt = (
         select(Document)
         .where(Document.business_flow == "tech_watch")
         .order_by(Document.published_at.desc().nullslast(), Document.created_at.desc())
-        .limit(limit)
     )
+    if min_relevance_score is not None:
+        stmt = stmt.where(Document.relevance_score > min_relevance_score)
+    stmt = stmt.limit(limit)
     return list((await session.execute(stmt)).scalars().all())
 
 

@@ -1050,8 +1050,10 @@ def _eligible_cluster_indices(
     eligible: list[int] = []
     for index, (doc, profile) in enumerate(zip(documents, profiles, strict=False)):
         score = float(getattr(doc, "relevance_score", 0) or 0)
-        if score >= min_relevance:
+        if score > min_relevance or (report_type != "trend_mapping" and score >= min_relevance):
             eligible.append(index)
+            continue
+        if report_type == "trend_mapping":
             continue
         if (
             profile.source_kind in {"paper", "pdf", "institutional_report", "patent"}
@@ -1950,6 +1952,12 @@ def generate_report_analysis(
     methodology_version = "analytics_methodology_v5"
     analytics_settings = _analytics_settings(report_type)
     min_relevance = analytics_settings["min_relevance_for_clustering"]
+    if report_type == "trend_mapping":
+        documents = [
+            doc
+            for doc in documents
+            if float(getattr(doc, "relevance_score", 0) or 0) > min_relevance
+        ]
 
     if not documents:
         empty_summary = {

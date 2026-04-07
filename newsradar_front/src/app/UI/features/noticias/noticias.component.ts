@@ -9,7 +9,7 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'tech-watch', label: 'Vigilancia tecnologica', route: 'tech-watch' },
+  { id: 'home', label: 'Home', route: 'home' },
   { id: 'trendmap', label: 'Mapa de tendencias', route: 'trendmap' },
   { id: 'subscriptions', label: 'Suscripciones', route: 'subscriptions' },
   { id: 'aras', label: 'ARAS y riesgos', route: 'aras' },
@@ -61,5 +61,5 @@ const TABS: TabDef[] = [
 })
 export class NoticiasComponent {
   readonly tabs = TABS;
-  readonly activeTab = signal('tech-watch');
+  readonly activeTab = signal('home');
 }
