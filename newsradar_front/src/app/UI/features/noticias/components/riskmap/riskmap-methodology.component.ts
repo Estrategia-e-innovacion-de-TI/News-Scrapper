@@ -1,5 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, input } from '@angular/core';
+
 import {
   FiltersMetadata,
   MethodologyBlock,
@@ -7,7 +8,7 @@ import {
 } from '../../../../../domain/noticias/models';
 
 @Component({
-  selector: 'app-trendmap-methodology',
+  selector: 'app-riskmap-methodology',
   standalone: true,
   imports: [DecimalPipe],
   template: `
@@ -15,11 +16,11 @@ import {
       <section class="rounded-2xl border border-dark-border bg-dark-surface p-6">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h4 class="text-lg font-semibold text-dark-text">Metodologia analitica</h4>
+            <h4 class="text-lg font-semibold text-dark-text">Metodologia analitica de riesgo</h4>
             <p class="mt-2 max-w-3xl text-sm leading-6 text-dark-muted">
-              El motor analitico construye el snapshot con representacion documental hibrida,
-              agrupacion explicable y puntajes de multiples factores. Esta pantalla muestra
-              los resultados ya preparados.
+              El motor de riesgo construye un snapshot con representacion documental,
+              agrupacion explicable y puntajes orientados a severidad, persistencia e
+              incertidumbre. Esta pantalla resume como se interpreta ese resultado.
             </p>
           </div>
           <span class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-xs text-dark-muted">
@@ -51,9 +52,9 @@ import {
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
           <h5 class="text-sm font-semibold text-dark-text">Agrupacion</h5>
           <p class="mt-3 text-sm leading-6 text-dark-muted">
-            Se combinan espacio lexical/semantico, reduccion para coordenadas 2D y un
-            algoritmo de agrupacion con manejo de ruido. Los clusters pequenos y de
-            alta novedad se marcan como señales tempranas.
+            Se combinan espacio lexical y semantico, reduccion para coordenadas 2D y
+            algoritmo de agrupacion con manejo de ruido. Los clusters pequenos con
+            alta novedad se consideran señales tempranas de riesgo.
           </p>
           @if (clusteringEntries().length > 0) {
             <div class="mt-4 space-y-2">
@@ -86,9 +87,9 @@ import {
                 </p>
               </div>
               <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Keywords utiles</p>
+                <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Sin cluster</p>
                 <p class="mt-2 text-xl font-semibold text-dark-text">
-                  {{ qualityChecks()!.keyword_usefulness_ratio | number:'1.0-0' }}%
+                  {{ qualityChecks()!.unclustered_ratio | number:'1.0-0' }}%
                 </p>
               </div>
               <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
@@ -100,8 +101,8 @@ import {
             </div>
           } @else {
             <p class="mt-3 text-sm leading-6 text-dark-muted">
-              El snapshot incluye coherencia de agrupaciones, calidad promedio, proporcion sin agrupar,
-              cobertura taxonomica y utilidad de palabras clave para monitorear degradacion.
+              El snapshot incluye coherencia de agrupaciones, cobertura taxonomica,
+              ratio sin cluster y señales tempranas para monitorear degradacion del modelo.
             </p>
           }
         </section>
@@ -156,45 +157,38 @@ import {
     </div>
   `,
 })
-export class TrendmapMethodologyComponent {
+export class RiskmapMethodologyComponent {
   readonly methodology = input<MethodologyBlock | null>(null);
   readonly qualityChecks = input<QualityChecks | null>(null);
   readonly filtersMetadata = input<FiltersMetadata | null>(null);
 
   readonly formulas = [
     {
-      label: 'Impacto de tendencia',
+      label: 'Severidad de riesgo',
       description:
-        'Combina relevancia, autoridad de fuentes, diversidad, escala del cluster, foco taxonomico y transversalidad.',
+        'Combina relevancia, materialidad potencial, autoridad de fuentes, diversidad, cobertura taxonomica y transversalidad.',
       value:
-        '0.28 relevancia + 0.16 autoridad + 0.14 diversidad + 0.14 escala + 0.14 foco taxonomico + 0.14 transversalidad',
+        '0.26 relevancia + 0.24 materialidad + 0.18 autoridad + 0.16 diversidad + 0.16 foco taxonomico',
     },
     {
-      label: 'Madurez de tendencia',
+      label: 'Persistencia',
       description:
-        'Evita heuristicas arbitrarias: pondera recurrencia temporal, adopcion explicita, tamano, coherencia, autoridad y baja novedad.',
+        'Mide si el riesgo se mantiene en el tiempo: recurrencia temporal, tamano del cluster, autoridad, coherencia y diversidad.',
       value:
-        '0.28 recurrencia + 0.20 adopcion + 0.16 escala + 0.14 coherencia + 0.12 autoridad + 0.10 baja novedad',
+        '0.40 recurrencia + 0.20 escala + 0.15 autoridad + 0.15 coherencia + 0.10 diversidad',
     },
     {
       label: 'Dinamica',
       description:
-        'Mide intensidad reciente a partir de crecimiento, aceleracion, share reciente y visibilidad observada en el cluster.',
+        'Mide aceleracion reciente de la señal documental para identificar riesgos en escalada.',
       value: '0.40 crecimiento + 0.25 aceleracion + 0.20 recencia + 0.15 visibilidad',
     },
     {
       label: 'Novedad e incertidumbre',
       description:
-        'La novedad favorece recencia y baja recurrencia; la incertidumbre sube con exploracion, baja coherencia, baja autoridad y duplicidad.',
+        'La novedad favorece recencia y baja recurrencia; la incertidumbre sube con exploracion, baja coherencia y baja autoridad.',
       value:
         'Novedad: 0.45 recencia + 0.30 baja recurrencia + 0.15 exploracion + 0.10 escala pequena. Incertidumbre: 0.30 exploracion + 0.25 baja coherencia + 0.20 baja autoridad + 0.15 duplicidad + 0.10 bajo foco taxonomico',
-    },
-    {
-      label: 'Severidad y persistencia de riesgo',
-      description:
-        'El mapa de riesgos usa formulas paralelas para severidad potencial y persistencia, de modo que el mapa sea comparable pero orientado a materialidad.',
-      value:
-        'Severidad: 0.26 relevancia + 0.24 materialidad + 0.18 autoridad + 0.16 diversidad + 0.16 foco taxonomico. Persistencia: 0.40 recurrencia + 0.20 escala + 0.15 autoridad + 0.15 coherencia + 0.10 diversidad',
     },
   ];
 
@@ -206,17 +200,6 @@ export class TrendmapMethodologyComponent {
     }));
   });
 
-  methodologyLabel(value: string): string {
-    const normalized = value.toLowerCase();
-    if (normalized.includes('build_trendmap') || normalized.includes('trend_pipeline_adapter')) {
-      return 'Motor analitico de tendencias v2';
-    }
-    if (normalized.includes('analytics_methodology')) {
-      return 'Motor analitico avanzado';
-    }
-    return value.replaceAll('_', ' ');
-  }
-
   readonly clusteringEntries = computed(() => {
     const clustering = this.methodology()?.clustering ?? {};
     return Object.entries(clustering).map(([key, value]) => ({
@@ -225,10 +208,21 @@ export class TrendmapMethodologyComponent {
     }));
   });
 
+  methodologyLabel(value: string): string {
+    const normalized = value.toLowerCase();
+    if (normalized.includes('build_riskmap') || normalized.includes('risk_pipeline_adapter')) {
+      return 'Motor analitico de riesgos v2';
+    }
+    if (normalized.includes('analytics_methodology')) {
+      return 'Motor analitico avanzado';
+    }
+    return value.replaceAll('_', ' ');
+  }
+
   representationDescription(): string {
     const representation = this.methodology()?.representation;
     if (!representation) {
-      return 'Cada documento se representa con titulo, extracto, texto normalizado, palabras clave, taxonomia y metadatos de fuente. El espacio de caracteristicas puede combinar TF-IDF, vectores semanticos y señales auxiliares.';
+      return 'Cada documento se representa con titulo, extracto, texto normalizado, palabras clave, taxonomia y metadatos de fuente. El espacio de caracteristicas combina señales lexicales y semanticas.';
     }
     return (
       String(representation['document_text'] ?? '') ||

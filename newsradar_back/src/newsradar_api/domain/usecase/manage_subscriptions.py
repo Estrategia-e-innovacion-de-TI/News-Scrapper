@@ -16,6 +16,20 @@ from newsradar_api.domain.model.dtos import (
 
 logger = logging.getLogger(__name__)
 
+
+TOPIC_DISPLAY_NAMES: dict[str, str] = {
+    "ia_ml": "Inteligencia artificial y analitica avanzada",
+    "blockchain": "Blockchain, activos digitales y finanzas descentralizadas",
+    "computacion_cuantica": "Computacion cuantica y criptografia postcuantica",
+    "ciberseguridad": "Ciberseguridad y resiliencia digital",
+    "fintech": "Fintech y nuevos modelos financieros",
+    "cloud_datos": "Cloud, datos y plataformas",
+    "banca_digital": "Banca digital y experiencia financiera",
+    "papers": "Articulos academicos y publicaciones especializadas",
+    "repos": "Repositorios y desarrollos tecnologicos",
+    "patents": "Patentes y propiedad intelectual",
+}
+
 SearchRunner = Callable[..., Awaitable[tuple[list[Any], Any]]]
 
 
@@ -71,8 +85,9 @@ class ManageSubscriptionsUseCase:
                 topics=[
                     TopicItem(
                         group_id=group_id,
-                        display_name=group_id.replace("_", " ").title(),
+                        display_name=self._display_name(group_id),
                         term_count=len(terms_by_group.get(group_id, [])),
+                        terms=terms_by_group.get(group_id, []),
                     )
                     for group_id in groups
                 ],
@@ -86,6 +101,7 @@ class ManageSubscriptionsUseCase:
                         group_id=topic.group_id,
                         display_name=topic.display_name,
                         term_count=topic.term_count,
+                        terms=getattr(topic, "terms", []) or [],
                     )
                     for topic in topics
                 ],
@@ -180,6 +196,10 @@ class ManageSubscriptionsUseCase:
 
             self._search_runner = run_search
         return self._search_runner
+
+    @staticmethod
+    def _display_name(group_id: str) -> str:
+        return TOPIC_DISPLAY_NAMES.get(group_id, group_id.replace("_", " ").title())
 
     def _cluster_results(self, results: list[dict[str, Any]]) -> dict[str, Any]:
         if self._cluster_engine is None:

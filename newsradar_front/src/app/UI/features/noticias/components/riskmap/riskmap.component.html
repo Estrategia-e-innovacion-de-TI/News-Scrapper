@@ -1,13 +1,13 @@
 <div class="min-h-screen bg-dark-bg text-dark-text">
-  <div class="space-y-6 p-6">
-    <div class="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+  <div class="p-6">
+    <div class="mb-6 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
       <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 class="text-2xl font-semibold">Mapa de riesgos</h2>
             <p class="mt-2 max-w-3xl text-sm leading-6 text-dark-muted">
-              Radar snapshot-driven de riesgos emergentes: identifica patrones sospechosos,
-              senales tempranas, severidad, persistencia y momentum para la organizacion.
+              Analisis snapshot-driven de riesgos emergentes con scoring interpretable,
+              agrupacion explicable y detalle accionable por cluster.
             </p>
           </div>
           <div class="flex flex-wrap items-center justify-end gap-3">
@@ -16,22 +16,6 @@
                 {{ methodologyLabel(snapshot()?.methodology_version) }}
               </span>
             }
-            <button
-              class="rounded-full border border-yellow-400 bg-yellow-300 px-4 py-2 text-sm font-medium text-dark-text shadow-sm disabled:opacity-50"
-              [disabled]="generating()"
-              type="button"
-              (click)="generateRiskmap()"
-            >
-              @if (generating()) { Generando... } @else { Generar reporte }
-            </button>
-            <button
-              class="rounded-full border border-dark-border bg-white px-4 py-2 text-sm font-medium text-dark-text shadow-sm disabled:opacity-50"
-              [disabled]="ingesting()"
-              type="button"
-              (click)="runRiskmap()"
-            >
-              @if (ingesting()) { Ejecutando... } @else { Ejecutar ingesta }
-            </button>
           </div>
         </div>
 
@@ -40,11 +24,13 @@
             {{ statusMessage() }}
           </div>
         }
+
         @if (snapshot()?.summary?.executive_summary) {
           <p class="mt-4 text-sm leading-6 text-dark-text/90">
             {{ snapshot()?.summary?.executive_summary }}
           </p>
         }
+
         @if (snapshot()?.comparative_signals?.summary) {
           <div class="mt-4 rounded-2xl border border-dark-border bg-dark-bg/70 px-4 py-3 text-sm text-dark-muted">
             {{ snapshot()?.comparative_signals?.summary }}
@@ -73,7 +59,7 @@
               >
                 <p class="text-sm font-medium text-dark-text">{{ cluster.label }}</p>
                 <p class="mt-1 text-xs text-dark-muted">
-                  Severidad {{ cluster.risk_severity | number:'1.0-0' }} | Momentum
+                  Severidad {{ cluster.risk_severity | number:'1.0-0' }} | Dinamica
                   {{ cluster.momentum_score | number:'1.0-0' }}
                 </p>
               </button>
@@ -106,24 +92,55 @@
         }
       </nav>
 
-      @switch (activeTab()) {
-        @case ('resumen') {
-          <app-riskmap-overview
-            [data]="snapshot()!"
+      <div class="flex flex-col gap-6 2xl:flex-row">
+        <div class="min-w-0 flex-1">
+          @switch (activeTab()) {
+            @case ('resumen') {
+              <app-riskmap-overview
+                [data]="snapshot()!"
+                [clusters]="filteredClusters()"
+                (clusterSelected)="selectCluster($event); activeTab.set('detalle')"
+              />
+            }
+            @case ('mapa') {
+              <app-riskmap-d3-scatter
+                [articles]="filteredDocuments()"
+                [clusters]="filteredClusters()"
+                [selectedCluster]="selectedCluster()"
+                (clusterSelected)="selectCluster($event)"
+              />
+            }
+            @case ('impacto') {
+              <app-riskmap-impact [clusters]="filteredClusters()" />
+            }
+            @case ('hype') {
+              <app-riskmap-hype
+                [clusters]="snapshot()?.clusters ?? []"
+                (clusterSelected)="selectCluster($event); activeTab.set('detalle')"
+              />
+            }
+            @case ('detalle') {
+              <app-riskmap-detail
+                [cluster]="selectedCluster()"
+                [documents]="selectedOrFilteredDocuments()"
+                [scoreRows]="selectedScoreRows()"
+              />
+            }
+            @case ('metodologia') {
+              <app-riskmap-methodology
+                [methodology]="snapshot()?.methodology ?? null"
+                [qualityChecks]="snapshot()?.quality_checks ?? null"
+                [filtersMetadata]="snapshot()?.filters_metadata ?? null"
+              />
+            }
+          }
+        </div>
+
+        @if (showSidebar()) {
+          <app-riskmap-sidebar
             [clusters]="filteredClusters()"
-            (clusterSelected)="selectCluster($event); activeTab.set('detalle')"
-          />
-        }
-        @case ('mapa') {
-          <app-riskmap-map
-            [clusters]="filteredClusters()"
+            [filtersMetadata]="snapshot()?.filters_metadata ?? null"
             [selectedCluster]="selectedCluster()"
-            [categories]="categories()"
-            [sourceTypes]="sourceTypes()"
-            [hypeStages]="hypeStages()"
-            [severityBands]="severityBands()"
-            [noveltyBands]="noveltyBands()"
-            [sortOptions]="sortOptions"
             [filterCategory]="filterCategory()"
             [filterSourceType]="filterSourceType()"
             [filterHypeStage]="filterHypeStage()"
@@ -131,6 +148,7 @@
             [filterNoveltyBand]="filterNoveltyBand()"
             [weakSignalsOnly]="weakSignalsOnly()"
             [sortBy]="sortBy()"
+            [qualityChecks]="snapshot()?.quality_checks ?? null"
             (clusterSelected)="selectCluster($event)"
             (categoryChanged)="setFilterCategory($event)"
             (sourceTypeChanged)="setFilterSourceType($event)"
@@ -142,21 +160,7 @@
             (clearRequested)="clearFilters()"
           />
         }
-        @case ('impacto') {
-          <app-riskmap-impact
-            [clusters]="filteredClusters()"
-            [selectedCluster]="selectedCluster()"
-            (clusterSelected)="selectCluster($event); activeTab.set('detalle')"
-          />
-        }
-        @case ('detalle') {
-          <app-riskmap-detail
-            [cluster]="selectedCluster()"
-            [documents]="selectedOrFilteredDocuments()"
-            [scoreRows]="selectedScoreRows()"
-          />
-        }
-      }
+      </div>
     }
   </div>
 </div>

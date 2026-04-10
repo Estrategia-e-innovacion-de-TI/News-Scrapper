@@ -16,7 +16,7 @@ interface SortOption {
 
 const SORT_OPTIONS: SortOption[] = [
   { value: 'impact', label: 'Impacto' },
-  { value: 'momentum', label: 'Momentum' },
+  { value: 'momentum', label: 'Dinamica' },
   { value: 'novelty', label: 'Novedad' },
   { value: 'size', label: 'Tamano cluster' },
   { value: 'quality', label: 'Calidad analitica' },
@@ -97,7 +97,7 @@ const SORT_OPTIONS: SortOption[] = [
             >
               <option value="">Todas</option>
               @for (item of sourceTypes(); track item) {
-                <option [value]="item">{{ item }}</option>
+                <option [value]="item">{{ sourceTypeLabel(item) }}</option>
               }
             </select>
           </label>
@@ -120,7 +120,7 @@ const SORT_OPTIONS: SortOption[] = [
 
           <label class="grid gap-1">
             <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
-              Hype stage
+              Etapa del ciclo
             </span>
             <select
               class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
@@ -152,7 +152,7 @@ const SORT_OPTIONS: SortOption[] = [
 
           <label class="grid gap-1">
             <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">
-              Estado de senal
+              Estado de señal
             </span>
             <select
               class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
@@ -224,9 +224,9 @@ const SORT_OPTIONS: SortOption[] = [
             (change)="onWeakSignalsChange($event)"
           />
           <span>
-            <span class="block text-sm text-dark-text">Solo weak signals</span>
+            <span class="block text-sm text-dark-text">Solo señales tempranas</span>
             <span class="block text-xs leading-5 text-dark-muted">
-              Prioriza clusters pequenos con alta novedad y senales tempranas.
+              Prioriza clusters pequenos con alta novedad y señales tempranas.
             </span>
           </span>
         </label>
@@ -234,7 +234,7 @@ const SORT_OPTIONS: SortOption[] = [
 
       @if (qualityChecks()) {
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-4">
-          <h4 class="text-sm font-semibold text-dark-text">Quality Checks</h4>
+          <h4 class="text-sm font-semibold text-dark-text">Controles de calidad</h4>
           <div class="mt-3 grid grid-cols-2 gap-3">
             <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
               <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Coherencia</p>
@@ -333,7 +333,7 @@ const SORT_OPTIONS: SortOption[] = [
                   </p>
                 </div>
                 <div class="rounded-lg bg-dark-bg/70 px-2 py-2">
-                  <p class="text-dark-muted">Momentum</p>
+                  <p class="text-dark-muted">Dinamica</p>
                   <p class="mt-1 font-medium text-dark-text">
                     {{ cluster.momentum_score | number:'1.0-0' }}
                   </p>
@@ -347,14 +347,14 @@ const SORT_OPTIONS: SortOption[] = [
               </div>
 
               <div class="mt-3 flex items-center justify-between gap-3 text-xs text-dark-muted">
-                <span>{{ cluster.item_count }} docs</span>
+                <span>{{ cluster.item_count }} documentos</span>
                 @if (cluster.comparative_signal) {
                   <span class="rounded-full border border-dark-border bg-dark-surface px-2 py-1">
                     {{ cluster.comparative_signal.status }} · {{ cluster.comparative_signal.stability_score ?? 0 | number:'1.0-0' }}
                   </span>
                 } @else if (cluster.weak_signal_flag) {
                   <span class="rounded-full border border-yellow-500 bg-yellow-100 px-2 py-1 text-yellow-900">
-                    weak signal
+                    señal temprana
                   </span>
                 }
               </div>
@@ -497,6 +497,19 @@ export class TrendmapSidebarComponent {
 
   formatStage(stage: string): string {
     return stage.replaceAll('_', ' ');
+  }
+
+  sourceTypeLabel(sourceType: string): string {
+    const labels: Record<string, string> = {
+      news: 'Noticias',
+      rss: 'Articulos y blogs',
+      paper: 'Articulos academicos',
+      pdf: 'Documentos tecnicos',
+      patent: 'Patentes',
+      institutional_report: 'Reportes institucionales',
+    };
+
+    return labels[sourceType] ?? sourceType.replaceAll('_', ' ');
   }
 
   cardClass(cluster: TrendmapCluster): string {

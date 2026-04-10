@@ -14,16 +14,16 @@ import { RouterLink } from '@angular/router';
             <span class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-dark-border bg-white p-1.5 shadow-sm sm:h-20 sm:w-20">
               <img
                 src="/images/logo.png"
-                alt="Bancolombia - Framework de Innovacion TI"
+                alt="Bancolombia - Vigilancia estrategica de tecnologia"
                 class="h-full w-full object-contain object-center"
               />
             </span>
             <span class="hidden min-w-0 sm:block">
               <span class="block text-base font-semibold tracking-tight text-dark-text">
-                Radar de Noticias
+                Radar Estrategico TI
               </span>
               <span class="block text-xs text-dark-muted">
-                Un artefacto de Navi
+                Una herramienta de apoyo estrategico
               </span>
             </span>
           </a>

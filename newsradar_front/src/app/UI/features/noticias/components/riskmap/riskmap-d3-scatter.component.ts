@@ -1,18 +1,19 @@
 import {
+  AfterViewInit,
   Component,
   ElementRef,
+  effect,
   input,
   output,
-  effect,
   viewChild,
-  AfterViewInit,
 } from '@angular/core';
-import {
-  TrendmapArticle,
-  TrendmapCluster,
-  DARK_THEME,
-} from '../../../../../domain/noticias/models';
 import * as d3 from 'd3';
+
+import {
+  DARK_THEME,
+  RiskmapCluster,
+  TrendmapArticle,
+} from '../../../../../domain/noticias/models';
 
 const WIDTH = 800;
 const HEIGHT = 550;
@@ -20,21 +21,33 @@ const MARGIN = { top: 20, right: 20, bottom: 30, left: 40 };
 
 type TooltipSelection = d3.Selection<HTMLDivElement, null, d3.BaseType, unknown>;
 
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  news: 'Noticias',
+  rss: 'Articulos y blogs',
+  paper: 'Articulos academicos',
+  pdf: 'Documentos tecnicos',
+  patent: 'Patentes',
+  institutional_report: 'Reportes institucionales',
+};
+
 @Component({
-  selector: 'app-d3-scatter',
+  selector: 'app-riskmap-d3-scatter',
   standalone: true,
   template: `
-    <div class="bg-dark-surface border border-dark-border rounded-lg p-4">
-      <h4 class="text-sm font-semibold text-dark-text mb-2">Mapa de Artículos (UMAP)</h4>
+    <div class="rounded-2xl border border-dark-border bg-dark-surface p-4">
+      <h4 class="mb-1 text-sm font-semibold text-dark-text">Mapa de articulos (UMAP)</h4>
+      <p class="mb-3 text-xs leading-5 text-dark-muted">
+        Proyeccion semantica de documentos de riesgo. Color por categoria. Pasa el cursor sobre grupos o articulos para ver detalles.
+      </p>
       <svg #chart [attr.width]="width" [attr.height]="height"></svg>
     </div>
   `,
 })
-export class D3ScatterComponent implements AfterViewInit {
+export class RiskmapD3ScatterComponent implements AfterViewInit {
   readonly articles = input<TrendmapArticle[]>([]);
-  readonly clusters = input<TrendmapCluster[]>([]);
-  readonly selectedCluster = input<TrendmapCluster | null>(null);
-  readonly clusterSelected = output<TrendmapCluster | null>();
+  readonly clusters = input<RiskmapCluster[]>([]);
+  readonly selectedCluster = input<RiskmapCluster | null>(null);
+  readonly clusterSelected = output<RiskmapCluster | null>();
   readonly chartRef = viewChild.required<ElementRef<SVGSVGElement>>('chart');
 
   readonly width = WIDTH;
@@ -60,15 +73,14 @@ export class D3ScatterComponent implements AfterViewInit {
 
   private render(
     articles: TrendmapArticle[],
-    clusters: TrendmapCluster[],
-    selectedCluster: TrendmapCluster | null,
+    clusters: RiskmapCluster[],
+    selectedCluster: RiskmapCluster | null,
   ): void {
     const svg = d3.select(this.chartRef().nativeElement);
     svg.selectAll('*').remove();
 
     if (articles.length === 0) return;
 
-    // Background
     svg
       .append('rect')
       .attr('width', WIDTH)
@@ -78,10 +90,8 @@ export class D3ScatterComponent implements AfterViewInit {
 
     const g = svg.append('g');
 
-    // Scales
     const xExtent = d3.extent(articles, (d) => d.x_embed) as [number, number];
     const yExtent = d3.extent(articles, (d) => d.y_embed) as [number, number];
-
     const xPad = (xExtent[1] - xExtent[0]) * 0.05 || 1;
     const yPad = (yExtent[1] - yExtent[0]) * 0.05 || 1;
 
@@ -95,14 +105,15 @@ export class D3ScatterComponent implements AfterViewInit {
       .domain([yExtent[0] - yPad, yExtent[1] + yPad])
       .range([HEIGHT - MARGIN.bottom, MARGIN.top]);
 
-    const orderedCategories = [...new Set(clusters.map((cluster) => cluster.category))];
+    const orderedCategories = [...new Set(clusters.map((c) => c.category))];
     const color = d3.scaleOrdinal<string, string>(d3.schemeTableau10).domain(orderedCategories);
-    const tooltip = d3
+
+    const tooltip: TooltipSelection = d3
       .select('body')
-      .selectAll<HTMLDivElement, null>('div.trendmap-record-tooltip')
+      .selectAll<HTMLDivElement, null>('div.riskmap-record-tooltip')
       .data([null])
       .join('div')
-      .attr('class', 'trendmap-record-tooltip')
+      .attr('class', 'riskmap-record-tooltip')
       .style('position', 'absolute')
       .style('max-width', '360px')
       .style('background', DARK_THEME.surface)
@@ -117,10 +128,9 @@ export class D3ScatterComponent implements AfterViewInit {
       .style('opacity', 0)
       .style('z-index', '1200');
 
-    // Build cluster map for quick lookup
     const clusterMap = new Map(clusters.map((c) => [c.cluster_id, c]));
 
-    // Draw hull polygons from backend snapshot to keep geometry snapshot-driven.
+    // Hull polygons
     clusters.forEach((cluster) => {
       if ((cluster.hull_polygon?.length ?? 0) < 3) return;
       const polygon = (cluster.hull_polygon ?? []).map(([px, py]) => [x(px), y(py)] as [number, number]);
@@ -141,9 +151,7 @@ export class D3ScatterComponent implements AfterViewInit {
         .on('mousemove', (event: MouseEvent) => {
           this.positionTooltip(tooltip, event);
         })
-        .on('mouseleave', () => {
-          tooltip.style('opacity', 0);
-        })
+        .on('mouseleave', () => tooltip.style('opacity', 0))
         .on('click', () => {
           this.clusterSelected.emit(
             selectedCluster?.cluster_id === cluster.cluster_id ? null : cluster,
@@ -151,9 +159,7 @@ export class D3ScatterComponent implements AfterViewInit {
         });
     });
 
-    const articlesByCluster = d3.group(articles, (a) => a.cluster_id);
-
-    // Draw article points
+    // Article dots
     g.selectAll('circle.article')
       .data(articles)
       .join('circle')
@@ -181,26 +187,22 @@ export class D3ScatterComponent implements AfterViewInit {
         const safeUrl = this.escapeHtml(d.url || 'sin URL');
         const safeCluster = this.escapeHtml(d.cluster_label || clusterMap.get(d.cluster_id)?.label || d.cluster_id);
         const safeSource = this.escapeHtml(d.source || 'fuente');
+        const riskCluster = clusterMap.get(d.cluster_id);
         tooltip
           .style('opacity', 1)
           .html(
             `<div style="font-weight:600; margin-bottom:6px;">${safeTitle}</div>` +
               `<div style="margin-bottom:6px; color:${DARK_THEME.textMuted};">${safeCluster} | ${safeSource}</div>` +
-              `<div style="margin-bottom:6px; color:${DARK_THEME.textMuted};">Score ${d.score.toFixed(0)} | ${this.escapeHtml(this.sourceTypeLabel(d.source_type))}</div>` +
-              `<div style="color:${DARK_THEME.textMuted}; word-break:break-word;">${safeUrl}</div>`,
+              `<div style="margin-bottom:6px; color:${DARK_THEME.textMuted};">Puntaje ${d.score.toFixed(0)} | ${this.escapeHtml(SOURCE_TYPE_LABELS[d.source_type] ?? d.source_type)}</div>` +
+              (riskCluster ? `<div style="color:${DARK_THEME.textMuted};">Severidad ${riskCluster.risk_severity.toFixed(0)} | Persistencia ${riskCluster.persistence_score.toFixed(0)}</div>` : '') +
+              `<div style="margin-top:4px; color:${DARK_THEME.textMuted}; word-break:break-word;">${safeUrl}</div>`,
           );
-        tooltip
-          .style('left', `${event.pageX + 14}px`)
-          .style('top', `${event.pageY - 12}px`);
+        this.positionTooltip(tooltip, event);
       })
       .on('mousemove', (event: MouseEvent) => {
-        tooltip
-          .style('left', `${event.pageX + 14}px`)
-          .style('top', `${event.pageY - 12}px`);
+        this.positionTooltip(tooltip, event);
       })
-      .on('mouseleave', () => {
-        tooltip.style('opacity', 0);
-      })
+      .on('mouseleave', () => tooltip.style('opacity', 0))
       .on('click', (_event: MouseEvent, d: TrendmapArticle) => {
         const cluster = clusterMap.get(d.cluster_id) ?? null;
         this.clusterSelected.emit(
@@ -209,6 +211,7 @@ export class D3ScatterComponent implements AfterViewInit {
       });
 
     // Cluster labels at centroids
+    const articlesByCluster = d3.group(articles, (a) => a.cluster_id);
     articlesByCluster.forEach((clusterArticles, clusterId) => {
       const cluster = clusterMap.get(clusterId);
       if (!cluster) return;
@@ -226,9 +229,7 @@ export class D3ScatterComponent implements AfterViewInit {
         .on('mousemove', (event: MouseEvent) => {
           this.positionTooltip(tooltip, event);
         })
-        .on('mouseleave', () => {
-          tooltip.style('opacity', 0);
-        })
+        .on('mouseleave', () => tooltip.style('opacity', 0))
         .on('click', () => {
           this.clusterSelected.emit(
             selectedCluster?.cluster_id === cluster.cluster_id ? null : cluster,
@@ -275,17 +276,29 @@ export class D3ScatterComponent implements AfterViewInit {
     svg.call(zoom);
   }
 
-  private sourceTypeLabel(sourceType: string): string {
-    const labels: Record<string, string> = {
-      news: 'Noticias',
-      rss: 'Articulos y blogs',
-      paper: 'Articulos academicos',
-      pdf: 'Documentos tecnicos',
-      patent: 'Patentes',
-      institutional_report: 'Reportes institucionales',
-    };
+  private showClusterTooltip(
+    tooltip: TooltipSelection,
+    event: MouseEvent,
+    cluster: RiskmapCluster,
+  ): void {
+    const safeLabel = this.escapeHtml(cluster.label);
+    const safeCategory = this.escapeHtml(cluster.dominant_risk || cluster.category);
+    const safeSummary = this.escapeHtml(cluster.executive_takeaway || cluster.summary);
+    tooltip
+      .style('opacity', 1)
+      .html(
+        `<div style="font-weight:700; margin-bottom:6px;">${safeLabel}</div>` +
+          `<div style="margin-bottom:6px; color:${DARK_THEME.textMuted};">${safeCategory} | Documentos ${cluster.item_count}</div>` +
+          `<div style="margin-bottom:6px; color:${DARK_THEME.textMuted};">Severidad ${cluster.risk_severity.toFixed(0)} | Persistencia ${cluster.persistence_score.toFixed(0)} | Dinamica ${cluster.momentum_score.toFixed(0)}</div>` +
+          `<div style="color:${DARK_THEME.textMuted};">${safeSummary}</div>`,
+      );
+    this.positionTooltip(tooltip, event);
+  }
 
-    return labels[sourceType] ?? sourceType.replaceAll('_', ' ');
+  private positionTooltip(tooltip: TooltipSelection, event: MouseEvent): void {
+    tooltip
+      .style('left', `${event.pageX + 14}px`)
+      .style('top', `${event.pageY - 12}px`);
   }
 
   private escapeHtml(value: string): string {
@@ -297,67 +310,28 @@ export class D3ScatterComponent implements AfterViewInit {
       .replaceAll("'", '&#39;');
   }
 
-  private showClusterTooltip(
-    tooltip: TooltipSelection,
-    event: MouseEvent,
-    cluster: TrendmapCluster,
-  ): void {
-    const safeLabel = this.escapeHtml(cluster.label);
-    const safeCategory = this.escapeHtml(cluster.category);
-    const safeSummary = this.escapeHtml(cluster.executive_takeaway || cluster.summary);
-    tooltip
-      .style('opacity', 1)
-      .html(
-        `<div style="font-weight:700; margin-bottom:6px;">${safeLabel}</div>` +
-          `<div style="margin-bottom:6px; color:${DARK_THEME.textMuted};">${safeCategory} | Documentos ${cluster.item_count}</div>` +
-          `<div style="margin-bottom:6px; color:${DARK_THEME.textMuted};">Impacto ${cluster.impact_score.toFixed(0)} | Madurez ${cluster.maturity_score.toFixed(0)} | Dinamica ${cluster.momentum_score.toFixed(0)}</div>` +
-          `<div style="color:${DARK_THEME.textMuted};">${safeSummary}</div>`,
-      );
-    this.positionTooltip(tooltip, event);
-  }
-
-  private positionTooltip(
-    tooltip: TooltipSelection,
-    event: MouseEvent,
-  ): void {
-    tooltip
-      .style('left', `${event.pageX + 14}px`)
-      .style('top', `${event.pageY - 12}px`);
-  }
-
   private wrapClusterLabel(label: string, maxCharsPerLine: number): string[] {
     const words = label.split(/\s+/).flatMap((word) => this.splitLongWord(word, maxCharsPerLine));
     const lines: string[] = [];
     let currentLine = '';
-
     words.forEach((word) => {
       const candidate = currentLine ? `${currentLine} ${word}` : word;
       if (candidate.length <= maxCharsPerLine) {
         currentLine = candidate;
         return;
       }
-
-      if (currentLine) {
-        lines.push(currentLine);
-      }
+      if (currentLine) lines.push(currentLine);
       currentLine = word;
     });
-
-    if (currentLine) {
-      lines.push(currentLine);
-    }
-
+    if (currentLine) lines.push(currentLine);
     return lines.slice(0, 4);
   }
 
   private splitLongWord(word: string, maxCharsPerLine: number): string[] {
-    if (word.length <= maxCharsPerLine) {
-      return [word];
-    }
-
+    if (word.length <= maxCharsPerLine) return [word];
     const chunks: string[] = [];
-    for (let index = 0; index < word.length; index += maxCharsPerLine) {
-      chunks.push(word.slice(index, index + maxCharsPerLine));
+    for (let i = 0; i < word.length; i += maxCharsPerLine) {
+      chunks.push(word.slice(i, i + maxCharsPerLine));
     }
     return chunks;
   }

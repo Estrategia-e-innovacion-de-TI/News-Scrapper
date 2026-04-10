@@ -9,7 +9,7 @@ const BAR_HEIGHT = 10;
   standalone: true,
   template: `
     <div class="flex items-center gap-2"
-      [attr.aria-label]="label() ? label() + ': ' + pct() + '%' : 'Momentum: ' + pct() + '%'">
+      [attr.aria-label]="label() ? label() + ': ' + pct() + '%' : 'Dinamica: ' + pct() + '%'">
       @if (label()) {
         <span class="text-xs text-gray-500 whitespace-nowrap">{{ label() }}</span>
       }

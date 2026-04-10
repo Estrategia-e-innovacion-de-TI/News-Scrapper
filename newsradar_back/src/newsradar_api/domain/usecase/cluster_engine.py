@@ -279,10 +279,12 @@ class ClusterEngine:
         similarity_threshold: float = 0.3,
         min_cluster_size: int = 3,
         min_items_for_clustering: int = 6,
+        outlier_std_threshold: float = 2.0,
     ) -> None:
         self.similarity_threshold = similarity_threshold
         self.min_cluster_size = min_cluster_size
         self.min_items_for_clustering = min_items_for_clustering
+        self.outlier_std_threshold = outlier_std_threshold
 
     def cluster(self, items: list[dict[str, Any]]) -> ClusteringOutput:
         """Cluster a list of items and compute trends + hype indicators.
@@ -386,6 +388,9 @@ class ClusterEngine:
             cluster_groups, tfidf_matrix, items,
         )
 
+        # 4.1: Move centroid-distance outliers to "unclustered" to reduce noisy assignments.
+        cluster_groups = self._reassign_far_outliers(cluster_groups, tfidf_matrix)
+
         # 5. Build ClusterResult objects
         feature_names = vectorizer.get_feature_names_out()
         clusters: list[ClusterResult] = []
@@ -426,6 +431,58 @@ class ClusterEngine:
             trend_timeline=timeline,
             hype_indicators=hype,
         )
+
+    def _reassign_far_outliers(
+        self,
+        cluster_groups: dict[int, list[int]],
+        tfidf_matrix: Any,
+    ) -> dict[int, list[int]]:
+        """Move items with distance > mean + N*std to unclustered.
+
+        This keeps clusters tighter and prevents weakly related items from
+        inflating noise in silhouette-like separation metrics.
+        """
+        import numpy as np
+        from sklearn.metrics.pairwise import cosine_similarity
+
+        if self.outlier_std_threshold <= 0:
+            return cluster_groups
+
+        result: dict[int, list[int]] = {}
+        unclustered_indices: list[int] = list(cluster_groups.get(-1, []))
+
+        for lbl, indices in cluster_groups.items():
+            if lbl == -1:
+                continue
+
+            # Keep tiny clusters untouched; they are already handled by merge logic.
+            if len(indices) < max(3, self.min_cluster_size):
+                result[lbl] = list(indices)
+                continue
+
+            vectors = tfidf_matrix[indices]
+            centroid = np.asarray(vectors.mean(axis=0)).flatten().reshape(1, -1)
+            similarities = cosine_similarity(vectors, centroid).reshape(-1)
+            distances = 1.0 - similarities
+
+            mean_distance = float(np.mean(distances))
+            std_distance = float(np.std(distances))
+            threshold = mean_distance + self.outlier_std_threshold * std_distance
+
+            kept: list[int] = []
+            for local_idx, global_idx in enumerate(indices):
+                if float(distances[local_idx]) > threshold:
+                    unclustered_indices.append(global_idx)
+                else:
+                    kept.append(global_idx)
+
+            if kept:
+                result[lbl] = kept
+
+        if unclustered_indices:
+            result[-1] = unclustered_indices
+
+        return result
 
     def _merge_small_clusters(
         self,

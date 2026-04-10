@@ -26,6 +26,14 @@ interface VolumePoint {
   count: number;
 }
 
+interface MethodologyMetricCard {
+  label: string;
+  value: number;
+  suffix?: string;
+  help: string;
+  interpretation: string;
+}
+
 @Component({
   selector: 'app-trendmap-overview',
   standalone: true,
@@ -68,42 +76,24 @@ interface VolumePoint {
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
           <h4 class="text-sm font-semibold text-dark-text">Cobertura metodologica</h4>
           <div class="mt-4 grid grid-cols-2 gap-3">
-            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Coherencia</p>
-              <p class="mt-2 text-xl font-semibold text-dark-text">
-                {{ data().quality_checks?.cluster_coherence_avg ?? 0 }}
-              </p>
-            </div>
-            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Calidad promedio</p>
-              <p class="mt-2 text-xl font-semibold text-dark-text">
-                {{ data().quality_checks?.cluster_quality_avg ?? 0 }}
-              </p>
-            </div>
-            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Taxonomia</p>
-              <p class="mt-2 text-xl font-semibold text-dark-text">
-                {{ data().quality_checks?.taxonomy_coverage ?? 0 }}%
-              </p>
-            </div>
-            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Weak signals</p>
-              <p class="mt-2 text-xl font-semibold text-dark-text">
-                {{ data().quality_checks?.weak_signal_clusters ?? 0 }}
-              </p>
-            </div>
-            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Cobertura</p>
-              <p class="mt-2 text-xl font-semibold text-dark-text">
-                {{ (data().quality_checks?.cluster_coverage ?? (100 - (data().quality_checks?.unclustered_ratio ?? 0))) | number:'1.0-0' }}%
-              </p>
-            </div>
-            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Estabilidad</p>
-              <p class="mt-2 text-xl font-semibold text-dark-text">
-                {{ (data().quality_checks?.stability_score_avg ?? 0) | number:'1.0-0' }}
-              </p>
-            </div>
+            @for (metric of methodologyMetrics(); track metric.label) {
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <div class="flex items-center gap-2">
+                  <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">{{ metric.label }}</p>
+                  <span
+                    class="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-dark-border bg-white text-[10px] font-semibold text-dark-muted"
+                    [attr.title]="metric.help + ' Interpretacion: ' + metric.interpretation"
+                    aria-label="Ayuda de metrica"
+                  >
+                    i
+                  </span>
+                </div>
+                <p class="mt-2 text-xl font-semibold text-dark-text">
+                  {{ metric.value | number:'1.0-1' }}{{ metric.suffix ?? '' }}
+                </p>
+                <p class="mt-1 text-xs leading-5 text-dark-muted">{{ metric.interpretation }}</p>
+              </div>
+            }
           </div>
         </section>
       </div>
@@ -112,9 +102,9 @@ interface VolumePoint {
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
           <div class="flex items-center justify-between gap-4">
             <div>
-              <h4 class="text-sm font-semibold text-dark-text">Cluster cards</h4>
+              <h4 class="text-sm font-semibold text-dark-text">Tarjetas de agrupaciones</h4>
               <p class="mt-1 text-xs text-dark-muted">
-                Narrativa priorizada por impacto y momentum.
+                Narrativa priorizada por impacto y dinamica.
               </p>
             </div>
           </div>
@@ -148,7 +138,7 @@ interface VolumePoint {
                   </div>
                   @if (card.weak_signal_flag) {
                     <span class="rounded-full border border-yellow-500 bg-yellow-100 px-2 py-1 text-[10px] text-yellow-900">
-                      weak signal
+                      señal temprana
                     </span>
                   }
                 </div>
@@ -190,7 +180,7 @@ interface VolumePoint {
                     <p class="mt-1 font-medium text-dark-text">{{ card.maturity_score }}</p>
                   </div>
                   <div class="rounded-lg bg-dark-surface px-2 py-2">
-                    <p class="text-dark-muted">Momentum</p>
+                    <p class="text-dark-muted">Dinamica</p>
                     <p class="mt-1 font-medium text-dark-text">{{ card.momentum_score }}</p>
                   </div>
                   <div class="rounded-lg bg-dark-surface px-2 py-2">
@@ -251,9 +241,9 @@ interface VolumePoint {
 
       <div class="grid gap-6 xl:grid-cols-3">
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
-          <h4 class="text-sm font-semibold text-dark-text">Insights</h4>
+          <h4 class="text-sm font-semibold text-dark-text">Hallazgos clave</h4>
           @if (data().insights.length === 0) {
-            <p class="mt-3 text-sm text-dark-muted">No hay insights disponibles.</p>
+            <p class="mt-3 text-sm text-dark-muted">No hay hallazgos disponibles.</p>
           } @else {
             <div class="mt-4 space-y-3">
               @for (item of data().insights; track item) {
@@ -281,9 +271,9 @@ interface VolumePoint {
         </section>
 
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
-          <h4 class="text-sm font-semibold text-dark-text">Weak signals</h4>
+          <h4 class="text-sm font-semibold text-dark-text">Señales tempranas</h4>
           @if (weakSignals().length === 0) {
-            <p class="mt-3 text-sm text-dark-muted">No se detectaron weak signals destacados.</p>
+            <p class="mt-3 text-sm text-dark-muted">No se detectaron señales tempranas destacadas.</p>
           } @else {
             <div class="mt-4 space-y-3">
               @for (item of weakSignals().slice(0, 4); track item.cluster_id) {
@@ -339,7 +329,7 @@ export class TrendmapOverviewComponent implements AfterViewInit {
       { label: 'Sin cluster', value: snapshot.summary.unclustered_documents ?? 0 },
       { label: 'Fuentes', value: snapshot.filters_metadata?.sources.length ?? 0 },
       { label: 'Taxonomia', value: `${snapshot.quality_checks?.taxonomy_coverage ?? 0}%` },
-      { label: 'Weak signals', value: snapshot.quality_checks?.weak_signal_clusters ?? 0 },
+      { label: 'Señales tempranas', value: snapshot.quality_checks?.weak_signal_clusters ?? 0 },
     ];
   }
 
@@ -359,6 +349,90 @@ export class TrendmapOverviewComponent implements AfterViewInit {
 
   weakSignals() {
     return this.data().weak_signals ?? [];
+  }
+
+  methodologyMetrics(): MethodologyMetricCard[] {
+    const quality = this.data().quality_checks;
+    const coherence = quality?.cluster_coherence_avg ?? 0;
+    const avgQuality = quality?.cluster_quality_avg ?? 0;
+    const taxonomy = quality?.taxonomy_coverage ?? 0;
+    const weakSignals = quality?.weak_signal_clusters ?? 0;
+    const coverage = quality?.cluster_coverage ?? (100 - (quality?.unclustered_ratio ?? 0));
+    const stability = quality?.stability_score_avg ?? 0;
+
+    return [
+      {
+        label: 'Coherencia',
+        value: coherence,
+        help: 'Mide que tan consistentes son los documentos dentro de cada cluster.',
+        interpretation: this.interpretScore(coherence, 'Alta coherencia entre documentos.'),
+      },
+      {
+        label: 'Calidad promedio',
+        value: avgQuality,
+        help: 'Resume la calidad analitica de los clusters segun relevancia, consistencia y evidencia.',
+        interpretation: this.interpretScore(avgQuality, 'Calidad analitica alta y confiable.'),
+      },
+      {
+        label: 'Taxonomia',
+        value: taxonomy,
+        suffix: '%',
+        help: 'Indica cuanto del corpus queda bien cubierto por la taxonomia definida.',
+        interpretation: this.interpretScore(taxonomy, 'Excelente alineacion con la taxonomia.'),
+      },
+      {
+        label: 'Señales tempranas',
+        value: weakSignals,
+        help: 'Cuenta clusters emergentes de baja madurez y alta novedad que requieren seguimiento.',
+        interpretation: this.interpretWeakSignals(weakSignals),
+      },
+      {
+        label: 'Cobertura',
+        value: coverage,
+        suffix: '%',
+        help: 'Mide el porcentaje de documentos que lograron ser agrupados en clusters utiles.',
+        interpretation: this.interpretScore(coverage, 'Cobertura alta del corpus en clusters.'),
+      },
+      {
+        label: 'Estabilidad',
+        value: stability,
+        help: 'Mide que tan estable es la señal entre snapshots (menos volatilidad, mayor estabilidad).',
+        interpretation: this.interpretStability(stability),
+      },
+    ];
+  }
+
+  private interpretScore(value: number, highText: string): string {
+    if (value >= 80) {
+      return `${highText} (${value.toFixed(1)})`;
+    }
+    if (value >= 60) {
+      return `Nivel medio: conviene monitorear para fortalecerlo. (${value.toFixed(1)})`;
+    }
+    return `Nivel bajo: requiere ajustes de fuentes, taxonomia o clusterizacion. (${value.toFixed(1)})`;
+  }
+
+  private interpretWeakSignals(value: number): string {
+    if (value === 0) {
+      return 'No se detectan señales tempranas destacadas en este snapshot.';
+    }
+    if (value <= 3) {
+      return `Hay ${value} señales tempranas: foco exploratorio acotado y manejable.`;
+    }
+    if (value <= 8) {
+      return `Hay ${value} señales tempranas: buen nivel de exploracion para vigilancia activa.`;
+    }
+    return `Hay ${value} señales tempranas: alta exploracion, revisar priorizacion para evitar ruido.`;
+  }
+
+  private interpretStability(value: number): string {
+    if (value >= 80) {
+      return `Estabilidad alta: la señal es consistente entre periodos. (${value.toFixed(1)})`;
+    }
+    if (value >= 60) {
+      return `Estabilidad media: hay cambios esperados pero aun es interpretable. (${value.toFixed(1)})`;
+    }
+    return `Estabilidad baja: la señal es volatil y requiere confirmacion adicional. (${value.toFixed(1)})`;
   }
 
   formatStage(stage: string): string {

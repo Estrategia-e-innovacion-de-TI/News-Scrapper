@@ -127,6 +127,7 @@ class TopicItem(BaseModel):
     group_id: str
     display_name: str
     term_count: int = 0
+    terms: list[str] = Field(default_factory=list)
 
 
 class TopicsResponse(BaseModel):

@@ -11,17 +11,17 @@ import { RouterLink } from '@angular/router';
         <div class="grid gap-0 lg:grid-cols-[1.25fr_0.75fr]">
           <div class="p-6 sm:p-8">
             <p class="text-xs font-semibold uppercase tracking-[0.22em] text-dark-muted">
-              Radar de Noticias Bancolombia
+              Radar Estrategico TI Bancolombia
             </p>
             <h1 class="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-dark-text sm:text-4xl">
-              Un radar para convertir ruido externo en decisiones de innovacion.
+              Un radar para convertir ruido externo en decisiones estrategicas.
             </h1>
             <p class="mt-4 max-w-3xl text-sm leading-7 text-dark-muted">
-              Este artefacto de Navi ayuda a identificar que temas estan ganando traccion,
-              cuales merecen exploracion, que riesgos empiezan a emerger y donde conviene
-              enfocar conversaciones, pilotos o vigilancia prioritaria. El resultado no es
-              solo una lista de noticias: es una lectura accionable con evidencia, clusters,
-              recomendaciones y trazabilidad documental.
+              Esta herramienta de Navi te ayuda a identificar que temas estan tomando fuerza,
+              cuales conviene observar con mayor atencion, que riesgos estan emergiendo y
+              donde vale la pena concentrar conversaciones clave. El resultado no es solo una
+              lista de noticias: es una lectura clara y accionable, con evidencia, agrupaciones
+              tematicas, recomendaciones y trazabilidad documental.
             </p>
 
             <div class="mt-6 flex flex-wrap gap-3">
@@ -46,16 +46,16 @@ import { RouterLink } from '@angular/router';
                 Que puedes obtener
               </p>
               <div class="mt-4 space-y-3 text-sm text-dark-muted">
-                <p><span class="font-semibold text-dark-text">Oportunidades:</span> temas emergentes que pueden alimentar discovery, pilotos y apuestas de negocio.</p>
-                <p><span class="font-semibold text-dark-text">Priorizacion:</span> lectura por impacto, madurez, momentum y novedad para separar senales fuertes de ruido.</p>
-                <p><span class="font-semibold text-dark-text">Riesgos:</span> senales tempranas de ciberseguridad, regulacion, fraude, reputacion u operacion.</p>
-                <p><span class="font-semibold text-dark-text">Evidencia:</span> documentos representativos, fuentes, rationale y recomendaciones para discutir con contexto.</p>
+                <p><span class="font-semibold text-dark-text">Oportunidades:</span> temas emergentes que pueden orientar exploracion, pilotos y apuestas de negocio.</p>
+                <p><span class="font-semibold text-dark-text">Priorizacion:</span> lectura por impacto, madurez, dinamica de crecimiento y novedad para separar senales fuertes del ruido.</p>
+                <p><span class="font-semibold text-dark-text">Riesgos:</span> indicios tempranos de ciberseguridad, regulacion, fraude, reputacion u operacion.</p>
+                <p><span class="font-semibold text-dark-text">Evidencia:</span> documentos representativos, fuentes, analisis y recomendaciones para conversar con contexto.</p>
               </div>
               <a
                 routerLink="../tech-watch"
                 class="mt-5 inline-flex rounded-full border border-dark-border bg-white px-4 py-2 text-xs font-semibold text-dark-text transition hover:border-yellow-400 hover:bg-yellow-50"
               >
-                Administrar ingesta
+                Gestionar fuentes y ejecuciones
               </a>
             </div>
           </div>
@@ -64,24 +64,26 @@ import { RouterLink } from '@angular/router';
 
       <div class="grid gap-4 md:grid-cols-3">
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
-          <h2 class="text-sm font-semibold text-dark-text">Detectar donde mirar</h2>
+          <h2 class="text-sm font-semibold text-dark-text">Enfocar la atencion</h2>
           <p class="mt-2 text-sm leading-6 text-dark-muted">
-            El radar agrupa senales dispersas en temas coherentes para mostrar que esta
-            creciendo, que se esta consolidando y que todavia es una senal debil.
+            El radar organiza indicios dispersos en temas coherentes para mostrar que esta
+            creciendo, que se esta consolidando y que aun requiere seguimiento cercano.
           </p>
         </section>
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
-          <h2 class="text-sm font-semibold text-dark-text">Decidir con evidencia</h2>
+          <h2 class="text-sm font-semibold text-dark-text">Decidir con claridad</h2>
           <p class="mt-2 text-sm leading-6 text-dark-muted">
-            Cada cluster trae documentos representativos, keywords, insight, recomendacion
-            y rationale para soportar discusiones ejecutivas y decisiones de portafolio.
+            Cada grupo tematico incluye documentos representativos, palabras clave,
+            interpretacion, recomendacion y justificacion para facilitar discusiones
+            ejecutivas y decisiones de portafolio.
           </p>
         </section>
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
           <h2 class="text-sm font-semibold text-dark-text">Anticipar riesgos</h2>
           <p class="mt-2 text-sm leading-6 text-dark-muted">
             La misma base permite observar riesgos emergentes, severidad, persistencia y
-            momentum para priorizar conversaciones con tecnologia, negocio y control.
+            dinamica de crecimiento para priorizar conversaciones entre tecnologia,
+            negocio y control.
           </p>
         </section>
       </div>

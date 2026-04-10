@@ -24,7 +24,7 @@ type SortDir = 'asc' | 'desc';
                 <p class="mt-2 text-xs text-dark-muted">
                   Estado {{ cluster()!.comparative_signal!.status }} frente al snapshot previo ·
                   estabilidad {{ (cluster()!.comparative_signal!.stability_score ?? 0) | number:'1.0-0' }} ·
-                  lineage {{ cluster()!.history_depth ?? 1 }}
+                  historial {{ cluster()!.history_depth ?? 1 }}
                 </p>
               }
             </div>
@@ -48,7 +48,7 @@ type SortDir = 'asc' | 'desc';
               <p class="mt-2 text-2xl font-semibold text-dark-text">{{ cluster()!.maturity_score | number:'1.0-0' }}</p>
             </div>
             <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-              <p class="text-xs uppercase tracking-wide text-dark-muted">Momentum</p>
+              <p class="text-xs uppercase tracking-wide text-dark-muted">Dinamica</p>
               <p class="mt-2 text-2xl font-semibold text-dark-text">{{ cluster()!.momentum_score | number:'1.0-0' }}</p>
             </div>
             <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
@@ -74,7 +74,7 @@ type SortDir = 'asc' | 'desc';
               </div>
 
               <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-4">
-                <h5 class="text-sm font-semibold text-dark-text">Evidencia y rationale</h5>
+                <h5 class="text-sm font-semibold text-dark-text">Evidencia y analisis</h5>
                 <p class="mt-2 text-sm leading-6 text-dark-muted">{{ cluster()!.rationale }}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                   @for (match of cluster()!.taxonomy_matches; track match.name) {
@@ -86,7 +86,7 @@ type SortDir = 'asc' | 'desc';
                 <div class="mt-3 space-y-2">
                   @for (evidence of cluster()!.insight_evidence; track evidence.type + evidence.detail) {
                     <div class="rounded-lg border border-dark-border bg-dark-surface/70 px-3 py-2 text-sm text-dark-text/90">
-                      <span class="font-medium capitalize">{{ evidence.type }}</span>: {{ evidence.detail }}
+                      <span class="font-medium">{{ evidenceTypeLabel(evidence.type) }}</span>: {{ evidence.detail }}
                     </div>
                   }
                 </div>
@@ -104,7 +104,7 @@ type SortDir = 'asc' | 'desc';
 
             <div class="space-y-4">
               <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-4">
-                <h5 class="text-sm font-semibold text-dark-text">Score Breakdown</h5>
+                <h5 class="text-sm font-semibold text-dark-text">Desglose del puntaje</h5>
                 <div class="mt-3 space-y-3">
                   @for (entry of scoreSections(); track entry.label) {
                     <div class="rounded-lg border border-dark-border bg-dark-surface/70 p-3">
@@ -112,12 +112,15 @@ type SortDir = 'asc' | 'desc';
                         <p class="text-sm font-medium text-dark-text">{{ entry.label }}</p>
                         <span class="text-xs text-dark-muted">{{ entry.breakdown.score | number:'1.0-0' }}</span>
                       </div>
-                      <p class="mt-1 text-xs leading-5 text-dark-muted">{{ entry.breakdown.formula }}</p>
+                      @if (metricDescription(entry.label)) {
+                        <p class="mt-1 text-xs leading-4 text-dark-muted italic">{{ metricDescription(entry.label) }}</p>
+                      }
+                      <p class="mt-2 text-xs leading-5 text-dark-muted">{{ entry.breakdown.formula }}</p>
                       <div class="mt-2 space-y-2">
                         @for (component of entry.breakdown.components.slice(0, 4); track component.name) {
                           <div>
                             <div class="flex items-center justify-between text-xs text-dark-muted">
-                              <span>{{ component.name }}</span>
+                              <span>{{ scoreComponentLabel(component.name) }}</span>
                               <span>{{ component.value | number:'1.0-0' }}</span>
                             </div>
                             <div class="mt-1 h-1.5 rounded-full bg-dark-border">
@@ -178,7 +181,7 @@ type SortDir = 'asc' | 'desc';
                   <th class="cursor-pointer px-3 py-2 text-left font-medium text-dark-muted hover:text-dark-text" (click)="toggleSort('source')">Fuente {{ sortIndicator('source') }}</th>
                   <th class="px-3 py-2 text-left font-medium text-dark-muted">Razon</th>
                   <th class="cursor-pointer px-3 py-2 text-left font-medium text-dark-muted hover:text-dark-text" (click)="toggleSort('date')">Fecha {{ sortIndicator('date') }}</th>
-                  <th class="cursor-pointer px-3 py-2 text-left font-medium text-dark-muted hover:text-dark-text" (click)="toggleSort('score')">Score {{ sortIndicator('score') }}</th>
+                  <th class="cursor-pointer px-3 py-2 text-left font-medium text-dark-muted hover:text-dark-text" (click)="toggleSort('score')">Puntaje {{ sortIndicator('score') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -226,7 +229,7 @@ export class TrendmapDetailComponent {
     const entries: Array<{ label: string; breakdown: ScoreBreakdown }> = [
       { label: 'Impacto', breakdown: cluster.impact_score_breakdown },
       { label: 'Madurez', breakdown: cluster.maturity_score_breakdown },
-      { label: 'Momentum', breakdown: cluster.momentum_score_breakdown },
+      { label: 'Dinamica', breakdown: cluster.momentum_score_breakdown },
       { label: 'Novedad', breakdown: cluster.novelty_score_breakdown },
       { label: 'Incertidumbre', breakdown: cluster.uncertainty_score_breakdown },
     ];
@@ -278,5 +281,90 @@ export class TrendmapDetailComponent {
   sortIndicator(field: SortField): string {
     if (this.sortField() !== field) return '';
     return this.sortDir() === 'asc' ? '^' : 'v';
+  }
+
+  scoreComponentLabel(rawName: string): string {
+    const aliases: Record<string, string> = {
+      recent_share: 'Participacion reciente',
+      source_diversity: 'Diversidad de fuentes',
+      stage_signal: 'Senal por etapa',
+      avg_score: 'Calidad promedio',
+      recency: 'Recencia',
+      growth: 'Crecimiento',
+      acceleration: 'Aceleracion',
+      authority: 'Autoridad de fuentes',
+      relevance: 'Relevancia',
+      scale: 'Escala del cluster',
+      size: 'Tamano del cluster',
+      coherence: 'Coherencia',
+      novelty: 'Novedad',
+      uncertainty: 'Incertidumbre',
+      persistence: 'Persistencia',
+      taxonomy_focus: 'Foco taxonomico',
+      transversality: 'Transversalidad',
+      adoption: 'Adopcion',
+      recurrence: 'Recurrencia',
+      visibility: 'Visibilidad',
+      materiality: 'Materialidad',
+      duplicate_pressure: 'Presion por duplicados',
+      low_recurrence: 'Baja recurrencia',
+      low_authority: 'Baja autoridad',
+      low_coherence: 'Baja coherencia',
+      low_taxonomy_focus: 'Bajo foco taxonomico',
+      low_scale: 'Escala pequena',
+      low_diversity: 'Baja diversidad',
+      low_activity: 'Baja actividad',
+      low_score: 'Bajo puntaje',
+      active_months: 'Meses activos',
+      volume: 'Volumen documental',
+      coverage: 'Cobertura',
+      methodology: 'Metodologia',
+      tempo: 'Tempo y ritmo',
+      exploratory_signal: 'Senal exploratoria',
+      small_scale: 'Escala pequena',
+      uncertainty_penalty: 'Penalizacion por incertidumbre',
+    };
+
+    if (aliases[rawName]) {
+      return aliases[rawName];
+    }
+
+    return rawName
+      .replaceAll('_', ' ')
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  metricDescription(metricName: string): string {
+    const descriptions: Record<string, string> = {
+      'Impacto': 'Mide la potencial repercusion e importancia estrategica del cluster en el negocio y tecnologia',
+      'Madurez': 'Mide el grado de adoption, recurrencia y consolidacion de la tematica en el tiempo',
+      'Dinamica': 'Mide la intensidad reciente, crecimiento acelerado y visibilidad emergente del cluster',
+      'Novedad': 'Mide el nivel de exploracion, recencia y baja recurrencia historica del tema',
+      'Incertidumbre': 'Mide el nivel de exploracion, baja coherencia y duplicidad presente en la senal',
+      'Severidad': 'Mide la potencial severidad y materialidad de un riesgo emergente',
+      'Persistencia': 'Mide la estabilidad temporal y persistencia del riesgo en el ecosistema',
+    };
+
+    return descriptions[metricName] ?? '';
+  }
+
+  evidenceTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      'Coverage': 'Cobertura',
+      'Methodology': 'Metodologia',
+      'Tempo': 'Tempo y ritmo',
+      'Trend': 'Tendencia',
+      'Pattern': 'Patron',
+      'Signal': 'Senal',
+      'Risk': 'Riesgo',
+      'Opportunity': 'Oportunidad',
+      'Insight': 'Insight',
+      'Evidence': 'Evidencia',
+      'Adoption': 'Adopcion',
+      'Growth': 'Crecimiento',
+      'Stability': 'Estabilidad',
+    };
+
+    return labels[type] ?? type.replaceAll('_', ' ');
   }
 }

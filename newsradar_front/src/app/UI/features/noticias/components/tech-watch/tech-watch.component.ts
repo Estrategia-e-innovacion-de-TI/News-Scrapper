@@ -37,7 +37,7 @@ interface TopicView {
         <div>
           <h2 class="text-lg font-semibold">Administracion de ingesta</h2>
           <p class="text-sm text-gray-500">
-            Estado de ejecuciones, documentos persistidos con relevancia mayor a 40, topicos disponibles y snapshot analitico.
+            Estado de ejecuciones, documentos guardados con relevancia mayor a 40, topicos disponibles y resumen analitico.
           </p>
         </div>
         <button
@@ -95,7 +95,7 @@ interface TopicView {
           @if (snapshotStatus()) {
             <p class="text-sm">{{ snapshotStatus() }}</p>
           } @else {
-            <p class="text-sm text-gray-400">Trend mapping aun no generado.</p>
+            <p class="text-sm text-gray-400">Mapa de tendencias aun no generado.</p>
           }
         </section>
       </div>
@@ -110,7 +110,7 @@ interface TopicView {
               <a [href]="doc.url" target="_blank" class="block border rounded p-3 hover:bg-gray-50">
                 <div class="flex items-center justify-between gap-3">
                   <span class="font-medium text-sm">{{ doc.title }}</span>
-                  <span class="text-xs text-gray-500">{{ doc.relevance_score ?? 'n/a' }}</span>
+                  <span class="text-xs text-gray-500">{{ doc.relevance_score ?? 'sin dato' }}</span>
                 </div>
                 <p class="text-xs text-gray-500 mt-1">{{ doc.source_id }} · {{ doc.published_at || 'sin fecha' }}</p>
               </a>
@@ -159,7 +159,7 @@ export class TechWatchComponent implements OnInit {
       error: () => this.topics.set([]),
     });
     this.http.get<any>(`${this.baseUrl}/trendmap/latest`).subscribe({
-      next: (snapshot) => this.snapshotStatus.set(`Snapshot generado: ${snapshot.generated_at || snapshot.snapshot_id}`),
+      next: (snapshot) => this.snapshotStatus.set(`Resumen generado: ${snapshot.generated_at || snapshot.snapshot_id}`),
       error: () => this.snapshotStatus.set(null),
     });
   }
@@ -168,7 +168,7 @@ export class TechWatchComponent implements OnInit {
     this.running.set(true);
     this.http.post<{ run_id: string }>(`${this.baseUrl}/tech-watch/run`, {}).subscribe({
       next: (response) => {
-        this.snapshotStatus.set(`Ejecucion lanzada: ${response.run_id}`);
+        this.snapshotStatus.set(`Ejecucion iniciada: ${response.run_id}`);
         this.running.set(false);
         this.refresh();
       },

@@ -47,8 +47,7 @@ const TABS: Tab[] = [
               <div>
                 <h2 class="text-2xl font-semibold">Mapa de tendencias</h2>
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-dark-muted">
-                  Analisis snapshot-driven con scoring interpretable, clusterizacion hibrida y detalle
-                  explicable por cluster.
+                  Analisis snapshot-driven con scoring interpretable, clusterizacion hibrida y detalle explicable por cluster.
                 </p>
               </div>
               @if (service.data()?.methodology_version) {
@@ -88,7 +87,7 @@ const TABS: Tab[] = [
                   <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-3">
                     <p class="text-sm font-medium text-dark-text">{{ card.label }}</p>
                     <p class="mt-1 text-xs text-dark-muted">
-                      Impacto {{ card.impact_score | number:'1.0-0' }} | Momentum
+                      Impacto {{ card.impact_score | number:'1.0-0' }} | Dinamica
                       {{ card.momentum_score | number:'1.0-0' }}
                     </p>
                   </div>
@@ -137,9 +136,7 @@ const TABS: Tab[] = [
                 }
                 @case ('hype') {
                   <app-hype-cycle
-                    [clusters]="service.filteredClusters()"
-                    [selectedStage]="service.filterHypeStage()"
-                    (stageSelected)="service.setFilterHypeStage($event)"
+                    [clusters]="service.data()?.clusters ?? []"
                     (clusterSelected)="service.selectCluster($event)"
                   />
                 }
@@ -205,7 +202,7 @@ export class TrendmapComponent implements OnInit {
 
   readonly showSidebar = computed(() => {
     const tab = this.activeTab();
-    return tab !== 'metodologia';
+    return tab === 'mapa' || tab === 'detalle';
   });
 
   readonly selectedOrFilteredArticles = computed(() => {

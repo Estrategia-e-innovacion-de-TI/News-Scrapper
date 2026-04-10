@@ -131,14 +131,14 @@ export class TrendmapSignalService {
   readonly activeFilterSummary = computed(() => {
     const active: string[] = [];
     if (this.filterCategory()) active.push(`Categoría: ${this.filterCategory()}`);
-    if (this.filterSourceType()) active.push(`Fuente: ${this.filterSourceType()}`);
+    if (this.filterSourceType()) active.push(`Fuente: ${this.sourceTypeLabel(this.filterSourceType()!)}`);
     if (this.filterMaturityStage()) active.push(`Madurez: ${this.filterMaturityStage()}`);
     if (this.filterHypeStage()) active.push(`Hype: ${this.filterHypeStage()}`);
     if (this.filterImpactBand()) active.push(`Impacto: ${this.filterImpactBand()}`);
     if (this.filterSignalState()) active.push(`Estado: ${this.filterSignalState()}`);
     if (this.filterComparativeStatus()) active.push(`Comparativo: ${this.filterComparativeStatus()}`);
     if (this.filterNoveltyBand()) active.push(`Novedad: ${this.filterNoveltyBand()}`);
-    if (this.weakSignalsOnly()) active.push('Solo weak signals');
+    if (this.weakSignalsOnly()) active.push('Solo señales tempranas');
     active.push(`Orden: ${this.sortBy()}`);
     return active;
   });
@@ -254,5 +254,18 @@ export class TrendmapSignalService {
     if (score >= 70) return 'high';
     if (score >= 45) return 'medium';
     return 'low';
+  }
+
+  private sourceTypeLabel(sourceType: string): string {
+    const labels: Record<string, string> = {
+      news: 'Noticias',
+      rss: 'Articulos y blogs',
+      paper: 'Articulos academicos',
+      pdf: 'Documentos tecnicos',
+      patent: 'Patentes',
+      institutional_report: 'Reportes institucionales',
+    };
+
+    return labels[sourceType] ?? sourceType.replaceAll('_', ' ');
   }
 }

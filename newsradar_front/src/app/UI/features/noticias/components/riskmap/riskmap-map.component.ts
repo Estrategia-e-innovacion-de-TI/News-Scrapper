@@ -17,7 +17,7 @@ type RiskBand = 'low' | 'medium' | 'high';
           <div class="flex items-center justify-between gap-3">
             <div>
               <h4 class="text-sm font-semibold text-dark-text">Filtros</h4>
-              <p class="mt-1 text-xs text-dark-muted">Categoria, fuente, stage y orden.</p>
+              <p class="mt-1 text-xs text-dark-muted">Categoria, fuente, etapa y orden.</p>
             </div>
             <button
               class="rounded-full border border-dark-border bg-dark-bg px-3 py-1 text-[11px] text-dark-muted"
@@ -44,7 +44,7 @@ type RiskBand = 'low' | 'medium' | 'high';
             </label>
 
             <label class="grid gap-1">
-              <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Tipo fuente</span>
+              <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Tipo de fuente</span>
               <select
                 class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
                 [value]="filterSourceType() ?? ''"
@@ -58,7 +58,7 @@ type RiskBand = 'low' | 'medium' | 'high';
             </label>
 
             <label class="grid gap-1">
-              <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Stage</span>
+              <span class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Etapa</span>
               <select
                 class="rounded-xl border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text"
                 [value]="filterHypeStage() ?? ''"
@@ -121,7 +121,7 @@ type RiskBand = 'low' | 'medium' | 'high';
               (change)="weakSignalsChanged.emit(onCheckboxValue($event))"
             />
             <span>
-              <span class="block text-sm text-dark-text">Solo weak signals</span>
+              <span class="block text-sm text-dark-text">Solo señales tempranas</span>
               <span class="block text-xs text-dark-muted">Riesgos pequenos con alta novedad.</span>
             </span>
           </label>
@@ -149,11 +149,11 @@ type RiskBand = 'low' | 'medium' | 'high';
                     <p class="mt-1 font-medium text-dark-text">{{ cluster.risk_severity | number:'1.0-0' }}</p>
                   </div>
                   <div class="rounded-lg bg-dark-bg/70 px-2 py-2">
-                    <p class="text-dark-muted">Momentum</p>
+                    <p class="text-dark-muted">Dinamica</p>
                     <p class="mt-1 font-medium text-dark-text">{{ cluster.momentum_score | number:'1.0-0' }}</p>
                   </div>
                   <div class="rounded-lg bg-dark-bg/70 px-2 py-2">
-                    <p class="text-dark-muted">Docs</p>
+                    <p class="text-dark-muted">Documentos</p>
                     <p class="mt-1 font-medium text-dark-text">{{ cluster.item_count }}</p>
                   </div>
                 </div>
@@ -166,9 +166,9 @@ type RiskBand = 'low' | 'medium' | 'high';
       <section class="rounded-2xl border border-dark-border bg-white p-5 shadow-sm">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h4 class="text-sm font-semibold text-dark-text">Mapa de clusterizacion</h4>
+            <h4 class="text-sm font-semibold text-dark-text">Mapa de agrupaciones</h4>
             <p class="mt-1 text-xs leading-5 text-dark-muted">
-              Proyeccion semantica de clusters de riesgo. Tamano por volumen y color por categoria.
+              Proyeccion semantica de agrupaciones de riesgo. Tamano por volumen y color por categoria.
             </p>
           </div>
         </div>
@@ -193,7 +193,7 @@ type RiskBand = 'low' | 'medium' | 'high';
                 [attr.stroke]="selectedCluster()?.cluster_id === point.cluster.cluster_id ? '#2c2a29' : '#e2e8f0'"
                 [attr.stroke-width]="selectedCluster()?.cluster_id === point.cluster.cluster_id ? 2 : 1.2"
               >
-                <title>{{ point.cluster.label }}&#10;Categoria: {{ point.cluster.category }}&#10;Docs: {{ point.cluster.item_count }}&#10;Severidad: {{ point.cluster.risk_severity | number:'1.0-0' }}&#10;Momentum: {{ point.cluster.momentum_score | number:'1.0-0' }}</title>
+                <title>{{ point.cluster.label }}&#10;Categoria: {{ point.cluster.category }}&#10;Documentos: {{ point.cluster.item_count }}&#10;Severidad: {{ point.cluster.risk_severity | number:'1.0-0' }}&#10;Dinamica: {{ point.cluster.momentum_score | number:'1.0-0' }}</title>
               </circle>
               @if (point.r >= 12) {
                 <text [attr.x]="point.x" [attr.y]="point.y - point.r - 8" text-anchor="middle" [attr.fill]="theme.text" font-size="9">

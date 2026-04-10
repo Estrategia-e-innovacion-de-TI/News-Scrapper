@@ -1,7 +1,16 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, input, output } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 
 import { RiskSignal, RiskmapCluster, RiskmapData } from '../../../../../domain/noticias/models';
+
+interface MethodologyCard {
+  label: string;
+  value: string | number;
+  suffix?: string;
+  help: string;
+  interpretation: string;
+  interpretClass: string;
+}
 
 @Component({
   selector: 'app-riskmap-overview',
@@ -38,22 +47,26 @@ import { RiskSignal, RiskmapCluster, RiskmapData } from '../../../../../domain/n
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
           <h4 class="text-sm font-semibold text-dark-text">Cobertura metodologica</h4>
           <div class="mt-4 grid grid-cols-2 gap-3">
-            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Coherencia</p>
-              <p class="mt-2 text-xl font-semibold text-dark-text">{{ data().quality_checks?.cluster_coherence_avg ?? 0 }}</p>
-            </div>
-            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Calidad</p>
-              <p class="mt-2 text-xl font-semibold text-dark-text">{{ data().quality_checks?.cluster_quality_avg ?? 0 }}</p>
-            </div>
-            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Taxonomia</p>
-              <p class="mt-2 text-xl font-semibold text-dark-text">{{ data().quality_checks?.taxonomy_coverage ?? 0 }}%</p>
-            </div>
-            <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
-              <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">Weak signals</p>
-              <p class="mt-2 text-xl font-semibold text-dark-text">{{ data().quality_checks?.weak_signal_clusters ?? 0 }}</p>
-            </div>
+            @for (card of methodologyMetrics(); track card.label) {
+              <div class="rounded-xl border border-dark-border bg-dark-bg/70 p-3">
+                <div class="flex items-center justify-between gap-1">
+                  <p class="text-[11px] uppercase tracking-[0.18em] text-dark-muted">{{ card.label }}</p>
+                  <button
+                    class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-dark-border bg-dark-surface text-[9px] font-bold text-dark-muted hover:bg-dark-bg"
+                    type="button"
+                    [attr.title]="card.help"
+                  >
+                    i
+                  </button>
+                </div>
+                <p class="mt-2 text-xl font-semibold text-dark-text">
+                  {{ card.value }}{{ card.suffix ?? '' }}
+                </p>
+                <p class="mt-1 text-xs leading-4" [class]="card.interpretClass">
+                  {{ card.interpretation }}
+                </p>
+              </div>
+            }
           </div>
         </section>
       </div>
@@ -61,7 +74,7 @@ import { RiskSignal, RiskmapCluster, RiskmapData } from '../../../../../domain/n
       <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
         <h4 class="text-sm font-semibold text-dark-text">Cluster cards de riesgo</h4>
         <p class="mt-1 text-xs text-dark-muted">
-          Lectura priorizada por severidad, momentum, persistencia y novedad.
+          Lectura priorizada por severidad, dinamica, persistencia y novedad.
         </p>
         <div class="mt-4 grid gap-4 xl:grid-cols-3">
           @for (cluster of clusters().slice(0, 6); track cluster.cluster_id) {
@@ -93,7 +106,7 @@ import { RiskSignal, RiskmapCluster, RiskmapData } from '../../../../../domain/n
                   <p class="mt-1 font-medium text-dark-text">{{ cluster.impact_score | number:'1.0-0' }}</p>
                 </div>
                 <div class="rounded-lg bg-dark-surface px-2 py-2">
-                  <p class="text-dark-muted">Momentum</p>
+                  <p class="text-dark-muted">Dinamica</p>
                   <p class="mt-1 font-medium text-dark-text">{{ cluster.momentum_score | number:'1.0-0' }}</p>
                 </div>
                 <div class="rounded-lg bg-dark-surface px-2 py-2">
@@ -146,7 +159,7 @@ import { RiskSignal, RiskmapCluster, RiskmapData } from '../../../../../domain/n
         </section>
 
         <section class="min-w-0 overflow-hidden rounded-2xl border border-dark-border bg-dark-surface p-5">
-          <h4 class="text-sm font-semibold text-dark-text">Senales e insights</h4>
+          <h4 class="text-sm font-semibold text-dark-text">Señales y hallazgos</h4>
           <div class="mt-4 space-y-3">
             @for (signal of topSignals().slice(0, 5); track signal.type + signal.description) {
               <div class="rounded-xl border border-dark-border bg-dark-bg/60 p-3">
@@ -163,7 +176,7 @@ import { RiskSignal, RiskmapCluster, RiskmapData } from '../../../../../domain/n
 
       <div class="grid gap-6 xl:grid-cols-2">
         <section class="rounded-2xl border border-dark-border bg-dark-surface p-5">
-          <h4 class="text-sm font-semibold text-dark-text">Insights</h4>
+          <h4 class="text-sm font-semibold text-dark-text">Hallazgos clave</h4>
           <div class="mt-4 space-y-3">
             @for (item of data().insights; track item) {
               <div class="rounded-xl border border-dark-border bg-dark-bg/60 px-3 py-3 text-sm leading-6 text-dark-text/90">
@@ -192,12 +205,69 @@ export class RiskmapOverviewComponent {
   readonly clusters = input.required<RiskmapCluster[]>();
   readonly clusterSelected = output<RiskmapCluster>();
 
+  readonly methodologyMetrics = computed((): MethodologyCard[] => {
+    const qc = this.data().quality_checks;
+    if (!qc) return [];
+    const coherence = qc.cluster_coherence_avg ?? 0;
+    const quality = qc.cluster_quality_avg ?? 0;
+    const taxonomy = qc.taxonomy_coverage ?? 0;
+    const weakSignals = qc.weak_signal_clusters ?? 0;
+    const coverage = qc.cluster_coverage ?? (100 - (qc.unclustered_ratio ?? 0));
+    const stability = qc.stability_score_avg ?? 0;
+    return [
+      {
+        label: 'Coherencia',
+        value: coherence,
+        help: 'Homogeneidad semantica de los clusters. Valores altos indican que los articulos dentro de cada cluster son muy similares entre si.',
+        interpretation: this.interpretScore(coherence, 60, 80),
+        interpretClass: this.interpretClass(coherence, 60, 80),
+      },
+      {
+        label: 'Calidad promedio',
+        value: quality,
+        help: 'Puntaje medio de calidad analitica por cluster. Combina coherencia, cobertura y señal.',
+        interpretation: this.interpretScore(quality, 55, 75),
+        interpretClass: this.interpretClass(quality, 55, 75),
+      },
+      {
+        label: 'Taxonomia',
+        value: taxonomy,
+        suffix: '%',
+        help: 'Porcentaje de clusters que tienen al menos un match en la taxonomia de riesgos. Indica que tan bien cubierto esta el espacio de riesgo definido.',
+        interpretation: this.interpretScore(taxonomy, 50, 75),
+        interpretClass: this.interpretClass(taxonomy, 50, 75),
+      },
+      {
+        label: 'Señales tempranas',
+        value: weakSignals,
+        help: 'Numero de clusters clasificados como señales debiles: bajo volumen pero alta novedad. Son riesgos emergentes que aun no tienen masa critica.',
+        interpretation: weakSignals > 5 ? 'Alto numero de señales tempranas: radar amplio.' : weakSignals > 0 ? 'Algunas señales emergentes detectadas.' : 'Sin señales tempranas en este ciclo.',
+        interpretClass: weakSignals > 0 ? 'text-amber-600' : 'text-emerald-600',
+      },
+      {
+        label: 'Cobertura',
+        value: coverage,
+        suffix: '%',
+        help: 'Porcentaje de documentos que quedaron asignados a algun cluster. Un valor alto indica que el motor clasifico bien la mayor parte del corpus.',
+        interpretation: this.interpretScore(coverage, 60, 80),
+        interpretClass: this.interpretClass(coverage, 60, 80),
+      },
+      {
+        label: 'Estabilidad',
+        value: stability,
+        help: 'Consistencia de los clusters entre snapshots anteriores. Valores altos indican que los mismos riesgos persisten en el tiempo.',
+        interpretation: this.interpretStability(stability),
+        interpretClass: stability >= 50 ? 'text-emerald-600' : stability >= 30 ? 'text-amber-600' : 'text-rose-600',
+      },
+    ];
+  });
+
   kpis() {
     const data = this.data();
     return [
       { label: 'Documentos', value: data.summary.total_documents ?? data.meta.total_filtered },
       { label: 'Clusters', value: data.meta.total_clusters },
-      { label: 'Weak', value: data.quality_checks?.weak_signal_clusters ?? 0 },
+      { label: 'Señales tempranas', value: data.quality_checks?.weak_signal_clusters ?? 0 },
       { label: 'Taxonomia', value: `${data.quality_checks?.taxonomy_coverage ?? 0}%` },
       { label: 'Sin cluster', value: data.summary.unclustered_documents ?? 0 },
       { label: 'Fuentes', value: data.filters_metadata?.sources.length ?? 0 },
@@ -245,5 +315,23 @@ export class RiskmapOverviewComponent {
     if (value === 'H') return base + 'border-rose-500 bg-rose-50 text-rose-700';
     if (value === 'M') return base + 'border-yellow-500 bg-yellow-100 text-yellow-900';
     return base + 'border-sky-500 bg-sky-50 text-sky-700';
+  }
+
+  private interpretScore(value: number, lowThreshold: number, highThreshold: number): string {
+    if (value >= highThreshold) return 'Nivel alto: calidad analitica solida.';
+    if (value >= lowThreshold) return 'Nivel medio: resultado aceptable.';
+    return 'Nivel bajo: puede mejorar con mas datos.';
+  }
+
+  private interpretClass(value: number, low: number, high: number): string {
+    if (value >= high) return 'text-emerald-600';
+    if (value >= low) return 'text-amber-600';
+    return 'text-rose-600';
+  }
+
+  private interpretStability(value: number): string {
+    if (value >= 60) return 'Alta: los riesgos son persistentes y recurrentes.';
+    if (value >= 30) return 'Media: algunos riesgos cambian entre ciclos.';
+    return 'Baja: señales muy volatiles o primer snapshot.';
   }
 }

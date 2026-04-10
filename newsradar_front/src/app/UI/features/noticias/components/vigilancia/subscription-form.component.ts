@@ -10,20 +10,20 @@ import { TopicItem } from '../../../../../domain/noticias/models';
   template: `
     <form [formGroup]="form" (ngSubmit)="onSubmit()" aria-label="Suscripción a vigilancia tecnológica">
       <fieldset>
-        <legend class="text-sm font-semibold mb-3">Datos del suscriptor</legend>
+        <legend class="mb-3 text-sm font-semibold text-dark-text">Datos del suscriptor</legend>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label for="vigilancia-email" class="block text-sm mb-1">Email</label>
+            <label for="vigilancia-email" class="mb-1 block text-sm text-dark-text">Correo</label>
             <input id="vigilancia-email" type="email" formControlName="email"
-              class="w-full border rounded px-3 py-2 text-sm" placeholder="usuario&#64;empresa.com" />
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm" placeholder="usuario&#64;empresa.com" />
             @if (form.get('email')?.touched && form.get('email')?.invalid) {
               <p class="text-red-500 text-xs mt-1">Ingrese un email válido.</p>
             }
           </div>
           <div>
-            <label for="vigilancia-name" class="block text-sm mb-1">Nombre</label>
+            <label for="vigilancia-name" class="mb-1 block text-sm text-dark-text">Nombre</label>
             <input id="vigilancia-name" formControlName="name"
-              class="w-full border rounded px-3 py-2 text-sm" placeholder="Nombre completo" />
+              class="w-full rounded-xl border border-dark-border px-3 py-2 text-sm" placeholder="Nombre completo" />
             @if (form.get('name')?.touched && form.get('name')?.invalid) {
               <p class="text-red-500 text-xs mt-1">El nombre es obligatorio.</p>
             }
@@ -32,12 +32,33 @@ import { TopicItem } from '../../../../../domain/noticias/models';
       </fieldset>
 
       <fieldset class="mt-4">
-        <legend class="text-sm font-semibold mb-3">Temas de interés</legend>
-        <div formArrayName="selectedGroups" class="space-y-1">
+        <legend class="mb-3 text-sm font-semibold text-dark-text">Temas de interes</legend>
+        <p class="mb-3 text-xs leading-5 text-dark-muted">
+          Cada tema incluye los subterminos principales que se usan para construir la vigilancia.
+        </p>
+        <div formArrayName="selectedGroups" class="space-y-3">
           @for (topic of topics(); track topic.group_id; let i = $index) {
-            <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" [formControlName]="i" />
-              {{ topic.display_name }} ({{ topic.term_count }} términos)
+            <label class="block cursor-pointer rounded-2xl border border-dark-border bg-white p-4 transition hover:border-yellow-400 hover:bg-yellow-50">
+              <div class="flex items-start gap-3">
+                <input class="mt-1" type="checkbox" [formControlName]="i" />
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-semibold text-dark-text">{{ topic.display_name }}</span>
+                    <span class="rounded-full border border-dark-border bg-dark-bg px-2 py-0.5 text-[11px] text-dark-muted">
+                      {{ topic.term_count }} subterminos
+                    </span>
+                  </div>
+                  @if ((topic.terms?.length ?? 0) > 0) {
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      @for (term of (topic.terms ?? []); track term) {
+                        <span class="rounded-full border border-dark-border bg-dark-surface px-2 py-1 text-[11px] leading-4 text-dark-muted">
+                          {{ term }}
+                        </span>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
             </label>
           }
         </div>
@@ -51,7 +72,7 @@ import { TopicItem } from '../../../../../domain/noticias/models';
       }
 
       <button type="submit" [disabled]="loading()"
-        class="mt-4 px-4 py-2 bg-yellow-400 text-black rounded text-sm font-medium disabled:opacity-50">
+        class="mt-4 rounded-full bg-yellow-400 px-4 py-2 text-sm font-medium text-black disabled:opacity-50">
         @if (loading()) {
           Suscribiendo...
         } @else {

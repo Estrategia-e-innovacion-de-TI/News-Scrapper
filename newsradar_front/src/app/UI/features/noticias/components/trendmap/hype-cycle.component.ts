@@ -5,6 +5,7 @@ import {
   effect,
   input,
   output,
+  signal,
   viewChild,
 } from '@angular/core';
 import * as d3 from 'd3';
@@ -30,13 +31,13 @@ const STAGE_ORDER: LifecycleStage[] = [
 ];
 
 const STAGE_LABELS: Record<LifecycleStage, string> = {
-  weak_signal: 'Weak Signal',
-  innovation_trigger: 'Innovation Trigger',
-  rising_attention: 'Rising Attention',
-  peak_visibility: 'Peak Visibility',
-  correction: 'Correction',
-  consolidation: 'Consolidation',
-  productive_adoption: 'Productive Adoption',
+  weak_signal: 'Señal temprana',
+  innovation_trigger: 'Disparador de innovacion',
+  rising_attention: 'Atencion creciente',
+  peak_visibility: 'Pico de visibilidad',
+  correction: 'Correccion',
+  consolidation: 'Consolidacion',
+  productive_adoption: 'Adopcion productiva',
 };
 
 const STAGE_X: Record<LifecycleStage, number> = {
@@ -61,9 +62,14 @@ const STAGE_Y: Record<LifecycleStage, number> = {
 
 interface HypePoint {
   cluster: TrendmapCluster;
+  stage: LifecycleStage;
+  baseX: number;
+  baseY: number;
   x: number;
   y: number;
   radius: number;
+  labelLines: string[];
+  showLabel: boolean;
 }
 
 @Component({
@@ -75,8 +81,9 @@ interface HypePoint {
         <div>
           <h4 class="text-sm font-semibold text-dark-text">Hype cycle operativo</h4>
           <p class="mt-1 text-xs leading-5 text-dark-muted">
-            La etapa sale de madurez, impacto, momentum, novedad e incertidumbre. Haz hover
-            sobre una etapa o burbuja para ver el detalle; si hay puntos apilados veras el grupo completo.
+            La etapa se deriva de madurez, impacto, dinamica, novedad e incertidumbre. Pasa el cursor
+            sobre una etapa o burbuja para ver el detalle; la grafica separa burbujas automaticamente y muestra
+            etiquetas solo donde hay espacio suficiente.
           </p>
         </div>
         <button
@@ -110,21 +117,21 @@ interface HypePoint {
 })
 export class HypeCycleComponent implements AfterViewInit {
   readonly clusters = input<TrendmapCluster[]>([]);
-  readonly selectedStage = input<LifecycleStage | null>(null);
   readonly chartRef = viewChild.required<ElementRef<SVGSVGElement>>('chart');
 
-  readonly stageSelected = output<LifecycleStage | null>();
   readonly clusterSelected = output<TrendmapCluster | null>();
 
   readonly width = WIDTH;
   readonly height = HEIGHT;
   readonly stageOrder = STAGE_ORDER;
+  readonly activeStage = signal<LifecycleStage | null>(null);
 
   private initialized = false;
   private tooltip: HTMLDivElement | null = null;
 
   constructor() {
     effect(() => {
+      this.activeStage();
       if (this.initialized) {
         this.render(this.clusters());
       }
@@ -145,7 +152,7 @@ export class HypeCycleComponent implements AfterViewInit {
   }
 
   stageChipClass(stage: LifecycleStage): string {
-    const selected = this.selectedStage() === stage;
+    const selected = this.activeStage() === stage;
     if (selected) {
       return 'border-yellow-500 bg-yellow-100 text-dark-text shadow-sm';
     }
@@ -153,7 +160,7 @@ export class HypeCycleComponent implements AfterViewInit {
   }
 
   toggleStage(stage: LifecycleStage | null): void {
-    this.stageSelected.emit(this.selectedStage() === stage ? null : stage);
+    this.activeStage.set(this.activeStage() === stage ? null : stage);
   }
 
   private render(clusters: TrendmapCluster[]): void {
@@ -164,7 +171,10 @@ export class HypeCycleComponent implements AfterViewInit {
       return;
     }
 
-    const selectedStage = this.selectedStage();
+    const selectedStage = this.activeStage();
+    const visibleClusters = selectedStage
+      ? clusters.filter((cluster) => cluster.hype_stage === selectedStage)
+      : clusters;
     svg
       .append('rect')
       .attr('width', WIDTH)
@@ -276,48 +286,79 @@ export class HypeCycleComponent implements AfterViewInit {
 
     const radius = d3
       .scaleSqrt()
-      .domain([0, d3.max(clusters, (cluster) => cluster.item_count) ?? 1])
+      .domain([0, d3.max(visibleClusters, (cluster) => cluster.item_count) ?? 1])
       .range([7, 26]);
 
-    const color = d3.scaleOrdinal<string, string>([
-      '#0057b8',
-      '#f6c600',
-      '#00a86b',
-      '#f97316',
-      '#475569',
-      '#0ea5e9',
-      '#dc2626',
-      '#7c3aed',
-    ]);
-    const stageCounts = new Map<LifecycleStage, number>();
-    const placedPoints: HypePoint[] = [];
-
-    clusters.forEach((cluster) => {
+    const orderedCategories = [...new Set(visibleClusters.map((cluster) => cluster.category))];
+    const color = d3.scaleOrdinal<string, string>(d3.schemeTableau10).domain(orderedCategories);
+    const stageBoundaryMap = new Map(stageBandBoundaries.map((band) => [band.stage, band]));
+    const placedPoints: HypePoint[] = visibleClusters.map((cluster) => {
       const stage = cluster.hype_stage;
-      const currentCount = stageCounts.get(stage) ?? 0;
-      stageCounts.set(stage, currentCount + 1);
-
-      const baseX = x(STAGE_X[stage]);
-      const baseY = y(STAGE_Y[stage]);
-      const jitterX = ((currentCount % 4) - 1.5) * 18;
-      const jitterY = Math.floor(currentCount / 4) * 16 - cluster.momentum_score * 0.15;
-      const bubbleX = baseX + jitterX;
-      const bubbleY = baseY + jitterY;
-      const bubbleRadius = radius(cluster.item_count);
       const point: HypePoint = {
         cluster,
-        x: bubbleX,
-        y: bubbleY,
-        radius: bubbleRadius,
+        stage,
+        baseX: x(STAGE_X[stage]),
+        baseY: y(STAGE_Y[stage]) - cluster.momentum_score * 0.12,
+        x: x(STAGE_X[stage]),
+        y: y(STAGE_Y[stage]) - cluster.momentum_score * 0.12,
+        radius: radius(cluster.item_count),
+        labelLines: this.wrapLabel(cluster.label, 18, 2),
+        showLabel: false,
       };
-      placedPoints.push(point);
+      return point;
+    });
+
+    const simulation = d3
+      .forceSimulation(placedPoints)
+      .force('x', d3.forceX<HypePoint>((point) => point.baseX).strength(0.28))
+      .force('y', d3.forceY<HypePoint>((point) => point.baseY).strength(0.22))
+      .force('collide', d3.forceCollide<HypePoint>((point) => point.radius + 4).iterations(3))
+      .stop();
+
+    for (let tick = 0; tick < 220; tick += 1) {
+      simulation.tick();
+      placedPoints.forEach((point) => {
+        const bounds = stageBoundaryMap.get(point.stage);
+        if (!bounds) {
+          return;
+        }
+        point.x = Math.max(bounds.start + point.radius + 6, Math.min(bounds.end - point.radius - 6, point.x));
+        point.y = Math.max(MARGIN.top + point.radius + 6, Math.min(HEIGHT - MARGIN.bottom - point.radius - 14, point.y));
+      });
+    }
+
+    const occupiedLabelRects: Array<{ left: number; right: number; top: number; bottom: number }> = [];
+    [...placedPoints]
+      .sort((a, b) => b.radius - a.radius || b.cluster.impact_score - a.cluster.impact_score)
+      .forEach((point) => {
+        if (point.radius < 10) {
+          return;
+        }
+        const maxLineLength = Math.max(...point.labelLines.map((line) => line.length), 0);
+        const labelWidth = maxLineLength * 6.2 + 14;
+        const labelHeight = point.labelLines.length * 12 + 8;
+        const left = point.x - labelWidth / 2;
+        const right = point.x + labelWidth / 2;
+        const bottom = point.y - point.radius - 8;
+        const top = bottom - labelHeight;
+        const insideChart = left >= MARGIN.left && right <= WIDTH - MARGIN.right && top >= MARGIN.top;
+        const overlaps = occupiedLabelRects.some((rect) => !(right < rect.left || left > rect.right || bottom < rect.top || top > rect.bottom));
+        if (insideChart && !overlaps) {
+          point.showLabel = true;
+          occupiedLabelRects.push({ left, right, top, bottom });
+        }
+      });
+
+    placedPoints.forEach((point) => {
+      const cluster = point.cluster;
+      const stage = point.stage;
 
       const group = svg.append('g').style('cursor', 'pointer');
       group
         .append('circle')
-        .attr('cx', bubbleX)
-        .attr('cy', bubbleY)
-        .attr('r', bubbleRadius)
+        .attr('cx', point.x)
+        .attr('cy', point.y)
+        .attr('r', point.radius)
         .attr('fill', color(cluster.category))
         .attr('fill-opacity', 0.9)
         .attr('stroke', selectedStage === stage ? '#2c2a29' : '#ffffff')
@@ -337,15 +378,49 @@ export class HypeCycleComponent implements AfterViewInit {
           this.clusterSelected.emit(cluster);
         });
 
-      if (bubbleRadius >= 12) {
+      if (point.showLabel) {
         group
+          .append('line')
+          .attr('x1', point.x)
+          .attr('x2', point.x)
+          .attr('y1', point.y - point.radius - 2)
+          .attr('y2', point.y - point.radius - 12)
+          .attr('stroke', color(cluster.category))
+          .attr('stroke-opacity', 0.45)
+          .attr('stroke-width', 1);
+
+        const labelGroup = group
+          .append('g')
+          .attr('transform', `translate(${point.x}, ${point.y - point.radius - 16})`)
+          .attr('pointer-events', 'none');
+
+        const labelText = labelGroup
           .append('text')
-          .attr('x', bubbleX)
-          .attr('y', bubbleY - bubbleRadius - 8)
           .attr('text-anchor', 'middle')
           .attr('fill', DARK_THEME.text)
-          .attr('font-size', '8px')
-          .text(cluster.label.length > 22 ? `${cluster.label.slice(0, 22)}...` : cluster.label);
+          .attr('font-size', '9.5px')
+          .attr('font-weight', '600');
+
+        point.labelLines.forEach((line, index) => {
+          labelText
+            .append('tspan')
+            .attr('x', 0)
+            .attr('dy', index === 0 ? `${-(point.labelLines.length - 1) * 0.55}em` : '1.1em')
+            .text(line);
+        });
+
+        const bounds = (labelText.node() as SVGTextElement).getBBox();
+        labelGroup
+          .insert('rect', 'text')
+          .attr('x', bounds.x - 6)
+          .attr('y', bounds.y - 3)
+          .attr('width', bounds.width + 12)
+          .attr('height', bounds.height + 6)
+          .attr('rx', 6)
+          .attr('fill', 'rgba(255, 255, 255, 0.94)')
+          .attr('stroke', '#e2e8f0')
+          .attr('stroke-opacity', 0.9)
+          .attr('stroke-width', 0.9);
       }
     });
   }
@@ -389,7 +464,7 @@ export class HypeCycleComponent implements AfterViewInit {
           <div style="border-top:1px solid #e2e8f0; margin-top:8px; padding-top:8px;">
             <div style="font-weight:700; color:#2c2a29;">${this.escapeHtml(cluster.label)}</div>
             <div style="color:#64748b;">${this.escapeHtml(cluster.category)} | ${this.escapeHtml(this.stageLabel(cluster.hype_stage))}</div>
-            <div style="margin-top:4px;">Impacto ${cluster.impact_score.toFixed(0)} | Madurez ${cluster.maturity_score.toFixed(0)} | Momentum ${cluster.momentum_score.toFixed(0)}</div>
+            <div style="margin-top:4px;">Impacto ${cluster.impact_score.toFixed(0)} | Madurez ${cluster.maturity_score.toFixed(0)} | Dinamica ${cluster.momentum_score.toFixed(0)}</div>
             <div style="margin-top:4px; color:#475569;">${this.escapeHtml(cluster.executive_takeaway || cluster.summary)}</div>
           </div>
         `)
@@ -408,9 +483,9 @@ export class HypeCycleComponent implements AfterViewInit {
       <div style="font-weight:700; color:#2c2a29;">${this.escapeHtml(primary.label)}</div>
       <div style="margin-top:2px; color:#64748b;">${this.escapeHtml(primary.category)} | ${this.escapeHtml(this.stageLabel(primary.hype_stage))}</div>
       <div style="margin-top:8px;">
-        Impacto ${primary.impact_score.toFixed(0)} | Madurez ${primary.maturity_score.toFixed(0)} | Momentum ${primary.momentum_score.toFixed(0)}
+        Impacto ${primary.impact_score.toFixed(0)} | Madurez ${primary.maturity_score.toFixed(0)} | Dinamica ${primary.momentum_score.toFixed(0)}
       </div>
-      <div>Docs ${primary.item_count} | Calidad ${primary.cluster_quality.score.toFixed(0)}</div>
+      <div>Documentos ${primary.item_count} | Calidad ${primary.cluster_quality.score.toFixed(0)}</div>
       <div style="margin-top:8px; color:#475569;">${this.escapeHtml(primary.executive_takeaway || primary.summary)}</div>
       <div style="margin-top:8px; color:#64748b;">${this.escapeHtml(keywords)}</div>
     `;
@@ -449,9 +524,39 @@ export class HypeCycleComponent implements AfterViewInit {
       const dx = point.x - target.x;
       const dy = point.y - target.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      return point.cluster.hype_stage === target.cluster.hype_stage
+      return point.stage === target.stage
         && distance <= Math.max(34, point.radius + target.radius + 6);
     });
+  }
+
+  private wrapLabel(label: string, maxCharsPerLine: number, maxLines: number): string[] {
+    const words = label.split(/\s+/);
+    const lines: string[] = [];
+    let currentLine = '';
+
+    words.forEach((word) => {
+      const candidate = currentLine ? `${currentLine} ${word}` : word;
+      if (candidate.length <= maxCharsPerLine) {
+        currentLine = candidate;
+        return;
+      }
+
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      currentLine = word.length > maxCharsPerLine ? `${word.slice(0, maxCharsPerLine - 1)}…` : word;
+    });
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    const limited = lines.slice(0, maxLines);
+    if (lines.length > maxLines) {
+      const last = limited[maxLines - 1];
+      limited[maxLines - 1] = last.endsWith('…') ? last : `${last.slice(0, Math.max(0, maxCharsPerLine - 1))}…`;
+    }
+    return limited;
   }
 
   private escapeHtml(value: string): string {

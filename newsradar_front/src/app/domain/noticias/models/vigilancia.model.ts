@@ -2,6 +2,7 @@ export interface TopicItem {
   group_id: string;
   display_name: string;
   term_count: number;
+  terms?: string[];
 }
 
 export interface SubscribeRequest {
